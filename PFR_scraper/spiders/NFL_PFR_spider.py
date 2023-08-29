@@ -1,5 +1,5 @@
 from scrapy import Spider
-from NFL_PFR.item import NFL_ProFootballReference
+from PFR_scraper.item import NFL_ProFootballReference
 import pandas as pd
 
 class NFLSpider(Spider):

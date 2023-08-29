@@ -9,7 +9,7 @@ from itemadapter import ItemAdapter
 
 class WriteItemPipeline(object):
 	def __init__(self):
-		self.filename = 'NFL_wk_by_wk.csv'
+		self.filename = 'data/NFL_wk_by_wk.csv'
 	def open_spider(self, spider):
 		self.file = open(self.filename, 'w')
 	def close_spider(self, spider):
