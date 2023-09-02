@@ -1,4 +1,4 @@
-# Scrapy settings for NFL_PFR project
+# Scrapy settings for PFR_scraper project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -7,10 +7,10 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'NFL_PFR'
+BOT_NAME = 'PFR_scraper'
 
-SPIDER_MODULES = ['NFL_PFR.spiders']
-NEWSPIDER_MODULE = 'NFL_PFR.spiders'
+SPIDER_MODULES = ['PFR_scraper.spiders']
+NEWSPIDER_MODULE = 'PFR_scraper.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
@@ -45,13 +45,13 @@ DOWNLOAD_DELAY = 3
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    'NFL_PFR.middlewares.NflPfrSpiderMiddleware': 543,
+#    'PFR_scraper.middlewares.NflPfrSpiderMiddleware': 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    'NFL_PFR.middlewares.NflPfrDownloaderMiddleware': 543,
+#    'PFR_scraper.middlewares.NflPfrDownloaderMiddleware': 543,
 #}
 
 # Enable or disable extensions
@@ -62,7 +62,7 @@ DOWNLOAD_DELAY = 3
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-ITEM_PIPELINES = {'NFL_PFR.pipelines.WriteItemPipeline': 100,}
+ITEM_PIPELINES = {'PFR_scraper.pipelines.WriteItemPipeline': 100,}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

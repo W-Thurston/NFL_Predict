@@ -22,4 +22,6 @@ class NFL_ProFootballReference(Item):
 	yards_lose 		 = Field()	# Yards gained by losing team
 	to_lose  		 = Field()	# Turnovers by the losing team
 	year			 = Field()  # Year (ex: '18-'19)
+	stadium          = Field()  # The name of the stadium the game was played in
+	game_info        = Field()  # The Roof type, field surface type, and weather at kickoff
 		

@@ -1,6 +1,6 @@
 from scrapy import Spider
 from PFR_scraper.item import NFL_ProFootballReference
-import pandas as pd
+
 
 class NFLSpider(Spider):
 	name = 'TwitterBot'
@@ -46,6 +46,8 @@ class NFLSpider(Spider):
 			item['yards_lose'] 		 = yards_lose 		# Yards gained by losing team
 			item['to_lose'] 		 = to_lose   		# Turnovers by the losing team
 			item['year']			 = str(response.url)[-12:-10]+"-"+str(int(str(response.url)[-12:-10])+1)
+
+
 
 			yield item
 
