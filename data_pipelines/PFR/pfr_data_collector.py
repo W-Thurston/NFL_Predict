@@ -5,8 +5,10 @@ from scrapy.utils.project import get_project_settings
 from PFR_scraper.spiders.NFL_PFR_spider import NFLSpider
 
 import os
+import re
 
 import pandas as pd
+import numpy as np
 
 class PFR_Data_Collector(object):
 
@@ -33,10 +35,15 @@ class PFR_Data_Collector(object):
                      names=['WEEK_NUM','GAME_DAY_OF_WEEK','GAME_DATE','GAMETIME',
                             'WINNER','GAME_LOCATION','LOSER','BOXSCORE_LINK','PTS_WINNER',
                             'PTS_LOSER','YARDS_WINNER','TURNOVERS_WINNER','YARDS_LOSER',
-                            'TURNOVERS_LOSER','YEAR'], index_col=False)
+                            'TURNOVERS_LOSER','YEAR','STADIUM','ROOF','SURFACE','VEGAS_LINE','OVER_UNDER',
+                            'TEMPERATURE','HUMIDITY','WIND'], index_col=False)
 
        ## In the data pull the header shows up multiple times
        df = df[((df['WEEK_NUM']!='Week')&(df['WEEK_NUM']!='NULL_VALUE'))]
+
+       
+       df['FAVORITED']  = df['VEGAS_LINE'].apply(lambda x: x[:x.index(' -')] if '-' in x else x)
+       df['VEGAS_LINE'] = df['VEGAS_LINE'].apply(lambda x: x[x.index(' -'):] if '-' in x else x)
 
        ## Replace old team names with the newest version
        df['WINNER'].replace({'St. Louis Rams'           : 'Los Angeles Rams',
@@ -57,6 +64,16 @@ class PFR_Data_Collector(object):
                              'Phoenix Cardinals'        : 'Arizona Cardinals',
                              'Washington Redskins'      : 'Washington Commanders',
                              'Washington Football Team' : 'Washington Commanders'},inplace=True)
+       
+       df['FAVORITED'].replace({ 'St. Louis Rams'           : 'Los Angeles Rams',
+                                 'San Diego Chargers'       : 'Los Angeles Chargers',
+                                 'Houston Oilers'           : 'Tennessee Titans',
+                                 'Tennessee Oilers'         : 'Tennessee Titans',
+                                 'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                 'Oakland Raiders'          : 'Las Vegas Raiders',
+                                 'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                 'Washington Redskins'      : 'Washington Commanders',
+                                 'Washington Football Team' : 'Washington Commanders'},inplace=True)
 
        ## Data pull error, easier to fix here
        df['YEAR'].replace({ "99-100":'99-00',
@@ -100,14 +117,30 @@ class PFR_Data_Collector(object):
        ## These data points are games were teams tied, the data didn't pull because of a "strong" tag
        df.loc[df['PTS_WINNER']=='NULL_VALUE','PTS_WINNER'] = df.loc[df['PTS_WINNER']=='NULL_VALUE','PTS_LOSER']
 
+       ## Reduce Temp, Humidity, Wind down to just numbers
+       df['TEMPERATURE'] = df['TEMPERATURE'].str.extract('(\d+)')
+       df['HUMIDITY'] = df['HUMIDITY'].str.extract('(\d+)')
+       df['WIND'] = df['WIND'].str.extract('(\d+)')
+
+       df['TEMPERATURE'] = df['TEMPERATURE'].replace('',np.nan)
+       df['HUMIDITY']    = df['HUMIDITY'].replace('',np.nan)
+       df['WIND']        = df['WIND'].replace('',np.nan)
+       df['VEGAS_LINE']  = df['VEGAS_LINE'].replace('Pick',np.nan)
+       df['FAVORITED']   = df['FAVORITED'].replace('Pick',np.nan)
+
        ## Change values to be numeric
-       df['WEEK_NUM']   = df['WEEK_NUM'].astype('int')
-       df['PTS_WINNER'] = df['PTS_WINNER'].astype('int')
-       df['PTS_LOSER']  = df['PTS_LOSER'].astype('int')
-       df['PTS_LOSER']  = df['YARDS_WINNER'].astype('int')
-       df['PTS_LOSER']  = df['TURNOVERS_WINNER'].astype('int')
-       df['PTS_LOSER']  = df['YARDS_LOSER'].astype('int')
-       df['PTS_LOSER']  = df['TURNOVERS_LOSER'].astype('int')
+       df['WEEK_NUM']         = df['WEEK_NUM'].astype('int')
+       df['PTS_WINNER']       = df['PTS_WINNER'].astype('int')
+       df['PTS_LOSER']        = df['PTS_LOSER'].astype('int')
+       df['YARDS_WINNER']     = df['YARDS_WINNER'].astype('int')
+       df['TURNOVERS_WINNER'] = df['TURNOVERS_WINNER'].astype('int')
+       df['YARDS_LOSER']      = df['YARDS_LOSER'].astype('int')
+       df['TURNOVERS_LOSER']  = df['TURNOVERS_LOSER'].astype('int')
+       df['OVER_UNDER']       = df['OVER_UNDER'].astype('float')
+       df['VEGAS_LINE']       = df['VEGAS_LINE'].astype('float')
+       df['TEMPERATURE']      = df['TEMPERATURE'].astype('float')
+       df['HUMIDITY']         = df['HUMIDITY'].astype('float')
+       df['WIND']             = df['WIND'].astype('float')
 
        ## Create a column that denotes a win or a tie (could be used for prediction measuring)
        df.loc[df['PTS_WINNER']>df['PTS_LOSER'],'WIN_OR_TIE'] = 1
@@ -197,6 +230,8 @@ class PFR_Data_Collector(object):
        
        ## Set 'WIN_OR_TIE' to .5 to denote a tie
        df.loc[df['PTS_WINNER']==df['PTS_LOSER'], 'WIN_OR_TIE'] = 0.5
+
+       df.sort_values(['GAME_DATE','GAMETIME'], ascending=True, inplace=True)
 
        ## Save cleaned data to 'cleaned_' file
        df.to_csv(self.cleaned_data_file, index=False)

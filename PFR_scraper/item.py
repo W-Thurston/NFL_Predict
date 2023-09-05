@@ -23,5 +23,11 @@ class NFL_ProFootballReference(Item):
 	to_lose  		 = Field()	# Turnovers by the losing team
 	year			 = Field()  # Year (ex: '18-'19)
 	stadium          = Field()  # The name of the stadium the game was played in
-	game_info        = Field()  # The Roof type, field surface type, and weather at kickoff
+	roof			 = Field()  # Type of roof the stadium has
+	surface			 = Field()  # Type of surface the field has (ie. grass, turf, etc)
+	vegas_line		 = Field()  # Vegas betting line at kickoff
+	over_under		 = Field()  # Vegas over/under at kickoff
+	temperature      = Field()  # Temperature at kickoff
+	humidity         = Field()  # Relative Humidity at kickoff
+	wind             = Field()  # MPH Wind at kickoff
 		
