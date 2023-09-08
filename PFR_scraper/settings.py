@@ -64,7 +64,7 @@ DOWNLOAD_DELAY = 3
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-ITEM_PIPELINES = {'PFR_scraper.pipelines.WriteItemPipeline': 100,}
+# ITEM_PIPELINES = {'PFR_scraper.pipelines.HistoricalPFRWriteItemPipeline': 100,}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

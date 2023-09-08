@@ -10,8 +10,10 @@ def main():
     print("Data Pipeline for Pro Football Reference Scraping and Feature Generation")
     ap = ArgumentParser()
     # ap.add_argument("--config_path", help="Path to yaml config file.")
-    ap.add_argument("--collect_PFR_data")
-    ap.add_argument("--clean_PFR_data")
+    ap.add_argument("--collect_historical_PFR_data")
+    ap.add_argument("--clean_historical_PFR_data")
+    ap.add_argument("--collect_upcoming_data")
+    ap.add_argument("--clean_upcoming_PFR_data")
     ap.add_argument("--build_model_input_features")
 
     args = ap.parse_args()
@@ -20,25 +22,46 @@ def main():
     #     config_dict = yaml.load(file, Loader=yaml.FullLoader)
 
     ## Collect Data ##
-    if args.collect_PFR_data:
-        print("> Collecting PFR Data -- START")
+    if args.collect_historical_PFR_data:
+        print("> Collecting Historical PFR Data -- START")
         ## Instantiate PFR Scraper
         PFR_Data_Collector_object = PFR_Data_Collector()
         
         ## Run PFR Scraper
-        PFR_Data_Collector_object.fetch_data()
-        print("> Collecting PFR Data -- END")
+        PFR_Data_Collector_object.fetch_historical_data()
+        print("> Collecting Historical PFR Data -- END")
         print()
 
-    ## Collect Data ##
-    if args.clean_PFR_data:
+    ## Clean historical Data ##
+    if args.clean_historical_PFR_data:
         print("> Cleaning PFR Scraped data -- START")
         ## Instantiate PFR Scraper
         PFR_Data_Collector_object = PFR_Data_Collector()
 
         ## Clean PFR Scraped data
-        PFR_Data_Collector_object.clean_data()
+        PFR_Data_Collector_object.clean_historical_data()
         print("> Cleaning PFR Scraped data -- END")
+        print()
+
+    if args.collect_upcoming_data:
+        print("> Collecting the Upcoming Schedule Data -- START")
+        ## Instantiate PFR Scraper
+        PFR_Data_Collector_object = PFR_Data_Collector()
+        
+        ## Run PFR Scraper
+        PFR_Data_Collector_object.fetch_upcoming_schedule_data()
+        print("> Collecting the Upcoming Schedule Data -- END")
+        print()
+
+    ## Clean upcoming schedule Data ##
+    if args.clean_upcoming_PFR_data:
+        print("> Cleaning PFR Upcoming Schedule Scraped data -- START")
+        ## Instantiate PFR Scraper
+        PFR_Data_Collector_object = PFR_Data_Collector()
+
+        ## Clean PFR Scraped data
+        PFR_Data_Collector_object.clean_upcoming_schedule_data()
+        print("> Cleaning PFR Upcoming Schedule Scraped data -- END")
         print()
         
 
@@ -65,10 +88,12 @@ def main():
 
 if __name__ == '__main__':
     """
-    "Usage:"
+    Usage:
     python PFR_data_pipeline_run.py
-        --collect_PFR_data 0
-        --clean_PFR_data 0
+        --collect_historical_PFR_data 0
+        --clean_historical_PFR_data 0
+        --collect_upcoming_data 0
+        --clean_clean_upcoming_PFR_data 0
         --build_model_input_features 0
     """
     main()

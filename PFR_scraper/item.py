@@ -31,3 +31,12 @@ class NFL_ProFootballReference(Item):
 	humidity         = Field()  # Relative Humidity at kickoff
 	wind             = Field()  # MPH Wind at kickoff
 		
+class NFL_PFR_Upcoming_Schedule(Item):
+	week_num 		 = Field() 	# Week number in season
+	game_day_of_week = Field()  # Day of week 
+	game_date 		 = Field()	# Month & day
+	home_team  		 = Field()	# Winning team name 
+	away_team  	  	 = Field()	# Losing team name
+	gametime 		 = Field()	# Game Time, EST
+	year			 = Field()  # Year (ex: '18-'19)
+	

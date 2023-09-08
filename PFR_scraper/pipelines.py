@@ -7,9 +7,22 @@
 # useful for handling different item types with a single interface
 from itemadapter import ItemAdapter
 
-class WriteItemPipeline(object):
+class HistoricalPFRWriteItemPipeline(object):
 	def __init__(self):
 		self.filename = 'data/raw/NFL_wk_by_wk.csv'
+	def open_spider(self, spider):
+		self.file = open(self.filename, 'w')
+	def close_spider(self, spider):
+		self.file.close()
+
+	def process_item(self, item, spider):
+		line = ','.join(item.values()) + '\n'
+		self.file.write(line)
+		return item
+
+class UpcomingScheduleWriteItemPipeline(object):
+	def __init__(self):
+		self.filename = 'data/raw/NFL_upcoming_schedule.csv'
 	def open_spider(self, spider):
 		self.file = open(self.filename, 'w')
 	def close_spider(self, spider):
