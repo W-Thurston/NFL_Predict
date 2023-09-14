@@ -39,7 +39,7 @@ class Historical_PFR_Spider(Spider):
 			to_win 			 = row.xpath('./td[@data-stat="to_win"]/text()').extract_first()           if row.xpath('./td[@data-stat="to_win"]/text()').extract_first() else "NULL_VALUE"
 			yards_lose 		 = row.xpath('./td[@data-stat="yards_lose"]/text()').extract_first()       if row.xpath('./td[@data-stat="yards_lose"]/text()').extract_first() else "NULL_VALUE"
 			to_lose  		 = row.xpath('./td[@data-stat="to_lose"]/text()').extract_first()          if row.xpath('./td[@data-stat="to_lose"]/text()').extract_first() else "NULL_VALUE"
-			year 			 = str(response.url)[-12:-10]+"-"+str(int(str(response.url)[-12:-10])+1)
+			year 			 = str(response.url)[-14:-10]+"-"+str(int(str(response.url)[-14:-10])+1)
 
 			## If the game has not been played yet, it will show 'preview' instead of boxscore, we don't want to waste time going to that page
 			if row.xpath('./td[@data-stat="boxscore_word"]/a/text()').extract_first() == 'preview':
@@ -81,7 +81,10 @@ class Historical_PFR_Spider(Spider):
 		item['yards_lose'] 		 = response.meta["yards_lose_meta"] 	  # Yards gained by losing team
 		item['to_lose'] 		 = response.meta["to_lose_meta"]   		  # Turnovers by the losing team
 		item['year']			 = response.meta["year_meta"]			  # Ex: '91-92'
-		item['stadium']			 = response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() if response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() else "NULL_VALUE"
+		if re.findall('\d+', response.xpath('//div[@class="scorebox_meta"]/div/a/text()').extract_first()) != []:
+			item['stadium'] = 'NULL_VALUE'
+		else:
+			item['stadium']		 = response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() if response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() else "NULL_VALUE"
 
 		## Game info data -- Pull data from the "Game Info" grid on the boxscore pages
 		## Initialize thes values
@@ -190,7 +193,7 @@ class Append_New_PFR_Spider(Spider):
 			to_win 			 = row.xpath('./td[@data-stat="to_win"]/text()').extract_first()           if row.xpath('./td[@data-stat="to_win"]/text()').extract_first() else "NULL_VALUE"
 			yards_lose 		 = row.xpath('./td[@data-stat="yards_lose"]/text()').extract_first()       if row.xpath('./td[@data-stat="yards_lose"]/text()').extract_first() else "NULL_VALUE"
 			to_lose  		 = row.xpath('./td[@data-stat="to_lose"]/text()').extract_first()          if row.xpath('./td[@data-stat="to_lose"]/text()').extract_first() else "NULL_VALUE"
-			year 			 = str(response.url)[-12:-10]+"-"+str(int(str(response.url)[-12:-10])+1)
+			year 			 = str(response.url)[-14:-10]+"-"+str(int(str(response.url)[-14:-10])+1)
 
 			if row.xpath('./td[@data-stat="boxscore_word"]/a/text()').extract_first() == 'preview':
 				return
@@ -231,7 +234,10 @@ class Append_New_PFR_Spider(Spider):
 		item['yards_lose'] 		 = response.meta["yards_lose_meta"] 	  # Yards gained by losing team
 		item['to_lose'] 		 = response.meta["to_lose_meta"]   		  # Turnovers by the losing team
 		item['year']			 = response.meta["year_meta"]			  # Ex: '91-92'
-		item['stadium']			 = response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() if response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() else "NULL_VALUE"
+		if re.findall('\d+', response.xpath('//div[@class="scorebox_meta"]/div/a/text()').extract_first()) != []:
+			item['stadium'] = 'NULL_VALUE'
+		else:
+			item['stadium']		 = response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() if response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() else "NULL_VALUE"
 
 		## Game info data -- Pull data from the "Game Info" grid on the boxscore pages
 		## Initialize thes values
