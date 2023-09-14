@@ -15,6 +15,7 @@ def main():
     ap.add_argument("--collect_upcoming_data")
     ap.add_argument("--clean_upcoming_PFR_data")
     ap.add_argument("--build_model_input_features")
+    ap.add_argument("--draftkings_odds")
 
     args = ap.parse_args()
 
@@ -83,6 +84,16 @@ def main():
         print("> Building model input features -- END")
         print()
 
+    ##
+    if args.draftkings_odds:
+        print("> Collect DraftKings odds -- START")
+        ## Instantiate Data Collector
+        PFR_Data_Collector_object = PFR_Data_Collector()
+
+        ## Pull DraftKings Odds
+        PFR_Data_Collector_object.pull_dk_sportsbook_odds()
+        print("> Collect DraftKings odds -- END")
+
 if __name__ == '__main__':
     """
     Usage:
@@ -92,6 +103,6 @@ if __name__ == '__main__':
         --collect_upcoming_data 0
         --clean_upcoming_PFR_data 0
         --build_model_input_features 0
-        --update_elo 0
+        --draftkings_odds 0
     """
     main()

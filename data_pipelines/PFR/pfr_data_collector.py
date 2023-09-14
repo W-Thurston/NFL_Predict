@@ -6,6 +6,7 @@ from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New
 
 import os
 import re
+import requests
 
 import pandas as pd
 import numpy as np
@@ -18,6 +19,7 @@ class PFR_Data_Collector(object):
               self.cleaned_historical_data_file        = 'data/cleaned/NFL_wk_by_wk_cleaned.csv'
               self.raw_upcoming_schedule_data_file     = 'data/raw/NFL_upcoming_schedule.csv'
               self.cleaned_upcoming_schedule_data_file = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'
+              self.ELO_visualization_file              = 'data/output/Ranks_and_Betting.xlsx'
 
 
        def fetch_historical_data(self, all_data:bool = False, scrape_year:str = '2023'):
@@ -270,3 +272,78 @@ class PFR_Data_Collector(object):
               df.to_csv(self.cleaned_historical_data_file, index=False)
               print(f'> PFR Scrapy data cleaned and written to file: {self.cleaned_historical_data_file}')
        
+
+       def pull_dk_sportsbook_odds(self):
+              """
+              SOURCED FROM: github.com/agad495/DKscraPy
+              
+              Scrapes current NFL game lines.
+
+              """
+              dk_api = requests.get("https://sportsbook.draftkings.com//sites/US-NJ-SB/api/v5/eventgroups/88808?format=json").json()
+              dk_markets = dk_api['eventGroup']['offerCategories'][0]['offerSubcategoryDescriptors'][0]['offerSubcategory']['offers']
+
+              games = {}
+              for i in dk_markets:
+                     if i[0]['outcomes'][0]['oddsDecimal'] == 0: # Skip this if there is no spread
+                            continue
+                     away_team = i[0]['outcomes'][0]['label']
+                     home_team = i[0]['outcomes'][1]['label']
+                     
+                     if away_team not in games: 
+                            # Gotta be a better way then a bunch of try excepts
+                            games[away_team] = {'location':0}
+                            try:
+                                   games[away_team]['moneyline'] = i[2]['outcomes'][0]['oddsAmerican']
+                            except:
+                                   pass
+                            try:
+                                   games[away_team]['spread'] = [i[0]['outcomes'][0]['line'],
+                                                                 i[0]['outcomes'][0]['oddsAmerican']]
+                            except:
+                                   pass
+                            try:
+                                   games[away_team]['over'] = [i[1]['outcomes'][0]['line'],
+                                                               i[1]['outcomes'][0]['oddsAmerican']]
+                            except:
+                                   pass
+                            try:
+                                   games[away_team]['under'] = [i[1]['outcomes'][1]['line'],
+                                                                i[1]['outcomes'][1]['oddsAmerican']]
+                            except:
+                                   pass
+                            games[away_team]['opponent'] = home_team
+                     
+                     if home_team not in games:
+                            games[home_team] = {'location':1}
+                            try:
+                                   games[home_team]['moneyline'] = i[2]['outcomes'][1]['oddsAmerican']
+                            except:
+                                   pass
+                            try:
+                                   games[home_team]['spread'] = [i[0]['outcomes'][1]['line'],
+                                                                 i[0]['outcomes'][1]['oddsAmerican']]
+                            except:
+                                   pass
+                            try:
+                                   games[home_team]['over'] = [i[1]['outcomes'][0]['line'],
+                                                               i[1]['outcomes'][0]['oddsAmerican']]
+                            except:
+                                   pass
+                            try:
+                                   games[home_team]['under'] = [i[1]['outcomes'][1]['line'],
+                                                                i[1]['outcomes'][1]['oddsAmerican']]
+                            except:
+                                   pass     
+                            games[home_team]['opponent'] = away_team
+
+              games = pd.DataFrame(games).T.reset_index()
+
+
+              with pd.ExcelWriter(self.ELO_visualization_file, mode='a', if_sheet_exists='overlay') as writer:
+                     games.to_excel(      excel_writer= writer,
+                                          sheet_name = 'Betting Outcomes',
+                                          index=False,
+                                          header=False, 
+                                          startrow = 2,
+                                          startcol = 32)
