@@ -1,17 +1,26 @@
 import pandas as pd
 import numpy as np
 
+import re
+from geopy.distance import distance
 from tqdm import tqdm
+tqdm.pandas()
+
+import datetime
+import timezonefinder, pytz
 
 import utils.elo as elo
 
 class model_input_feature_builder(object):
 
     def __init__(self):
+
+        ## Data Filenames
         self.pfr_cleaned_data_file = 'data/cleaned/NFL_wk_by_wk_cleaned.csv'
         self.ELO_data_file         = 'data/cleaned/NFL_Team_Elo.csv'
         self.modeling_base_file    = 'data/modeling/base_modeling_file.csv'
         self.modeling_file         = 'data/modeling/modeling_file.csv'
+        self.stadium_file          = 'data/cleaned/NFL_stadium_reference.csv'
 
     
     def prep_data_modeling_file(self):
@@ -20,14 +29,12 @@ class model_input_feature_builder(object):
         
         ## Create a list of sorted years, then set that as the sorting order for 'YEAR' as a categorical feature
         game_data['GAME_DATE'] = pd.to_datetime(game_data['GAME_DATE'])
-        first_year = sorted(game_data['GAME_DATE'].dt.year.unique())[0]
-        last_year  = sorted(game_data['GAME_DATE'].dt.year.unique())[-1]
-        sorted_years = [f"{str(yr)[-2:]}"+"-"+f"{str(yr+1)[-2:]}" for yr in range(int(first_year), int(last_year)+1) ]
+        sorted_years = sorted(game_data['YEAR'].unique())
         game_data['YEAR'] = pd.Categorical(game_data['YEAR'], sorted_years)
 
         ## Clean up after yourself
-        first_year, last_year, sorted_years = None, None, None
-        del first_year, last_year, sorted_years
+        sorted_years = None
+        del sorted_years
 
         ## Set the modeling target variable to '1' for winners
         game_data = game_data.loc[:,['WINNER','LOSER','YEAR','WEEK_NUM']]
@@ -69,10 +76,8 @@ class model_input_feature_builder(object):
         df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
 
         ## Create sorted year list like '91-92' to use as categorical ordering list
-        first_year = sorted(df['GAME_DATE'].dt.year.unique())[0]
-        last_year  = sorted(df['GAME_DATE'].dt.year.unique())[-1]
-        sorted_years = [f"{str(yr)[-2:]}"+"-"+f"{str(yr+1)[-2:]}" for yr in range(int(first_year), int(last_year)+1) ]
-        increase_in_number_of_weeks_in_season = sorted_years.index('21-22')
+        sorted_years = sorted(df['YEAR'].unique())
+        increase_in_number_of_weeks_in_season = sorted_years.index('2021-2022')
 
         dataframe_builder_list = []
         for team in NFL_TEAMS:
@@ -82,7 +87,7 @@ class model_input_feature_builder(object):
 
         df_team_elo = pd.DataFrame.from_records(dataframe_builder_list, columns=['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK']).drop_duplicates()
         df_team_elo['ELO'] = np.nan
-        df_team_elo.loc[(df_team_elo['NFL_YEAR']==sorted_years[0])&(df_team_elo['NFL_WEEK']==1),'ELO'] = 1300
+        df_team_elo.loc[(df_team_elo['NFL_YEAR']==sorted_years[0])&(df_team_elo['NFL_WEEK']==1),'ELO'] = 1500
 
         dataframe_builder_list = None
 
@@ -91,7 +96,7 @@ class model_input_feature_builder(object):
 
         ## Create lists of year numbers to denote different length seasons
         seasons_with_21_weeks = sorted_years[:increase_in_number_of_weeks_in_season]
-        seasons_with_21_weeks.remove('93-94') ## This year had an extra bye week
+        seasons_with_21_weeks.remove('1993-1994') ## This year had an extra bye week
 
         ## Remove week 22 from seasons prior to '21-22'
         df_team_elo = df_team_elo.loc[~((df_team_elo['NFL_YEAR'].isin(seasons_with_21_weeks))&
@@ -104,22 +109,22 @@ class model_input_feature_builder(object):
         #   Ex: Carolina Panthers didn't start until the 1995 season, remove all years prior
 
         ## Carolina Panthers
-        carolina_panthers_start_year = '95-96'
+        carolina_panthers_start_year = '1995-1996'
         carolina_panthers_year_list_to_remove = df_team_elo[(df_team_elo['NFL_TEAM']=='Carolina Panthers')&
                                                             (df_team_elo['NFL_YEAR'].isin(sorted_years[:sorted_years.index(carolina_panthers_start_year)]))].index.values
 
         ## Jacksonville Jaguars
-        jacksonville_jaguars_start_year = '95-96'
+        jacksonville_jaguars_start_year = '1995-1996'
         jacksonville_jaguars_year_list_to_remove = df_team_elo[(df_team_elo['NFL_TEAM']=='Jacksonville Jaguars')&
                                                                (df_team_elo['NFL_YEAR'].isin(sorted_years[:sorted_years.index(jacksonville_jaguars_start_year)]))].index.values
 
         ## Baltimore Ravens
-        baltimore_ravens_start_year = '96-97'
+        baltimore_ravens_start_year = '1996-1997'
         baltimore_ravens_year_list_to_remove = df_team_elo[(df_team_elo['NFL_TEAM']=='Baltimore Ravens')&
                                                            (df_team_elo['NFL_YEAR'].isin(sorted_years[:sorted_years.index(baltimore_ravens_start_year)]))].index.values
 
         ## Houston Texans
-        houston_texans_start_year = '02-03'
+        houston_texans_start_year = '2002-2003'
         houston_texans_year_list_to_remove = df_team_elo[(df_team_elo['NFL_TEAM']=='Houston Texans')&
                                                          (df_team_elo['NFL_YEAR'].isin(sorted_years[:sorted_years.index(houston_texans_start_year)]))].index.values
 
@@ -133,12 +138,12 @@ class model_input_feature_builder(object):
         ## Create a new column of Elo per week of a season
         print(f"> Filling out ELO column")
         k=20
-        for idx, yr in enumerate(tqdm(sorted_years[:-1])):
+        for idx, yr in enumerate(tqdm(sorted_years)):
             curr_year = yr
             if curr_year != sorted_years[-1]:
                 next_year = sorted_years[idx+1]
             else: 
-                break
+                next_year = None
 
             number_of_weeks_in_curr_year = len(df.loc[df['YEAR'] == curr_year, 'WEEK_NUM'].unique())
 
@@ -153,16 +158,16 @@ class model_input_feature_builder(object):
                      
                     ## Calculate the winner's and loser's new Elo ranking.
                     winner_elo, loser_elo = elo.update_elo( df_team_elo.loc[(df_team_elo['NFL_TEAM'] == winning_team_name )&
-                                                                        (df_team_elo['NFL_YEAR'] == curr_year         )&
-                                                                        (df_team_elo['NFL_WEEK'] == wk                ),'ELO'].values[0],
-                                                        df_team_elo.loc[(df_team_elo['NFL_TEAM'] == losing_team_name  )&
-                                                                        (df_team_elo['NFL_YEAR'] == curr_year         )&
-                                                                        (df_team_elo['NFL_WEEK'] == wk                ),'ELO'].values[0],
-                                                        win_or_tie= i[1]['WIN_OR_TIE'],
-                                                        K=k)
+                                                                            (df_team_elo['NFL_YEAR'] == curr_year         )&
+                                                                            (df_team_elo['NFL_WEEK'] == wk                ),'ELO'].values[0],
+                                                            df_team_elo.loc[(df_team_elo['NFL_TEAM'] == losing_team_name  )&
+                                                                            (df_team_elo['NFL_YEAR'] == curr_year         )&
+                                                                            (df_team_elo['NFL_WEEK'] == wk                ),'ELO'].values[0],
+                                                            win_or_tie= i[1]['WIN_OR_TIE'],
+                                                            K=k)
 
                     ## Update Elo for next season's week 1
-                    if wk == number_of_weeks_in_curr_year:
+                    if (wk == number_of_weeks_in_curr_year) and (next_year is not None):
                         ## Update winning team's ELO
                         df_team_elo.loc[(df_team_elo['NFL_TEAM'] == winning_team_name)&
                                         (df_team_elo['NFL_YEAR'] == next_year        )&
@@ -189,7 +194,7 @@ class model_input_feature_builder(object):
                         
 
                 ## Set week 1's ELO of next year equal to the ELO of the last week of the current year
-                if wk == number_of_weeks_in_curr_year:
+                if (wk == number_of_weeks_in_curr_year) and (next_year is not None):
                     ## Get boolean values for next year, week 1, and ELO is null
                     null_idx = df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&(df_team_elo['NFL_WEEK'] == 1),'ELO'].isnull()
                     
@@ -232,19 +237,20 @@ class model_input_feature_builder(object):
                                                                                                            (df_team_elo['NFL_YEAR'] == curr_year   )&
                                                                                                            (df_team_elo['NFL_WEEK'].isin([wk,wk+1])),'ELO'].fillna(method='ffill')
 
-            ## Take the mean ELO of week 1 of next_year
-            curr_season_mean_elo = df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&
-                                                   (df_team_elo['NFL_WEEK'] == 1 )&
-                                                   (df_team_elo['NFL_TEAM'].isin(teams_this_season)),'ELO'].mean()
-            
-            ## Offseason decay -- regress end of year ELO's to the mean and assign to first week of next year
-            df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&
-                            (df_team_elo['NFL_WEEK'] == 1 )&
-                            (df_team_elo['NFL_TEAM'].isin(teams_this_season)),'ELO'] =  curr_season_mean_elo*(1/3.0) + \
-                                                                                        df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&
-                                                                                                        (df_team_elo['NFL_WEEK'] == 1 )&
-                                                                                                        (df_team_elo['NFL_TEAM'].isin(teams_this_season)),'ELO']\
-                                                                                        *(1-(1/3.0))
+            if next_year is not None:
+                ## Take the mean ELO of week 1 of next_year
+                curr_season_mean_elo = df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&
+                                                    (df_team_elo['NFL_WEEK'] == 1        )&
+                                                    (df_team_elo['NFL_TEAM'].isin(teams_this_season)),'ELO'].mean()
+                
+                ## Offseason decay -- regress end of year ELO's to the mean and assign to first week of next year
+                df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&
+                                (df_team_elo['NFL_WEEK'] == 1        )&
+                                (df_team_elo['NFL_TEAM'].isin(teams_this_season)),'ELO'] =  curr_season_mean_elo*(1/3.0) \
+                                                                                            + df_team_elo.loc[(df_team_elo['NFL_YEAR'] == next_year)&
+                                                                                                            (df_team_elo['NFL_WEEK'] == 1 )&
+                                                                                                            (df_team_elo['NFL_TEAM'].isin(teams_this_season)),'ELO']\
+                                                                                            *(1-(1/3.0))
 
         df_team_elo.to_csv(self.ELO_data_file, index=False)
         print(f"> ELO filled data written to file: {self.ELO_data_file}")
@@ -287,7 +293,8 @@ class model_input_feature_builder(object):
 
     @staticmethod
     def _append_home_or_away(self):
-        print(f'> Building Home or Away feature')
+        
+        print(f'> Building Home or Away feature -- START')
         game_data = pd.read_csv(self.pfr_cleaned_data_file)
         modeling_file = pd.read_csv(self.modeling_file)
 
@@ -312,11 +319,132 @@ class model_input_feature_builder(object):
         modeling_file = modeling_file.merge(game_data, how='left', on=['TEAM_A','TEAM_B','YEAR','WEEK_NUM'])
 
         modeling_file.to_csv(self.modeling_file, index=False)
-        print(f'> Home or away feature built')
+        print(f'> Building Home or Away feature -- END')
         print()
+    
+    @staticmethod
+    def _convert(self, tude):
 
+        ## If the latiTUDE or longiTUDE are in the form [Degrees°Minutes′Secounds″Direction]
+        if '″' in tude:
+
+            ## Multiplier is 1 for North/East & -1 for South/West
+            multiplier = 1 if tude[-1] in ['N', 'E'] else -1
+
+            ## Split data with Degree/Minute/Seconds symbols
+            deg, minutes, seconds, direction = re.split('[°\′″]', tude)
+
+            ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
+            decimal_degrees = round(multiplier * (float(deg) + float(minutes)/60 + float(seconds)/(60*60)),4)
+
+            #print(f"{tude} converted to {decimal_degrees}")
+            return decimal_degrees
+        
+        ## If the latiTUDE or longiTUDE are in the form [Degrees°]
+        else:
+            
+            ## Split data with Degree symbols
+            decimal_degrees, direction = re.split('[°]', tude)
+
+            ## Multiplier is 1 for North/East & -1 for South/West
+            multiplier = 1 if direction in ['N', 'E'] else -1
+
+            ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
+            decimal_degrees = round(multiplier * float(decimal_degrees),4)
+
+            #print(f"{tude} converted to {decimal_degrees}")
+            return decimal_degrees
+
+    @staticmethod
+    def _measure_distance(self, lat_long_of_home:list, lat_long_of_game:list, metric:str='km') -> float:
+        
+        ## Convert string value of either Degrees, Minutes, Seconds, Direction or Degrees, Direction to +/- Degrees
+        lat_of_home_to_decimal  = self._convert(self, lat_long_of_home[0])
+        long_of_home_to_decimal = self._convert(self, lat_long_of_home[1])
+        lat_of_game_to_decimal  = self._convert(self, lat_long_of_game[0])
+        long_of_game_to_decimal = self._convert(self, lat_long_of_game[1])
+        
+        ## Place above converted values into tuple
+        coords_of_home = (lat_of_home_to_decimal, long_of_home_to_decimal)
+        coords_of_game = (lat_of_game_to_decimal, long_of_game_to_decimal)
+
+        ## If you want km or miles; then round the wanted distance to nearest 2 decimal places
+        if metric=='km':
+            #print(f"Distance between:\n\t{coords_of_home}\n\t{coords_of_game}\n\t{round(distance(coords_of_home, coords_of_game).km,2)} km")
+            return round(distance(coords_of_home, coords_of_game).km,6)
+            
+        elif metric=='miles':
+            #print(f"Distance between:\n\t{coords_of_home}\n\t{coords_of_game}\n\t{round(distance(coords_of_home, coords_of_game).miles,2)} miles")
+            return round(distance(coords_of_home, coords_of_game).miles,6)
+        
+    @staticmethod
+    def _find_utc_offset(self, latitude, longitude, tf):
+        
+        ## From the lat/long, get the tz-database-style time zone name (e.g. 'America/New York') or None
+        timezone_str = tf.certain_timezone_at(lat=self._convert(self, latitude), lng=self._convert(self, longitude))
+
+        ## From time zon name get UTC offset (e.g. '-0500' for America/New York)
+        timezone = pytz.timezone(timezone_str).localize(datetime.datetime.now()).strftime('%z')
+        # timezone = pytz.timezone(timezone_str).localize(datetime.datetime(2020,12,1)).strftime('%z')  ## Leaving this here so that I can implement based on specific date
+
+        return timezone
+
+    @staticmethod
+    def _calculate_timezone_difference(self, lat_x, long_x, lat_y, long_y, tz_find):
+
+        timezone_x = int(self._find_utc_offset(self, lat_x, long_x, tf=tz_find))
+        timezone_y = int(self._find_utc_offset(self, lat_y, long_y, tf=tz_find))
+
+        timezone_diff = timezone_x - timezone_y
+
+        return timezone_diff
+
+    @staticmethod
+    def _calculate_travel_and_tz_distance(self):
+        
+        print(f'> Calculating travel and timezone distances -- START')
+        df_modeling_file = pd.read_csv(self.modeling_file)
+        df_stadium       = pd.read_csv(self.stadium_file)
+
+        ## Create temporary Dataframe to hold ['TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD','LATITUDE_TEAM_A','LONGITUDE_TEAM_A','LATITUDE_TEAM_B','LONGITUDE_TEAM_B']
+        #    Used for easily applying distance & tz calculations
+        temp_df = pd.merge(df_modeling_file.loc[:,['TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD']],
+                           df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE']]             , 
+                           how='left', left_on=['TEAM_A','YEAR'], right_on=['HOME_TEAM','YEAR']).drop('HOME_TEAM',axis=1)
+        temp_df = pd.merge(temp_df, 
+                           df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE']],
+                           how='left', left_on=['TEAM_B','YEAR'], right_on=['HOME_TEAM','YEAR']).drop('HOME_TEAM',axis=1)
+        
+        ## Calculate Team A's Kilometers of travel
+        temp_df['TEAM_A_KM_TRAVELED'] = temp_df.progress_apply(lambda row: self._measure_distance(self, 
+                                                                                                  [row['LATITUDE_x'], row['LONGITUDE_x']],
+                                                                                                  [row['LATITUDE_y'], row['LONGITUDE_y']]) if row['HOME_FIELD']==0 else 0 , axis=1)
+        ## Calculate Team A's Timezone change (US/Pacific -> US/Easter = -300)
+        timezone_finder = timezonefinder.TimezoneFinder()
+        temp_df['TEAM_A_TZ_TRAVELED'] = temp_df.progress_apply(lambda row: self._calculate_timezone_difference( self,
+                                                                                                                row['LATITUDE_x' ],
+                                                                                                                row['LONGITUDE_x'],
+                                                                                                                row['LATITUDE_y' ],
+                                                                                                                row['LONGITUDE_y'],
+                                                                                                                tz_find = timezone_finder) if row['HOME_FIELD']==0 else 0 , axis=1)
+            
+        ## Drop unneeded columns
+        temp_df.drop(['LATITUDE_x', 'LONGITUDE_x', 'LATITUDE_y', 'LONGITUDE_y','HOME_FIELD'],axis=1, inplace=True)
+
+        ## Merge Temp Dataframe back onto modeling_file Dataframe
+        df_modeling_file = df_modeling_file.merge(temp_df, how='left', on=['TEAM_A','TEAM_B','YEAR','WEEK_NUM'])
+
+        ## Clean up after yourself
+        temp_df = None
+
+        ## Save data
+        df_modeling_file.to_csv(self.modeling_file, index=False)
+        print(f"> Travel and Timezone distance written to file: {self.modeling_file}")
+        print(f'> Calculating travel and timezone distances -- END')
 
     def handle_location_data(self):
         
         print('> Building Location based features')
         self._append_home_or_away(self)
+
+        self._calculate_travel_and_tz_distance(self)

@@ -10,7 +10,7 @@ def main():
     print("Data Pipeline for Pro Football Reference Scraping and Feature Generation")
     ap = ArgumentParser()
     # ap.add_argument("--config_path", help="Path to yaml config file.")
-    ap.add_argument("--collect_historical_PFR_data")
+    ap.add_argument("--collect_historical_PFR_data", nargs='+', type=str, help="All Data: bool->False & A year: str-> '2023' ")
     ap.add_argument("--clean_historical_PFR_data")
     ap.add_argument("--collect_upcoming_data")
     ap.add_argument("--clean_upcoming_PFR_data")
@@ -28,7 +28,7 @@ def main():
         PFR_Data_Collector_object = PFR_Data_Collector()
         
         ## Run PFR Scraper
-        PFR_Data_Collector_object.fetch_historical_data()
+        PFR_Data_Collector_object.fetch_historical_data(all_data = eval(args.collect_historical_PFR_data[0]), scrape_year = args.collect_historical_PFR_data[1])
         print("> Collecting Historical PFR Data -- END")
         print()
 
@@ -83,17 +83,15 @@ def main():
         print("> Building model input features -- END")
         print()
 
-        
-
-
 if __name__ == '__main__':
     """
     Usage:
     python PFR_data_pipeline_run.py
-        --collect_historical_PFR_data 0
+        --collect_historical_PFR_data False '2023'
         --clean_historical_PFR_data 0
         --collect_upcoming_data 0
-        --clean_clean_upcoming_PFR_data 0
+        --clean_upcoming_PFR_data 0
         --build_model_input_features 0
+        --update_elo 0
     """
     main()

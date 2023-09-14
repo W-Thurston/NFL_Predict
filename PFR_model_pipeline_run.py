@@ -9,8 +9,9 @@ def main():
     print("Data Pipeline for Pro Football Reference Scraping and Feature Generation")
     ap = ArgumentParser()
     # ap.add_argument("--config_path", help="Path to yaml config file.")
-    ap.add_argument("--ELO_only")
+    ap.add_argument("--ELO_only", nargs='+', type=str, help="A year: '2023-2024' & A week: 1 ")
     ap.add_argument("--eval_elo")
+    ap.add_argument("--ranks_and_betting", nargs='+', type=str, help="A year: '2023-2024' & A week: 1 ")
 
     args = ap.parse_args()
 
@@ -24,7 +25,7 @@ def main():
         PFR_Model_Builder_object = pfr_model_builder()
         
         ## Produce Elo based predictions
-        PFR_Model_Builder_object.predict_elo_only()
+        PFR_Model_Builder_object.predict_elo_only( year = args.ELO_only[0], week = int(args.ELO_only[1]))
         print("> Producing ELO only Reccommendations -- END")
         print()
 
@@ -42,12 +43,24 @@ def main():
         print("> Evaluating ELO only Reccommendations -- END")
         print()
 
+    ## Collect Data ##
+    if args.ranks_and_betting:
+        print("> Building Ranks and Betting Excel -- START")
+        ## Instantiate ranks_and_betting_builder object
+        Ranks_and_Betting_builder_object = pfr_model_builder()
+        
+        ## Build Excel Visualization for Current week elo changes
+        Ranks_and_Betting_builder_object.build_new_ranks(year = args.ELO_only[0], week = int(args.ELO_only[1]))
+        print("> Building Ranks and Betting Excel -- END")
+        print()
+
 
 if __name__ == '__main__':
     """
     "Usage:"
     python PFR_model_pipeline_run.py
-        --ELO_only 0
+        --ELO_only '2023-2024' 1
         --eval_elo 0
+        --ranks_and_betting '2023-2024' 1
     """
     main()

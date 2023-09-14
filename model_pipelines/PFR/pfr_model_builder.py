@@ -9,16 +9,17 @@ class pfr_model_builder(object):
 
     def __init__(self):
         
-        self.ELO_data_file              = 'data/cleaned/NFL_Team_Elo.csv'
-        self.upcoming_schedule_filename = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'
-        self.elo_predictions            = 'data/output/elo_only_predictions.csv'
-        self.cleaned_data_file          = 'data/cleaned/NFL_wk_by_wk_cleaned.csv'
+        self.ELO_data_file               = 'data/cleaned/NFL_Team_Elo.csv'
+        self.upcoming_schedule_filename  = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'
+        self.ELO_visualization_file      = 'data/output/Ranks_and_Betting.xlsx'
+        self.cleaned_data_file           = 'data/cleaned/NFL_wk_by_wk_cleaned.csv'
 
-    def predict_elo_only(self):
+    def predict_elo_only(self, year: str = '2023-2024', week: int = 1):
         
         print(f"> Reading in upcoming schedule & Elo data from: \n\t{self.upcoming_schedule_filename}\n\t{self.ELO_data_file}")
         df_elo      = pd.read_csv(self.ELO_data_file)
         df_schedule = pd.read_csv(self.upcoming_schedule_filename)
+        df_schedule = df_schedule.loc[(df_schedule['YEAR']==year)&(df_schedule['WEEK_NUM']==week), :]
 
         ## Merge the Elo data onto the schedule for both Away and Home teams
         df_schedule = pd.merge(df_schedule, df_elo, how='left', left_on=['AWAY_TEAM', 'YEAR', 'WEEK_NUM'], right_on=['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK']).drop(['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK'],axis=1).rename(columns={'ELO':'AWAY_TEAM_ELO'})
@@ -40,8 +41,15 @@ class pfr_model_builder(object):
         ## Drop unneeded columns
         df_schedule.drop(['YEAR'],axis=1, inplace=True)
 
-        df_schedule.to_csv(self.elo_predictions, index=False)
-        print(f"> Saving Elo based predictions to: {self.elo_predictions}")
+        with pd.ExcelWriter(self.ELO_visualization_file, mode='a', if_sheet_exists='overlay') as writer:
+            df_schedule.to_excel(   excel_writer=writer,
+                                    sheet_name='Upcoming Weeks Predictions',
+                                    index=False,
+                                    header=False, 
+                                    startrow=2,
+                                    startcol=13)
+            
+        print(f"> Saving Elo based predictions to: {self.ELO_visualization_file}")
 
     def evaluate_elo_only(self, time_period:str='YEAR', ranking_system=elo.elo_win_probability):
 
@@ -79,3 +87,33 @@ class pfr_model_builder(object):
                 print(f"{i:02}: {(df.loc[df['WEEK_NUM']==i,'CORRECT'].sum()/df.loc[df['WEEK_NUM']==i,:].shape[0]):.0%} correct for this week in season")
 
         print(f"Overall: {(df['CORRECT'].sum()/df.shape[0]):.0%}")
+
+    def build_new_ranks(self, year:str, week:int):
+        '''
+        Used to visualize changes in ELO ranking from before the current week's Thursday night game to after the current week's Monday night game
+
+        year: str -> Current Year you'd like to visualize (ex "2023-2024")
+        week: int -> Current Week you'd like to visualize (ex 1) 
+
+        '''
+        df_elo = pd.read_csv(self.ELO_data_file)
+
+        ## Reduce RAM usage
+        df_elo = df_elo.loc[(df_elo['NFL_YEAR']==year)&
+                            (df_elo['NFL_YEAR'].isin([week,week+1])),:]
+        
+        df1 = df_elo.loc[(df_elo['NFL_YEAR']==year)&(df_elo['NFL_WEEK']==week  ),['NFL_TEAM','ELO']].sort_values(['ELO'],ascending=False).reset_index().drop('index',axis=1)
+        df1['Rank'] = np.arange(1,df1.shape[0]+1)
+        df1['EMPTY'] = np.nan
+        df2 = df_elo.loc[(df_elo['NFL_YEAR']==year)&(df_elo['NFL_WEEK']==week+1),['NFL_TEAM','ELO']].sort_values(['ELO'],ascending=False).reset_index().drop('index',axis=1)
+        df2['Rank'] = np.arange(1,df2.shape[0]+1)
+
+        df3 = pd.concat([df1, df2],axis=1)
+
+        with pd.ExcelWriter(self.ELO_visualization_file, mode='a', if_sheet_exists='overlay') as writer:
+            df3.to_excel(   excel_writer= writer,
+                            sheet_name = 'ELO Ranking Changes',
+                            index=False,
+                            header=False, 
+                            startrow = 3,
+                            startcol = 14)

@@ -2,7 +2,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 from scrapy.utils.project import get_project_settings
 
-from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Upcoming_Schedule_NFLSpider
+from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
 
 import os
 import re
@@ -20,15 +20,27 @@ class PFR_Data_Collector(object):
               self.cleaned_upcoming_schedule_data_file = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'
 
 
-       def fetch_historical_data(self):
-              settings = Settings()
-              os.environ['SCRAPY_SETTINGS_MODULE'] = 'PFR_scraper.settings'
-              settings_module_path = os.environ['SCRAPY_SETTINGS_MODULE']
-              settings.setmodule(settings_module_path, priority='project')
-              self.process = CrawlerProcess(settings)
-
-              self.process.crawl(Historical_PFR_Spider)
-              self.process.start(self)
+       def fetch_historical_data(self, all_data:bool = False, scrape_year:str = '2023'):
+              print(f"{all_data} || {scrape_year}")
+              print()
+              print()
+              print()
+              if all_data:
+                     settings = Settings()
+                     os.environ['SCRAPY_SETTINGS_MODULE'] = 'PFR_scraper.settings'
+                     settings_module_path = os.environ['SCRAPY_SETTINGS_MODULE']
+                     settings.setmodule(settings_module_path, priority='project')
+                     self.process = CrawlerProcess(settings)
+                     self.process.crawl(Historical_PFR_Spider)
+                     self.process.start(self)
+              else:
+                     settings = Settings()
+                     os.environ['SCRAPY_SETTINGS_MODULE'] = 'PFR_scraper.settings'
+                     settings_module_path = os.environ['SCRAPY_SETTINGS_MODULE']
+                     settings.setmodule(settings_module_path, priority='project')
+                     self.process = CrawlerProcess(settings)
+                     self.process.crawl(Append_New_PFR_Spider, year=scrape_year)
+                     self.process.start(self)
 
        def fetch_upcoming_schedule_data(self):
               settings = Settings()
@@ -58,112 +70,90 @@ class PFR_Data_Collector(object):
 
               print(f'> Reading in PFR Scrapy data from: {self.raw_historical_data_file}')
               ## Read raw Scrapy data pull into DataFrame
-              df = pd.read_csv(self.raw_historical_data_file,
-                            names=['WEEK_NUM','GAME_DAY_OF_WEEK','GAME_DATE','GAMETIME',
-                                   'WINNER','GAME_LOCATION','LOSER','BOXSCORE_LINK','PTS_WINNER',
-                                   'PTS_LOSER','YARDS_WINNER','TURNOVERS_WINNER','YARDS_LOSER',
-                                   'TURNOVERS_LOSER','YEAR','STADIUM','ROOF','SURFACE','VEGAS_LINE','OVER_UNDER',
-                                   'TEMPERATURE','HUMIDITY','WIND'], index_col=False)
+              df = pd.read_csv(    self.raw_historical_data_file,
+                                   names=['WEEK_NUM','GAME_DAY_OF_WEEK','GAME_DATE','GAMETIME',
+                                          'WINNER','GAME_LOCATION','LOSER','BOXSCORE_LINK','PTS_WINNER',
+                                          'PTS_LOSER','YARDS_WINNER','TURNOVERS_WINNER','YARDS_LOSER',
+                                          'TURNOVERS_LOSER','YEAR','STADIUM','ROOF','SURFACE','VEGAS_LINE','OVER_UNDER',
+                                          'TEMPERATURE','HUMIDITY','WIND'], index_col=False)
 
               ## In the data pull the header shows up multiple times
               df = df[((df['WEEK_NUM']!='Week')&(df['WEEK_NUM']!='NULL_VALUE'))]
+
+              ## Drop duplicate values; duplicates determined across all columns
+              df.drop_duplicates(['WEEK_NUM','GAME_DAY_OF_WEEK','GAME_DATE',
+                                  'GAMETIME','WINNER','GAME_LOCATION','LOSER'], inplace=True)
 
               
               df['FAVORITED']  = df['VEGAS_LINE'].apply(lambda x: x[:x.index(' -')] if '-' in x else x)
               df['VEGAS_LINE'] = df['VEGAS_LINE'].apply(lambda x: x[x.index(' -'):] if '-' in x else x)
 
               ## Replace old team names with the newest version
-              df['WINNER'].replace({'St. Louis Rams'           : 'Los Angeles Rams',
-                                   'San Diego Chargers'       : 'Los Angeles Chargers',
-                                   'Houston Oilers'           : 'Tennessee Titans',
-                                   'Tennessee Oilers'         : 'Tennessee Titans',
-                                   'Los Angeles Raiders'      : 'Las Vegas Raiders',
-                                   'Oakland Raiders'          : 'Las Vegas Raiders',
-                                   'Phoenix Cardinals'        : 'Arizona Cardinals',
-                                   'Washington Redskins'      : 'Washington Commanders',
-                                   'Washington Football Team' : 'Washington Commanders'},inplace=True)
-              df['LOSER'].replace({ 'St. Louis Rams'           : 'Los Angeles Rams',
-                                   'San Diego Chargers'       : 'Los Angeles Chargers',
-                                   'Houston Oilers'           : 'Tennessee Titans',
-                                   'Tennessee Oilers'         : 'Tennessee Titans',
-                                   'Los Angeles Raiders'      : 'Las Vegas Raiders',
-                                   'Oakland Raiders'          : 'Las Vegas Raiders',
-                                   'Phoenix Cardinals'        : 'Arizona Cardinals',
-                                   'Washington Redskins'      : 'Washington Commanders',
-                                   'Washington Football Team' : 'Washington Commanders'},inplace=True)
-              
-              df['FAVORITED'].replace({ 'St. Louis Rams'           : 'Los Angeles Rams',
-                                   'San Diego Chargers'       : 'Los Angeles Chargers',
-                                   'Houston Oilers'           : 'Tennessee Titans',
-                                   'Tennessee Oilers'         : 'Tennessee Titans',
-                                   'Los Angeles Raiders'      : 'Las Vegas Raiders',
-                                   'Oakland Raiders'          : 'Las Vegas Raiders',
-                                   'Phoenix Cardinals'        : 'Arizona Cardinals',
-                                   'Washington Redskins'      : 'Washington Commanders',
-                                   'Washington Football Team' : 'Washington Commanders'},inplace=True)
-
-              ## Data pull error, easier to fix here
-              if '01-02' in df['YEAR'].unique():
-                     df['YEAR'].replace({ "99-100":'99-00',
-                                          '00-1'  :'00-01',
-                                          '01-2'  :'01-02',
-                                          '02-3'  :'02-03',
-                                          '03-4'  :'03-04',
-                                          '04-5'  :'04-05',
-                                          '05-6'  :'05-06',
-                                          '06-7'  :'06-07',
-                                          '07-8'  :'07-08',
-                                          '08-9'  :'08-09'}, inplace=True)
-              elif '2-Jan' in df['YEAR'].unique(): ## Incase you open the CSV in Excel, it auto-formats oddly
-                     df['YEAR'].replace({ "99-100":'99-00',
-                                          '00-1'  :'00-01',
-                                          '2-Jan' :'01-02',
-                                          '3-Feb' :'02-03',
-                                          '4-Mar' :'03-04',
-                                          '5-Apr' :'04-05',
-                                          '6-May' :'05-06',
-                                          '7-Jun' :'06-07',
-                                          '8-Jul' :'07-08',
-                                          '9-Aug' :'08-09',
-                                          '10-Sep':'09-10',
-                                          '11-Oct':'10-11',
-                                          '12-Nov':'11-12',
-                                          '13-Dec':'12-13'}, inplace=True)
+              df['WINNER'].replace({      'St. Louis Rams'           : 'Los Angeles Rams',
+                                          'San Diego Chargers'       : 'Los Angeles Chargers',
+                                          'Houston Oilers'           : 'Tennessee Titans',
+                                          'Tennessee Oilers'         : 'Tennessee Titans',
+                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                          'Oakland Raiders'          : 'Las Vegas Raiders',
+                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                          'Washington Redskins'      : 'Washington Commanders',
+                                          'Washington Football Team' : 'Washington Commanders'},inplace=True)
+              df['LOSER'].replace({       'St. Louis Rams'           : 'Los Angeles Rams',
+                                          'San Diego Chargers'       : 'Los Angeles Chargers',
+                                          'Houston Oilers'           : 'Tennessee Titans',
+                                          'Tennessee Oilers'         : 'Tennessee Titans',
+                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                          'Oakland Raiders'          : 'Las Vegas Raiders',
+                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                          'Washington Redskins'      : 'Washington Commanders',
+                                          'Washington Football Team' : 'Washington Commanders'},inplace=True)
+              df['FAVORITED'].replace({   'St. Louis Rams'           : 'Los Angeles Rams',
+                                          'San Diego Chargers'       : 'Los Angeles Chargers',
+                                          'Houston Oilers'           : 'Tennessee Titans',
+                                          'Tennessee Oilers'         : 'Tennessee Titans',
+                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                          'Oakland Raiders'          : 'Las Vegas Raiders',
+                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                          'Washington Redskins'      : 'Washington Commanders',
+                                          'Washington Football Team' : 'Washington Commanders'}, inplace=True)
 
               ## Game Date to datetime
               df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
 
-              ## Create sorted year list like '91-92' to use as categorical ordering list
-              first_year = sorted(df['GAME_DATE'].dt.year.unique())[0]
-              last_year  = sorted(df['GAME_DATE'].dt.year.unique())[-1]
-              sorted_years = [f"{str(yr)[-2:]}"+"-"+f"{str(yr+1)[-2:]}" for yr in range(int(first_year), int(last_year)+1) ]
-              increase_in_number_of_weeks_in_season = sorted_years.index('21-22')
+              ## Overwrite Year column
+              df['YEAR'] = df['GAME_DATE'].apply(lambda x: f"{x.year}-{x.year+1}" if x.month in [8,9,10,11,12] else f"{x.year-1}-{x.year}")
+              
+              ## Create sorted year list like '1991-1992'
+              sorted_years = sorted(df['YEAR'].unique())
+              df['YEAR'] = pd.Categorical(df['YEAR'], sorted_years)
+              
+              increase_in_number_of_weeks_in_season = sorted_years.index('2021-2022')
 
               ## Create lists of year numbers to denote different length seasons
               seasons_with_21_weeks = sorted_years[:increase_in_number_of_weeks_in_season]
-              seasons_with_21_weeks.remove('93-94') ## This year had an extra bye week
+              seasons_with_21_weeks.remove('1993-1994') ## This year had an extra bye week
               seasons_with_22_weeks = sorted_years[increase_in_number_of_weeks_in_season:]
-              seasons_with_22_weeks.append('93-94')
+              seasons_with_22_weeks.append('1993-1994') ## This year had an extra bye week
 
               ## Change playoff week names to numbers
               ## prior to '21-22' season
-              df.loc[df['YEAR'].isin(seasons_with_21_weeks),:] = df.loc[df['YEAR'].isin(seasons_with_21_weeks),:].replace({'WildCard'  : '18',
-                                                                                                                       'Division'  : '19',
-                                                                                                                       'ConfChamp' : '20',
-                                                                                                                       'SuperBowl' : '21'})
+              df.loc[df['YEAR'].isin(seasons_with_21_weeks),:] = df.loc[df['YEAR'].isin(seasons_with_21_weeks),:].replace({   'WildCard'  : '18',
+                                                                                                                              'Division'  : '19',
+                                                                                                                              'ConfChamp' : '20',
+                                                                                                                              'SuperBowl' : '21'})
               ## after to '21-22' season
-              df.loc[df['YEAR'].isin(seasons_with_22_weeks),:] = df.loc[df['YEAR'].isin(seasons_with_22_weeks),:].replace({'WildCard'  : '19',
-                                                                                                                       'Division'  : '20',
-                                                                                                                       'ConfChamp' : '21',
-                                                                                                                       'SuperBowl' : '22'})
+              df.loc[df['YEAR'].isin(seasons_with_22_weeks),:] = df.loc[df['YEAR'].isin(seasons_with_22_weeks),:].replace({   'WildCard'  : '19',
+                                                                                                                              'Division'  : '20',
+                                                                                                                              'ConfChamp' : '21',
+                                                                                                                              'SuperBowl' : '22'})
 
               ## These data points are games were teams tied, the data didn't pull because of a "strong" tag
               df.loc[df['PTS_WINNER']=='NULL_VALUE','PTS_WINNER'] = df.loc[df['PTS_WINNER']=='NULL_VALUE','PTS_LOSER']
 
               ## Reduce Temp, Humidity, Wind down to just numbers
               df['TEMPERATURE'] = df['TEMPERATURE'].str.extract('(\d+)')
-              df['HUMIDITY'] = df['HUMIDITY'].str.extract('(\d+)')
-              df['WIND'] = df['WIND'].str.extract('(\d+)')
+              df['HUMIDITY']    = df['HUMIDITY'].str.extract('(\d+)')
+              df['WIND']        = df['WIND'].str.extract('(\d+)')
 
               df['TEMPERATURE'] = df['TEMPERATURE'].replace('',np.nan)
               df['HUMIDITY']    = df['HUMIDITY'].replace('',np.nan)
