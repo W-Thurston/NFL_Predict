@@ -2,14 +2,17 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 from scrapy.utils.project import get_project_settings
 
-from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
+import pandas as pd
+import numpy as np
 
 import os
 import re
 import requests
+from datetime import datetime
+import pytz
 
-import pandas as pd
-import numpy as np
+from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
+from utils.stadium_loc_dist_calc import convert
 
 class PFR_Data_Collector(object):
 
@@ -20,6 +23,7 @@ class PFR_Data_Collector(object):
               self.raw_upcoming_schedule_data_file     = 'data/raw/NFL_upcoming_schedule.csv'
               self.cleaned_upcoming_schedule_data_file = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'
               self.ELO_visualization_file              = 'data/output/Ranks_and_Betting.xlsx'
+              self.long_to_short_team_name_file        = 'data/cleaned/NFL_long_to_short_name.csv'
 
 
        def fetch_historical_data(self, all_data:bool = False, scrape_year:str = '2023'):
@@ -76,8 +80,7 @@ class PFR_Data_Collector(object):
                                    names=['WEEK_NUM','GAME_DAY_OF_WEEK','GAME_DATE','GAMETIME',
                                           'WINNER','GAME_LOCATION','LOSER','BOXSCORE_LINK','PTS_WINNER',
                                           'PTS_LOSER','YARDS_WINNER','TURNOVERS_WINNER','YARDS_LOSER',
-                                          'TURNOVERS_LOSER','YEAR','STADIUM','ROOF','SURFACE','VEGAS_LINE','OVER_UNDER',
-                                          'TEMPERATURE','HUMIDITY','WIND'], index_col=False)
+                                          'TURNOVERS_LOSER','YEAR','STADIUM','ROOF','SURFACE','VEGAS_LINE','OVER_UNDER'], index_col=False)
 
               ## In the data pull the header shows up multiple times
               df = df[((df['WEEK_NUM']!='Week')&(df['WEEK_NUM']!='NULL_VALUE'))]
@@ -86,7 +89,7 @@ class PFR_Data_Collector(object):
               df.drop_duplicates(['WEEK_NUM','GAME_DAY_OF_WEEK','GAME_DATE',
                                   'GAMETIME','WINNER','GAME_LOCATION','LOSER'], inplace=True)
 
-              
+              ## Split the pulled value of 'VEGAS_LINE' into Favorite (NFL team name) and Vegas Score line (how much they are favorited by)
               df['FAVORITED']  = df['VEGAS_LINE'].apply(lambda x: x[:x.index(' -')] if '-' in x else x)
               df['VEGAS_LINE'] = df['VEGAS_LINE'].apply(lambda x: x[x.index(' -'):] if '-' in x else x)
 
@@ -152,14 +155,6 @@ class PFR_Data_Collector(object):
               ## These data points are games were teams tied, the data didn't pull because of a "strong" tag
               df.loc[df['PTS_WINNER']=='NULL_VALUE','PTS_WINNER'] = df.loc[df['PTS_WINNER']=='NULL_VALUE','PTS_LOSER']
 
-              ## Reduce Temp, Humidity, Wind down to just numbers
-              df['TEMPERATURE'] = df['TEMPERATURE'].str.extract('(\d+)')
-              df['HUMIDITY']    = df['HUMIDITY'].str.extract('(\d+)')
-              df['WIND']        = df['WIND'].str.extract('(\d+)')
-
-              df['TEMPERATURE'] = df['TEMPERATURE'].replace('',np.nan)
-              df['HUMIDITY']    = df['HUMIDITY'].replace('',np.nan)
-              df['WIND']        = df['WIND'].replace('',np.nan)
               df['VEGAS_LINE']  = df['VEGAS_LINE'].replace('Pick',np.nan)
               df['FAVORITED']   = df['FAVORITED'].replace('Pick',np.nan)
 
@@ -173,9 +168,6 @@ class PFR_Data_Collector(object):
               df['TURNOVERS_LOSER']  = df['TURNOVERS_LOSER'].astype('int')
               df['OVER_UNDER']       = df['OVER_UNDER'].astype('float')
               df['VEGAS_LINE']       = df['VEGAS_LINE'].astype('float')
-              df['TEMPERATURE']      = df['TEMPERATURE'].astype('float')
-              df['HUMIDITY']         = df['HUMIDITY'].astype('float')
-              df['WIND']             = df['WIND'].astype('float')
 
               ## Create a column that denotes a win or a tie (could be used for prediction measuring)
               df.loc[df['PTS_WINNER']>df['PTS_LOSER'],'WIN_OR_TIE'] = 1
@@ -266,7 +258,38 @@ class PFR_Data_Collector(object):
               ## Set 'WIN_OR_TIE' to .5 to denote a tie
               df.loc[df['PTS_WINNER']==df['PTS_LOSER'], 'WIN_OR_TIE'] = 0.5
 
-              df.sort_values(['GAME_DATE','GAMETIME'], ascending=True, inplace=True)
+              ## Create a GAME_ID column
+              # create series of "YYYY-Wk-Away_team-Home_team" to use as an ID column
+              temp_id = df.apply(lambda row:  f"{row['YEAR']}_{row['WEEK_NUM']:02}_{row['WINNER'] if row['GAME_LOCATION']=='@' else row['LOSER']}_{row['WINNER'] if row['GAME_LOCATION']=='NULL_VALUE' else row['LOSER']}" ,axis=1)
+              temp_id = pd.DataFrame(temp_id, columns=['LONG_ID'])
+              
+              # Read in data that maps NFL's Long team name (ex: Arizona Cardinals) to NFL's short team name (ex: ARI)
+              df_short = pd.read_csv(self.long_to_short_team_name_file)
+
+              # Create dictionary to use for pandas series mapping
+              df_short_dict = {}
+              for row in df_short.itertuples():
+                     df_short_dict[row.NFL_LONG_NAME] = row.NFL_SHORT_NAME
+
+              # Map Long names to short names
+              temp_id = temp_id['LONG_ID'].replace(df_short_dict, regex=True)
+              df['GAME_ID'] = temp_id
+
+              # Clean up after yourself
+              df_short, df_short_dict, temp_id = None, None, None
+              del df_short, df_short_dict, temp_id
+
+              df['STADIUM'].replace({'Dolphin Stadium':'Dolphins Stadium'}, inplace=True)
+
+              ## Sort wk_by_wk file
+              df.sort_values(['GAME_DATE','GAMETIME', 'GAME_ID'], ascending=True, inplace=True, ignore_index=True)
+
+              ## Set ordering of columns
+              df = df.loc[:,[      'GAME_ID', 'WEEK_NUM', 'GAME_DAY_OF_WEEK', 'GAME_DATE', 'GAMETIME', 
+                                   'WINNER', 'GAME_LOCATION', 'LOSER', 'BOXSCORE_LINK', 'PTS_WINNER', 
+                                   'PTS_LOSER', 'YARDS_WINNER', 'TURNOVERS_WINNER', 'YARDS_LOSER', 
+                                   'TURNOVERS_LOSER', 'YEAR', 'STADIUM', 'ROOF', 'SURFACE', 'VEGAS_LINE', 
+                                   'OVER_UNDER', 'FAVORITED', 'WIN_OR_TIE']]
 
               ## Save cleaned data to 'cleaned_' file
               df.to_csv(self.cleaned_historical_data_file, index=False)
@@ -277,7 +300,7 @@ class PFR_Data_Collector(object):
               """
               SOURCED FROM: github.com/agad495/DKscraPy
               
-              Scrapes current NFL game lines.
+              Scrapes current NFL game lines on Draftkings Sportsbook.
 
               """
               dk_api = requests.get("https://sportsbook.draftkings.com//sites/US-NJ-SB/api/v5/eventgroups/88808?format=json").json()
@@ -296,22 +319,19 @@ class PFR_Data_Collector(object):
                             try:
                                    games[away_team]['moneyline'] = i[2]['outcomes'][0]['oddsAmerican']
                             except:
-                                   pass
+                                   games[away_team]['moneyline'] = 'NULL_VALUE'
                             try:
-                                   games[away_team]['spread'] = [i[0]['outcomes'][0]['line'],
-                                                                 i[0]['outcomes'][0]['oddsAmerican']]
+                                   games[away_team]['spread'] = [i[0]['outcomes'][0]['line'], i[0]['outcomes'][0]['oddsAmerican']]
                             except:
-                                   pass
+                                   games[away_team]['spread'] = 'NULL_VALUE'
                             try:
-                                   games[away_team]['over'] = [i[1]['outcomes'][0]['line'],
-                                                               i[1]['outcomes'][0]['oddsAmerican']]
+                                   games[away_team]['over'] = [i[1]['outcomes'][0]['line'], i[1]['outcomes'][0]['oddsAmerican']]
                             except:
-                                   pass
+                                   games[away_team]['over'] = 'NULL_VALUE'
                             try:
-                                   games[away_team]['under'] = [i[1]['outcomes'][1]['line'],
-                                                                i[1]['outcomes'][1]['oddsAmerican']]
+                                   games[away_team]['under'] = [i[1]['outcomes'][1]['line'], i[1]['outcomes'][1]['oddsAmerican']]
                             except:
-                                   pass
+                                   games[away_team]['under'] = 'NULL_VALUE'
                             games[away_team]['opponent'] = home_team
                      
                      if home_team not in games:
@@ -319,26 +339,22 @@ class PFR_Data_Collector(object):
                             try:
                                    games[home_team]['moneyline'] = i[2]['outcomes'][1]['oddsAmerican']
                             except:
-                                   pass
+                                   games[home_team]['moneyline'] = 'NULL_VALUE'
                             try:
-                                   games[home_team]['spread'] = [i[0]['outcomes'][1]['line'],
-                                                                 i[0]['outcomes'][1]['oddsAmerican']]
+                                   games[home_team]['spread'] = [i[0]['outcomes'][1]['line'], i[0]['outcomes'][1]['oddsAmerican']]
                             except:
-                                   pass
+                                   games[home_team]['spread'] = 'NULL_VALUE'
                             try:
-                                   games[home_team]['over'] = [i[1]['outcomes'][0]['line'],
-                                                               i[1]['outcomes'][0]['oddsAmerican']]
+                                   games[home_team]['over'] = [i[1]['outcomes'][0]['line'], i[1]['outcomes'][0]['oddsAmerican']]
                             except:
-                                   pass
+                                   games[home_team]['over'] = 'NULL_VALUE'
                             try:
-                                   games[home_team]['under'] = [i[1]['outcomes'][1]['line'],
-                                                                i[1]['outcomes'][1]['oddsAmerican']]
+                                   games[home_team]['under'] = [i[1]['outcomes'][1]['line'], i[1]['outcomes'][1]['oddsAmerican']]
                             except:
-                                   pass     
+                                   games[home_team]['under'] = 'NULL_VALUE'     
                             games[home_team]['opponent'] = away_team
 
               games = pd.DataFrame(games).T.reset_index()
-
 
               with pd.ExcelWriter(self.ELO_visualization_file, mode='a', if_sheet_exists='overlay') as writer:
                      games.to_excel(      excel_writer= writer,
@@ -347,3 +363,4 @@ class PFR_Data_Collector(object):
                                           header=False, 
                                           startrow = 2,
                                           startcol = 32)
+              

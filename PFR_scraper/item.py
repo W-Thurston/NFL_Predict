@@ -27,9 +27,6 @@ class NFL_ProFootballReference(Item):
 	surface			 = Field()  # Type of surface the field has (ie. grass, turf, etc)
 	vegas_line		 = Field()  # Vegas betting line at kickoff
 	over_under		 = Field()  # Vegas over/under at kickoff
-	temperature      = Field()  # Temperature at kickoff
-	humidity         = Field()  # Relative Humidity at kickoff
-	wind             = Field()  # MPH Wind at kickoff
 		
 class NFL_PFR_Upcoming_Schedule(Item):
 	week_num 		 = Field() 	# Week number in season

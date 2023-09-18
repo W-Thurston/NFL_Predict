@@ -10,6 +10,7 @@ import datetime
 import timezonefinder, pytz
 
 import utils.elo as elo
+import utils.stadium_loc_dist_calc as dist_calc
 
 class model_input_feature_builder(object):
 
@@ -321,83 +322,6 @@ class model_input_feature_builder(object):
         modeling_file.to_csv(self.modeling_file, index=False)
         print(f'> Building Home or Away feature -- END')
         print()
-    
-    @staticmethod
-    def _convert(self, tude):
-
-        ## If the latiTUDE or longiTUDE are in the form [Degrees°Minutes′Secounds″Direction]
-        if '″' in tude:
-
-            ## Multiplier is 1 for North/East & -1 for South/West
-            multiplier = 1 if tude[-1] in ['N', 'E'] else -1
-
-            ## Split data with Degree/Minute/Seconds symbols
-            deg, minutes, seconds, direction = re.split('[°\′″]', tude)
-
-            ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
-            decimal_degrees = round(multiplier * (float(deg) + float(minutes)/60 + float(seconds)/(60*60)),4)
-
-            #print(f"{tude} converted to {decimal_degrees}")
-            return decimal_degrees
-        
-        ## If the latiTUDE or longiTUDE are in the form [Degrees°]
-        else:
-            
-            ## Split data with Degree symbols
-            decimal_degrees, direction = re.split('[°]', tude)
-
-            ## Multiplier is 1 for North/East & -1 for South/West
-            multiplier = 1 if direction in ['N', 'E'] else -1
-
-            ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
-            decimal_degrees = round(multiplier * float(decimal_degrees),4)
-
-            #print(f"{tude} converted to {decimal_degrees}")
-            return decimal_degrees
-
-    @staticmethod
-    def _measure_distance(self, lat_long_of_home:list, lat_long_of_game:list, metric:str='km') -> float:
-        
-        ## Convert string value of either Degrees, Minutes, Seconds, Direction or Degrees, Direction to +/- Degrees
-        lat_of_home_to_decimal  = self._convert(self, lat_long_of_home[0])
-        long_of_home_to_decimal = self._convert(self, lat_long_of_home[1])
-        lat_of_game_to_decimal  = self._convert(self, lat_long_of_game[0])
-        long_of_game_to_decimal = self._convert(self, lat_long_of_game[1])
-        
-        ## Place above converted values into tuple
-        coords_of_home = (lat_of_home_to_decimal, long_of_home_to_decimal)
-        coords_of_game = (lat_of_game_to_decimal, long_of_game_to_decimal)
-
-        ## If you want km or miles; then round the wanted distance to nearest 2 decimal places
-        if metric=='km':
-            #print(f"Distance between:\n\t{coords_of_home}\n\t{coords_of_game}\n\t{round(distance(coords_of_home, coords_of_game).km,2)} km")
-            return round(distance(coords_of_home, coords_of_game).km,6)
-            
-        elif metric=='miles':
-            #print(f"Distance between:\n\t{coords_of_home}\n\t{coords_of_game}\n\t{round(distance(coords_of_home, coords_of_game).miles,2)} miles")
-            return round(distance(coords_of_home, coords_of_game).miles,6)
-        
-    @staticmethod
-    def _find_utc_offset(self, latitude, longitude, tf):
-        
-        ## From the lat/long, get the tz-database-style time zone name (e.g. 'America/New York') or None
-        timezone_str = tf.certain_timezone_at(lat=self._convert(self, latitude), lng=self._convert(self, longitude))
-
-        ## From time zon name get UTC offset (e.g. '-0500' for America/New York)
-        timezone = pytz.timezone(timezone_str).localize(datetime.datetime.now()).strftime('%z')
-        # timezone = pytz.timezone(timezone_str).localize(datetime.datetime(2020,12,1)).strftime('%z')  ## Leaving this here so that I can implement based on specific date
-
-        return timezone
-
-    @staticmethod
-    def _calculate_timezone_difference(self, lat_x, long_x, lat_y, long_y, tz_find):
-
-        timezone_x = int(self._find_utc_offset(self, lat_x, long_x, tf=tz_find))
-        timezone_y = int(self._find_utc_offset(self, lat_y, long_y, tf=tz_find))
-
-        timezone_diff = timezone_x - timezone_y
-
-        return timezone_diff
 
     @staticmethod
     def _calculate_travel_and_tz_distance(self):
@@ -405,6 +329,7 @@ class model_input_feature_builder(object):
         print(f'> Calculating travel and timezone distances -- START')
         df_modeling_file = pd.read_csv(self.modeling_file)
         df_stadium       = pd.read_csv(self.stadium_file)
+        df_wk_by_wk      = pd.read_csv(self.pfr_cleaned_data_file)
 
         ## Create temporary Dataframe to hold ['TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD','LATITUDE_TEAM_A','LONGITUDE_TEAM_A','LATITUDE_TEAM_B','LONGITUDE_TEAM_B']
         #    Used for easily applying distance & tz calculations
@@ -416,18 +341,48 @@ class model_input_feature_builder(object):
                            how='left', left_on=['TEAM_B','YEAR'], right_on=['HOME_TEAM','YEAR']).drop('HOME_TEAM',axis=1)
         
         ## Calculate Team A's Kilometers of travel
-        temp_df['TEAM_A_KM_TRAVELED'] = temp_df.progress_apply(lambda row: self._measure_distance(self, 
-                                                                                                  [row['LATITUDE_x'], row['LONGITUDE_x']],
-                                                                                                  [row['LATITUDE_y'], row['LONGITUDE_y']]) if row['HOME_FIELD']==0 else 0 , axis=1)
+        temp_df['TEAM_A_KM_TRAVELED'] = temp_df.progress_apply(lambda row: dist_calc._measure_distance( [row['LATITUDE_x'], row['LONGITUDE_x']],
+                                                                                                        [row['LATITUDE_y'], row['LONGITUDE_y']]) if row['HOME_FIELD']==0 else 0 , axis=1)
         ## Calculate Team A's Timezone change (US/Pacific -> US/Easter = -300)
         timezone_finder = timezonefinder.TimezoneFinder()
-        temp_df['TEAM_A_TZ_TRAVELED'] = temp_df.progress_apply(lambda row: self._calculate_timezone_difference( self,
-                                                                                                                row['LATITUDE_x' ],
-                                                                                                                row['LONGITUDE_x'],
-                                                                                                                row['LATITUDE_y' ],
-                                                                                                                row['LONGITUDE_y'],
-                                                                                                                tz_find = timezone_finder) if row['HOME_FIELD']==0 else 0 , axis=1)
-            
+        temp_df['TEAM_A_TZ_TRAVELED'] = temp_df.progress_apply(lambda row: dist_calc._calculate_timezone_difference(    row['LATITUDE_x' ],
+                                                                                                                        row['LONGITUDE_x'],
+                                                                                                                        row['LATITUDE_y' ],
+                                                                                                                        row['LONGITUDE_y'],
+                                                                                                                        tz_find = timezone_finder) if row['HOME_FIELD']==0 else 0 , axis=1)
+
+        ## For International games, we need to adjust the Travel distance and timezone difference
+        for row in df_wk_by_wk.loc[df_wk_by_wk['STADIUM'].isin(df_stadium.loc[(df_stadium['HOME_TEAM'].isin(['International', 'Alternate'])),'STADIUM']),:].itertuples():
+            if ((row.STADIUM == 'Gillette Stadium') & (not row.YEAR =='2002-2003'))|((row.STADIUM == 'TCF Bank Stadium') & (not row.YEAR =='2010-2011'))|((row.STADIUM == 'Husky Stadium') & (not row.YEAR =='1994-1995')):
+                continue
+            ## Adjust Travel Distance
+            temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
+                         ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                        (temp_df['YEAR']==row.YEAR)&
+                        (temp_df['WEEK_NUM']==row.WEEK_NUM),'TEAM_A_KM_TRAVELED'] = temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
+                                                                                                 ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                                                                                                (temp_df['YEAR']==row.YEAR)&
+                                                                                                (temp_df['WEEK_NUM']==row.WEEK_NUM),['LATITUDE_x', 'LONGITUDE_x']].apply(lambda x: dist_calc._measure_distance( [x.LATITUDE_x, x.LONGITUDE_x],
+                                                                                                                                                                                                                [df_stadium.loc[(df_stadium['STADIUM']==row.STADIUM)&
+                                                                                                                                                                                                                                (df_stadium['YEAR']   ==row.YEAR   ),'LATITUDE'].values[0],
+                                                                                                                                                                                                                df_stadium.loc[(df_stadium['STADIUM']==row.STADIUM)&
+                                                                                                                                                                                                                                (df_stadium['YEAR']   ==row.YEAR   ),'LONGITUDE'].values[0]]), axis=1)
+            ## Adjust Timezone Difference
+            temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
+                         ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                        (temp_df['YEAR']==row.YEAR)&
+                        (temp_df['WEEK_NUM']==row.WEEK_NUM),'TEAM_A_TZ_TRAVELED'] = temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
+                                                                                                 ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                                                                                                (temp_df['YEAR']==row.YEAR)&
+                                                                                                (temp_df['WEEK_NUM']==row.WEEK_NUM),['LATITUDE_x', 'LONGITUDE_x']].apply(lambda x: dist_calc._calculate_timezone_difference(x.LATITUDE_x, 
+                                                                                                                                                                                                                            x.LONGITUDE_x,
+                                                                                                                                                                                                                            df_stadium.loc[ (df_stadium['STADIUM']==row.STADIUM)&
+                                                                                                                                                                                                                                            (df_stadium['YEAR']   ==row.YEAR   ),'LATITUDE'].values[0],
+                                                                                                                                                                                                                            df_stadium.loc[ (df_stadium['STADIUM']==row.STADIUM)&
+                                                                                                                                                                                                                                            (df_stadium['YEAR']   ==row.YEAR   ),'LONGITUDE'].values[0],
+                                                                                                                                                                                                                            tz_find = timezone_finder), axis=1)
+
+
         ## Drop unneeded columns
         temp_df.drop(['LATITUDE_x', 'LONGITUDE_x', 'LATITUDE_y', 'LONGITUDE_y','HOME_FIELD'],axis=1, inplace=True)
 

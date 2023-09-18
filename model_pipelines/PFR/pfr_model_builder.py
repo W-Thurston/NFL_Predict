@@ -117,3 +117,12 @@ class pfr_model_builder(object):
                             header=False, 
                             startrow = 3,
                             startcol = 14)
+            
+    def build_new_weeks_prediction_file(self, year:str, week:int):
+        '''
+        Used to aggregate date for the up coming week into a format that matches the modeling file.
+
+        '''
+        self.modeling_file         = 'data/modeling/modeling_file.csv'
+        self.stadium_file          = 'data/cleaned/NFL_stadium_reference.csv'
+        self.upcoming_schedule_filename  = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'

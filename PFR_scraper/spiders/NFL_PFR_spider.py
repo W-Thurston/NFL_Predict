@@ -92,9 +92,6 @@ class Historical_PFR_Spider(Spider):
 		item['surface']     = None
 		item['vegas_line']  = None
 		item['over_under']  = None
-		item['temperature'] = None
-		item['humidity']    = None
-		item['wind']        = None
 
 		## regex to remove HTML comments strings
 		regex = re.compile(r'<!--(.*)-->', re.DOTALL)
@@ -126,15 +123,7 @@ class Historical_PFR_Spider(Spider):
 				elif val == 'over/under':
 					item['over_under'] = game_data_stat[idx]
 				elif val == 'weather*' or val == 'weather':
-					weather = game_data_stat[idx].split(',')
-					if len(weather) == 3 or len(weather) == 4:
-						item['temperature'] = weather[0].strip()
-						item['humidity']    = weather[1].strip()
-						item['wind']        = weather[2].strip()
-					elif len(weather) == 2:
-						item['temperature'] = weather[0].strip()
-						item['wind']        = weather[1].strip()
-						item['humidity']    = 'NULL_VALUE'
+					continue
 				elif val == 'attendance':
 					continue
 				elif val == 'won toss':
@@ -149,7 +138,7 @@ class Historical_PFR_Spider(Spider):
 					print(f"This was an un-caught info in all_game_stats: {val}")
 
 		## If any of the values we want did not appear on the page, set it to "NULL_VALUE"
-		for val in ['roof','surface','vegas_line','over_under','temperature','humidity','wind']:
+		for val in ['roof','surface','vegas_line','over_under']:
 			if item[val] is None:
 				item[val] = 'NULL_VALUE'
 
@@ -245,9 +234,6 @@ class Append_New_PFR_Spider(Spider):
 		item['surface']     = None
 		item['vegas_line']  = None
 		item['over_under']  = None
-		item['temperature'] = None
-		item['humidity']    = None
-		item['wind']        = None
 
 		## regex to remove HTML comments strings
 		regex = re.compile(r'<!--(.*)-->', re.DOTALL)
@@ -279,15 +265,7 @@ class Append_New_PFR_Spider(Spider):
 				elif val == 'over/under':
 					item['over_under'] = game_data_stat[idx]
 				elif val == 'weather*' or val == 'weather':
-					weather = game_data_stat[idx].split(',')
-					if len(weather) == 3 or len(weather) == 4:
-						item['temperature'] = weather[0].strip()
-						item['humidity']    = weather[1].strip()
-						item['wind']        = weather[2].strip()
-					elif len(weather) == 2:
-						item['temperature'] = weather[0].strip()
-						item['wind']        = weather[1].strip()
-						item['humidity']    = 'NULL_VALUE'
+					continue
 				elif val == 'attendance':
 					continue
 				elif val == 'won toss':
@@ -302,7 +280,7 @@ class Append_New_PFR_Spider(Spider):
 					print(f"This was an un-caught info in all_game_stats: {val}")
 
 		## If any of the values we want did not appear on the page, set it to "NULL_VALUE"
-		for val in ['roof','surface','vegas_line','over_under','temperature','humidity','wind']:
+		for val in ['roof','surface','vegas_line','over_under']:
 			if item[val] is None:
 				item[val] = 'NULL_VALUE'
 
