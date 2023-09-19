@@ -3,6 +3,7 @@ from scrapy import Spider
 from scrapy.selector import Selector
 
 import re
+import pandas as pd
 
 from PFR_scraper.item import NFL_ProFootballReference, NFL_PFR_Upcoming_Schedule
 
@@ -163,12 +164,21 @@ class Append_New_PFR_Spider(Spider):
 	def __init__(self, year: str = '2023'):
 		self.year = year
 		self.start_urls   = [f'https://www.pro-football-reference.com/years/{self.year}/games.htm']
+		self.cleaned_historical_data_file        = 'data/cleaned/NFL_wk_by_wk_cleaned.csv'
 
 	def parse(self, response):
+
+		df = pd.read_csv(self.cleaned_historical_data_file)
+		already_pulled_weeks = df.loc[df['YEAR'].str.startswith(self.year), 'WEEK_NUM'].unique()
 
 		rows = response.xpath('//tbody/tr')
 		for row in rows:
 			week_num 		 = row.xpath('./th[@data-stat="week_num"]/text()').extract_first()         if row.xpath('./th[@data-stat="week_num"]/text()').extract_first() else "NULL_VALUE"
+			try:
+				if int(week_num) in already_pulled_weeks:
+					continue
+			except:
+				pass
 			game_day_of_week = row.xpath('./td[@data-stat="game_day_of_week"]/text()').extract_first() if row.xpath('./td[@data-stat="game_day_of_week"]/text()').extract_first() else "NULL_VALUE"
 			game_date 		 = row.xpath('./td[@data-stat="game_date"]/text()').extract_first()        if row.xpath('./td[@data-stat="game_date"]/text()').extract_first() else "NULL_VALUE"
 			gametime 		 = row.xpath('./td[@data-stat="gametime"]/text()').extract_first()         if row.xpath('./td[@data-stat="gametime"]/text()').extract_first() else "NULL_VALUE"

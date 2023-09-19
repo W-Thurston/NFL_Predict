@@ -12,7 +12,7 @@ from datetime import datetime
 import pytz
 
 from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
-from utils.stadium_loc_dist_calc import convert
+from utils.stadium_loc_dist_calc import _convert
 
 class PFR_Data_Collector(object):
 
@@ -123,7 +123,10 @@ class PFR_Data_Collector(object):
                                           'Washington Football Team' : 'Washington Commanders'}, inplace=True)
 
               ## Game Date to datetime
-              df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
+              try:
+                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d")
+              except:
+                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%m/%d/%Y")
 
               ## Overwrite Year column
               df['YEAR'] = df['GAME_DATE'].apply(lambda x: f"{x.year}-{x.year+1}" if x.month in [8,9,10,11,12] else f"{x.year-1}-{x.year}")
@@ -362,5 +365,5 @@ class PFR_Data_Collector(object):
                                           index=False,
                                           header=False, 
                                           startrow = 2,
-                                          startcol = 32)
+                                          startcol = 31)
               

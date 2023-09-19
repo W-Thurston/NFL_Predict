@@ -47,7 +47,7 @@ class pfr_model_builder(object):
                                     index=False,
                                     header=False, 
                                     startrow=2,
-                                    startcol=13)
+                                    startcol=14)
             
         print(f"> Saving Elo based predictions to: {self.ELO_visualization_file}")
 
@@ -96,11 +96,12 @@ class pfr_model_builder(object):
         week: int -> Current Week you'd like to visualize (ex 1) 
 
         '''
+        print(f"> Adjusting elo ranks based on {year} and {week}")
         df_elo = pd.read_csv(self.ELO_data_file)
 
         ## Reduce RAM usage
         df_elo = df_elo.loc[(df_elo['NFL_YEAR']==year)&
-                            (df_elo['NFL_YEAR'].isin([week,week+1])),:]
+                            (df_elo['NFL_WEEK'].isin([week,week+1])),:]
         
         df1 = df_elo.loc[(df_elo['NFL_YEAR']==year)&(df_elo['NFL_WEEK']==week  ),['NFL_TEAM','ELO']].sort_values(['ELO'],ascending=False).reset_index().drop('index',axis=1)
         df1['Rank'] = np.arange(1,df1.shape[0]+1)
@@ -117,6 +118,8 @@ class pfr_model_builder(object):
                             header=False, 
                             startrow = 3,
                             startcol = 14)
+        
+        print(f"> Saving updated Elo Ranks to: {self.ELO_visualization_file}")
             
     def build_new_weeks_prediction_file(self, year:str, week:int):
         '''

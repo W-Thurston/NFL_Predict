@@ -50,7 +50,7 @@ def main():
         Ranks_and_Betting_builder_object = pfr_model_builder()
         
         ## Build Excel Visualization for Current week elo changes
-        Ranks_and_Betting_builder_object.build_new_ranks(year = args.ELO_only[0], week = int(args.ELO_only[1]))
+        Ranks_and_Betting_builder_object.build_new_ranks(year = args.ranks_and_betting[0], week = int(args.ranks_and_betting[1]))
         print("> Building Ranks and Betting Excel -- END")
         print()
 
