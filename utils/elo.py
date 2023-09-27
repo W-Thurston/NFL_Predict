@@ -1,5 +1,3 @@
-
-
 def elo_win_probability(rating_teamA, rating_teamB):
     '''
         

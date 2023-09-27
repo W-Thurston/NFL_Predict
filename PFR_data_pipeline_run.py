@@ -10,11 +10,11 @@ def main():
     print("Data Pipeline for Pro Football Reference Scraping and Feature Generation")
     ap = ArgumentParser()
     # ap.add_argument("--config_path", help="Path to yaml config file.")
-    ap.add_argument("--collect_historical_PFR_data", nargs='+', type=str, help="All Data: bool->False & A year: str-> '2023' ")
+    ap.add_argument("--collect_historical_PFR_data", nargs='+', type=str, help="all_data: bool->False & A year: str-> '2023' ")
     ap.add_argument("--clean_historical_PFR_data")
     ap.add_argument("--collect_upcoming_data")
     ap.add_argument("--clean_upcoming_PFR_data")
-    ap.add_argument("--build_model_input_features")
+    ap.add_argument("--build_model_input_features", nargs='+', type=str, help="all_data: bool->False")
     ap.add_argument("--draftkings_odds")
 
     args = ap.parse_args()
@@ -76,10 +76,10 @@ def main():
         model_input_feature_builder_object.prep_data_modeling_file()
         
         ## Create Elo data and append to base modeling file
-        model_input_feature_builder_object.handle_elo_data()
+        model_input_feature_builder_object.handle_elo_data(all_data=eval(args.build_model_input_features[0]))
 
         ## Create location based features
-        model_input_feature_builder_object.handle_location_data()
+        model_input_feature_builder_object.handle_location_data(all_data=eval(args.build_model_input_features[0]))
 
         print("> Building model input features -- END")
         print()
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         --clean_historical_PFR_data 0
         --collect_upcoming_data 0
         --clean_upcoming_PFR_data 0
-        --build_model_input_features 0
+        --build_model_input_features False
         --draftkings_odds 0
     """
     main()

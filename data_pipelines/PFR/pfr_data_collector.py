@@ -124,9 +124,9 @@ class PFR_Data_Collector(object):
 
               ## Game Date to datetime
               try:
-                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d")
+                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d", dayfirst=False, yearfirst=True)
               except:
-                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%m/%d/%Y")
+                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%m/%d/%Y", dayfirst=False, yearfirst=False)
 
               ## Overwrite Year column
               df['YEAR'] = df['GAME_DATE'].apply(lambda x: f"{x.year}-{x.year+1}" if x.month in [8,9,10,11,12] else f"{x.year-1}-{x.year}")
@@ -306,7 +306,7 @@ class PFR_Data_Collector(object):
               Scrapes current NFL game lines on Draftkings Sportsbook.
 
               """
-              dk_api = requests.get("https://sportsbook.draftkings.com//sites/US-NJ-SB/api/v5/eventgroups/88808?format=json").json()
+              dk_api = requests.get("https://sportsbook.draftkings.com/sites/US-CO/api/v5/eventgroups/88808?format=json").json()
               dk_markets = dk_api['eventGroup']['offerCategories'][0]['offerSubcategoryDescriptors'][0]['offerSubcategory']['offers']
 
               games = {}
@@ -365,5 +365,5 @@ class PFR_Data_Collector(object):
                                           index=False,
                                           header=False, 
                                           startrow = 2,
-                                          startcol = 31)
+                                          startcol = 35)
               
