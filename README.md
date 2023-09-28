@@ -4,6 +4,7 @@ The beginnings of a project to predict NFL scores and potentially fantasy footba
 
 How to update data:  
     If its your first time, change arguments to fit your needs:  
+    
         ```python  
         python PFR_data_pipeline_run.py \
                 --collect_historical_PFR_data True '2023' \
