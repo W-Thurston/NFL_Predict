@@ -2,5 +2,6 @@ data/
 TODO.txt
 *.pyc 
 
-notebooks/
+notebooks/exploratory/
+notebooks/modeling/
 configs/
