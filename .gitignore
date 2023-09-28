@@ -5,3 +5,5 @@ TODO.txt
 notebooks/exploratory/*.ipynb
 notebooks/modeling/*.ipynb
 configs/
+
+.ipynb_checkpoints/
