@@ -2,6 +2,8 @@ import re
 from geopy.distance import distance
 import datetime
 import timezonefinder, pytz
+import requests
+import json
 
 
 def _convert(tude):
@@ -9,35 +11,42 @@ def _convert(tude):
     
     '''
     
-    ## If the latiTUDE or longiTUDE are in the form [Degrees°Minutes′Secounds″Direction]
-    if '″' in tude:
+    ## If tude is a str, convert the string to decimal degrees
+    if isinstance(tude, str):
+        ## If the latiTUDE or longiTUDE are in the form [Degrees°Minutes′Secounds″Direction]
+        if '″' in tude:
 
-        ## Multiplier is 1 for North/East & -1 for South/West
-        multiplier = 1 if tude[-1] in ['N', 'E'] else -1
+            ## Multiplier is 1 for North/East & -1 for South/West
+            multiplier = 1 if tude[-1] in ['N', 'E'] else -1
 
-        ## Split data with Degree/Minute/Seconds symbols
-        deg, minutes, seconds, direction = re.split('[°\′″]', tude)
+            ## Split data with Degree/Minute/Seconds symbols
+            deg, minutes, seconds, direction = re.split('[°\′″]', tude)
 
-        ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
-        decimal_degrees = round(multiplier * (float(deg) + float(minutes)/60 + float(seconds)/(60*60)),4)
+            ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
+            decimal_degrees = round(multiplier * (float(deg) + float(minutes)/60 + float(seconds)/(60*60)),4)
 
-        #print(f"{tude} converted to {decimal_degrees}")
-        return decimal_degrees
-    
-    ## If the latiTUDE or longiTUDE are in the form [Degrees°]
-    else:
+            #print(f"{tude} converted to {decimal_degrees}")
+            return decimal_degrees
         
-        ## Split data with Degree symbols
-        decimal_degrees, direction = re.split('[°]', tude)
+        ## If the latiTUDE or longiTUDE are in the form [Degrees°]
+        else:
+            
+            ## Split data with Degree symbols
+            decimal_degrees, direction = re.split('[°]', tude)
 
-        ## Multiplier is 1 for North/East & -1 for South/West
-        multiplier = 1 if direction in ['N', 'E'] else -1
+            ## Multiplier is 1 for North/East & -1 for South/West
+            multiplier = 1 if direction in ['N', 'E'] else -1
 
-        ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
-        decimal_degrees = round(multiplier * float(decimal_degrees),4)
+            ## convert above split data into a +/- decimal representation of latiTUDE or longiTUDE
+            decimal_degrees = round(multiplier * float(decimal_degrees),4)
 
-        #print(f"{tude} converted to {decimal_degrees}")
-        return decimal_degrees
+            #print(f"{tude} converted to {decimal_degrees}")
+            return decimal_degrees
+        
+    ## If tude is already a float, just return that value rounded to 4 decimals
+    elif isinstance(tude, float):
+        return round(tude, 4)
+
 
 def _measure_distance(lat_long_of_home:list, lat_long_of_game:list, metric:str='km') -> float:
     '''
@@ -90,3 +99,20 @@ def _calculate_timezone_difference(lat_x, long_x, lat_y, long_y, tz_find):
     timezone_diff = timezone_x - timezone_y
 
     return timezone_diff
+
+
+def _get_altitude(df):
+    '''
+        Pull Elevation of stadium based on Lat and Lon data
+    '''
+    
+    url = "https://api.open-elevation.com/api/v1/lookup"
+    data = {}
+    data['locations'] = [{'latitude':x[0], 'longitude':x[1]} for x in df.loc[:,['LATITUDE','LONGITUDE']].values]
+    headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+    r = requests.post(url, data=json.dumps(data), headers=headers).json()
+
+    ## open-elevation api returns a dictionary {elevation:...,latitude:...,longitude:...};
+    #   Pull out just the elevation data
+    elevation_data = [x['elevation'] for x in r['results']]
+    return elevation_data

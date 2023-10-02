@@ -38,14 +38,14 @@ class model_input_feature_builder(object):
         del sorted_years
 
         ## Set the modeling target variable to '1' for winners
-        game_data = game_data.loc[:,['WINNER','LOSER','YEAR','WEEK_NUM']]
+        game_data = game_data.loc[:,['GAME_ID','WINNER','LOSER','YEAR','WEEK_NUM']]
         game_data['RESULT'] = 1
-        game_data.columns = ['TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT']
+        game_data.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT']
 
         ## Flip the winners and losers so that we can concat this data to the above and set modeling target to 0
-        game_data_flipped = game_data.loc[:,['TEAM_B','TEAM_A','YEAR','WEEK_NUM']]
+        game_data_flipped = game_data.loc[:,['GAME_ID','TEAM_B','TEAM_A','YEAR','WEEK_NUM']]
         game_data_flipped['RESULT'] = 0
-        game_data_flipped.columns = ['TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT']
+        game_data_flipped.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT']
 
         ## Concatenate the two DataFrames
         game_data = pd.concat([game_data, game_data_flipped]).sort_values(['YEAR','WEEK_NUM','TEAM_A'])
@@ -318,12 +318,12 @@ class model_input_feature_builder(object):
         ## Add Team_A's elo data to base modeling file data
         model_data = pd.merge(base_modeling_file,elo_data, how='left', left_on=['TEAM_A','YEAR','WEEK_NUM'], right_on=['NFL_TEAM','NFL_YEAR','NFL_WEEK'])
         model_data.drop(['NFL_TEAM','NFL_YEAR','NFL_WEEK'], axis=1, inplace=True)
-        model_data.columns = ['TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT','TEAM_A_ELO']
+        model_data.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT','TEAM_A_ELO']
 
         ## Add Team_B's elo data to base modeling file data
         model_data = pd.merge(model_data,elo_data, how='left', left_on=['TEAM_B','YEAR','WEEK_NUM'], right_on=['NFL_TEAM','NFL_YEAR','NFL_WEEK'])
         model_data.drop(['NFL_TEAM','NFL_YEAR','NFL_WEEK'], axis=1, inplace=True)
-        model_data.columns = ['TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT','TEAM_A_ELO','TEAM_B_ELO']
+        model_data.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT','TEAM_A_ELO','TEAM_B_ELO']
 
         ## just make sure there are no duplicates
         model_data.drop_duplicates(inplace=True)
@@ -362,17 +362,17 @@ class model_input_feature_builder(object):
             game_data = game_data.loc[(game_data['YEAR']==NFL_YEAR)&(game_data['WEEK_NUM']==NFL_WEEK),:]
 
         ## Reduce data to just columns we want to look at here
-        game_data = game_data.loc[:,['WINNER','LOSER','YEAR','WEEK_NUM','GAME_LOCATION']]
+        game_data = game_data.loc[:,['GAME_ID','WINNER','LOSER','YEAR','WEEK_NUM','GAME_LOCATION']]
 
         ## Change value of GAME_LOCATION to be 1 for home games or 0 for away games
         game_data['GAME_LOCATION'] = game_data['GAME_LOCATION'].apply(lambda x: 1 if x=='NULL_VALUE' else 0)
 
         ## Create a 'flipped' version of game_data just swapping the winner and loser column
-        game_data_flipped = game_data.loc[:,['LOSER','WINNER','YEAR','WEEK_NUM','GAME_LOCATION']]
+        game_data_flipped = game_data.loc[:,['GAME_ID','LOSER','WINNER','YEAR','WEEK_NUM','GAME_LOCATION']]
         game_data_flipped['GAME_LOCATION'] =  game_data_flipped['GAME_LOCATION'].apply(lambda x: 0 if x==1 else 1)
 
-        game_data.columns         = ['TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD']
-        game_data_flipped.columns = ['TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD']
+        game_data.columns         = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD']
+        game_data_flipped.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD']
 
         game_data = pd.concat([game_data, game_data_flipped])
 
@@ -380,7 +380,7 @@ class model_input_feature_builder(object):
         del game_data_flipped
         
         if all_data:
-            modeling_file = modeling_file.merge(game_data, how='left', on=['TEAM_A','TEAM_B','YEAR','WEEK_NUM']).drop_duplicates()
+            modeling_file = modeling_file.merge(game_data, how='left', on=['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM']).drop_duplicates()
             modeling_file.to_csv(self.modeling_file, index=False)
             print(f'> All Home or Away Feature written to {self.modeling_file}')
         else:
@@ -429,6 +429,18 @@ class model_input_feature_builder(object):
                                                                                                                         row['LATITUDE_y' ],
                                                                                                                         row['LONGITUDE_y'],
                                                                                                                         tz_find = timezone_finder) if row['HOME_FIELD']==0 else 0 , axis=1)
+        ## Assign approximate altitude of the stadium the game was played in
+        temp_df['ALTITUDE'] = np.nan
+        temp_df.loc[temp_df['HOME_FIELD']==1,'ALTITUDE'] = temp_df.loc[temp_df['HOME_FIELD']==1,:].merge(   df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE','ALTITUDE']], 
+                                                                                                            how='left',
+                                                                                                            left_on=['TEAM_A','YEAR','LATITUDE_x','LONGITUDE_x'],
+                                                                                                            right_on=['HOME_TEAM','YEAR','LATITUDE','LONGITUDE'])['ALTITUDE_y'].values
+
+        temp_df.loc[temp_df['HOME_FIELD']==0,'ALTITUDE'] = temp_df.loc[temp_df['HOME_FIELD']==0,:].merge(   df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE','ALTITUDE']], 
+                                                                                                            how='left',
+                                                                                                            left_on=['TEAM_A','YEAR','LATITUDE_x','LONGITUDE_x'],
+                                                                                                            right_on=['HOME_TEAM','YEAR','LATITUDE','LONGITUDE'])['ALTITUDE_y'].values
+
 
         ## For International games, we need to adjust the Travel distance and timezone difference
         for row in df_wk_by_wk.loc[df_wk_by_wk['STADIUM'].isin(df_stadium.loc[(df_stadium['HOME_TEAM'].isin(['International', 'Alternate'])),'STADIUM']),:].itertuples():
@@ -439,7 +451,7 @@ class model_input_feature_builder(object):
                          ((temp_df['TEAM_A']==row.LOSER) &(temp_df['TEAM_B']==row.WINNER)))&
                         (temp_df['YEAR']==row.YEAR        )&
                         (temp_df['WEEK_NUM']==row.WEEK_NUM),'TEAM_A_KM_TRAVELED'] = temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
-                                                                                                ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                                                                                                 ((temp_df['TEAM_A']==row.LOSER) &(temp_df['TEAM_B']==row.WINNER)))&
                                                                                                 (temp_df['YEAR']==row.YEAR)&
                                                                                                 (temp_df['WEEK_NUM']==row.WEEK_NUM),['LATITUDE_x', 'LONGITUDE_x']].apply(lambda x: dist_calc._measure_distance( [x.LATITUDE_x, x.LONGITUDE_x],
                                                                                                                                                                                                                 [df_stadium.loc[(df_stadium['STADIUM']==row.STADIUM)&
@@ -448,10 +460,10 @@ class model_input_feature_builder(object):
                                                                                                                                                                                                                                 (df_stadium['YEAR']   ==row.YEAR   ),'LONGITUDE'].values[0]]), axis=1)
             ## Adjust Timezone Difference
             temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
-                        ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                         ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
                         (temp_df['YEAR']==row.YEAR)&
                         (temp_df['WEEK_NUM']==row.WEEK_NUM),'TEAM_A_TZ_TRAVELED'] = temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
-                                                                                                ((temp_df['TEAM_A']==row.LOSER)  &(temp_df['TEAM_B']==row.WINNER)))&
+                                                                                                 ((temp_df['TEAM_A']==row.LOSER) &(temp_df['TEAM_B']==row.WINNER)))&
                                                                                                 (temp_df['YEAR']==row.YEAR)&
                                                                                                 (temp_df['WEEK_NUM']==row.WEEK_NUM),['LATITUDE_x', 'LONGITUDE_x']].apply(lambda x: dist_calc._calculate_timezone_difference(x.LATITUDE_x, 
                                                                                                                                                                                                                             x.LONGITUDE_x,
@@ -460,9 +472,21 @@ class model_input_feature_builder(object):
                                                                                                                                                                                                                             df_stadium.loc[ (df_stadium['STADIUM']==row.STADIUM)&
                                                                                                                                                                                                                                             (df_stadium['YEAR']   ==row.YEAR   ),'LONGITUDE'].values[0],
                                                                                                                                                                                                                             tz_find = timezone_finder), axis=1)
+            
+            ## Adjust Altitude
+            temp_df.loc[(((temp_df['TEAM_A']==row.WINNER)&(temp_df['TEAM_B']==row.LOSER  ))|
+                         ((temp_df['TEAM_A']==row.LOSER) &(temp_df['TEAM_B']==row.WINNER)))&
+                        (temp_df['YEAR']==row.YEAR)&
+                        (temp_df['WEEK_NUM']==row.WEEK_NUM),'ALTITUDE'] = df_stadium.loc[   (df_stadium['STADIUM']==row.STADIUM)&
+                                                                                            (df_stadium['YEAR']   ==row.YEAR   ),'ALTITUDE'].values[0]
 
         ## Drop unneeded columns
-        temp_df.drop(['LATITUDE_x', 'LONGITUDE_x', 'LATITUDE_y', 'LONGITUDE_y','HOME_FIELD'],axis=1, inplace=True)
+        # temp_df.drop(['LATITUDE_x', 'LONGITUDE_x', 'LATITUDE_y', 'LONGITUDE_y','HOME_FIELD'],axis=1, inplace=True)
+        temp_df = temp_df.rename(columns={'LATITUDE_x'  : 'LATITUDE_A',
+                                          'LONGITUDE_x' : 'LONGITUDE_A',
+                                          'LATITUDE_y'  : 'LATITUDE_B', 
+                                          'LONGITUDE_y' : 'LONGITUDE_B'})
+        temp_df.drop(['HOME_FIELD'],axis=1, inplace=True)
 
         if all_data:
             ## Merge Temp Dataframe back onto modeling_file Dataframe

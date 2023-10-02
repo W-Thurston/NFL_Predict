@@ -15,12 +15,15 @@ def main():
     ap.add_argument("--collect_upcoming_data")
     ap.add_argument("--clean_upcoming_PFR_data")
     ap.add_argument("--build_model_input_features", nargs='+', type=str, help="all_data: bool->False")
+    ap.add_argument("--collect_weather_data", nargs='+', type=str, help="year: str->'2023-2024'")
     ap.add_argument("--draftkings_odds")
 
     args = ap.parse_args()
 
     # with open(args.config_path) as file:
     #     config_dict = yaml.load(file, Loader=yaml.FullLoader)
+    with open('../../configs/config.yaml') as file:
+        config_dict = yaml.load(file, Loader=yaml.FullLoader)
 
     ## Collect Data ##
     if args.collect_historical_PFR_data:
@@ -84,7 +87,17 @@ def main():
         print("> Building model input features -- END")
         print()
 
-    ##
+    if args.collect_weather_data:
+        print("> Collect Weather Data -- START")
+        ## Instantiate PFR Scraper
+        PFR_Data_Collector_object = PFR_Data_Collector()
+
+        ## Pull weather data
+        PFR_Data_Collector_object.pull_weather_data(year=args.collect_weather_data[0], OWM_API_KEY=config_dict['OWM_API_KEY'])
+        print("> Collect Weather Data -- END")
+        print()
+
+    ## Pull most recent DraftKings Odds
     if args.draftkings_odds:
         print("> Collect DraftKings odds -- START")
         ## Instantiate Data Collector
@@ -103,6 +116,7 @@ if __name__ == '__main__':
         --collect_upcoming_data 0
         --clean_upcoming_PFR_data 0
         --build_model_input_features False
+        --collect_weather_data '2023-2024'
         --draftkings_odds 0
     """
     main()
