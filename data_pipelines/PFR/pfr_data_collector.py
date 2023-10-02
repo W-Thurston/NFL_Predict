@@ -263,7 +263,7 @@ class PFR_Data_Collector(object):
 
               ## Create a GAME_ID column
               # create series of "YYYY-Wk-Away_team-Home_team" to use as an ID column
-              temp_id = df.apply(lambda row:  f"{row['YEAR']}_{row['WEEK_NUM']:02}_{row['WINNER'] if row['GAME_LOCATION']=='@' else row['LOSER']}_{row['WINNER'] if row['GAME_LOCATION']=='NULL_VALUE' else row['LOSER']}" ,axis=1)
+              temp_id = df.apply(lambda row:  f"{row['YEAR'][:4]}_{row['WEEK_NUM']:02}_{row['WINNER'] if row['GAME_LOCATION']=='@' else row['LOSER']}_{row['WINNER'] if row['GAME_LOCATION']=='NULL_VALUE' else row['LOSER']}" ,axis=1)
               temp_id = pd.DataFrame(temp_id, columns=['LONG_ID'])
               
               # Read in data that maps NFL's Long team name (ex: Arizona Cardinals) to NFL's short team name (ex: ARI)
