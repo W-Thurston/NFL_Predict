@@ -322,45 +322,48 @@ class PFR_Data_Collector(object):
               '''
                      Pull data from Open Wheater Map
               '''
-              ## Make sure Lat & Lon are in decimal format
-              lat      = _convert(row.LATITUDE)
-              lon      = _convert(row.LONGITUDE)
-              
-              ## Build a timestamp that is accepted by the API
-              local    = pytz.timezone(tf.certain_timezone_at(lat=lat, lng=lon))
-              date = f'{row.GAME_DATE.year}-{row.GAME_DATE.month}-{row.GAME_DATE.day}'
+              try: 
+                     ## Make sure Lat & Lon are in decimal format
+                     lat      = _convert(row.LATITUDE)
+                     lon      = _convert(row.LONGITUDE)
+                     
+                     ## Build a timestamp that is accepted by the API
+                     local    = pytz.timezone(tf.certain_timezone_at(lat=lat, lng=lon))
+                     date = f'{row.GAME_DATE.year}-{row.GAME_DATE.month}-{row.GAME_DATE.day}'
 
-              if self._isTimeFormat(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%Y-%m-%d %H:%M:%S"):
-                     naive    = datetime.strptime(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%Y-%m-%d %H:%M:%S")
-              elif self._isTimeFormat(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%m-%d-%Y %H:%M:%S"):
-                     naive    = datetime.strptime(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%m-%d-%Y %H:%M:%S")
-              else:
-                     naive    = datetime.strptime(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%m/%d/%Y %H:%M:%S")
+                     if self._isTimeFormat(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%Y-%m-%d %H:%M:%S"):
+                            naive    = datetime.strptime(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%Y-%m-%d %H:%M:%S")
+                     elif self._isTimeFormat(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%m-%d-%Y %H:%M:%S"):
+                            naive    = datetime.strptime(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%m-%d-%Y %H:%M:%S")
+                     else:
+                            naive    = datetime.strptime(f"{date} {self._convert_12hour_to_24hour(row.GAMETIME)}", "%m/%d/%Y %H:%M:%S")
 
-              local_dt = local.localize(naive, is_dst=None)
-              utc_dt   = local_dt.astimezone(pytz.utc)
-              time     = int(utc_dt.timestamp())
+                     local_dt = local.localize(naive, is_dst=None)
+                     utc_dt   = local_dt.astimezone(pytz.utc)
+                     time     = int(utc_dt.timestamp())
 
-              ## Build the API's URL
-              url = f"https://api.openweathermap.org/data/3.0/onecall/timemachine?lat={lat}&lon={lon}&dt={time}&appid={OWM_API_KEY}"
+                     ## Build the API's URL
+                     url = f"https://api.openweathermap.org/data/3.0/onecall/timemachine?lat={lat}&lon={lon}&dt={time}&appid={OWM_API_KEY}"
 
-              ## Pull API's response as JSON
-              owm_response = session.get(url).json()
+                     ## Pull API's response as JSON
+                     owm_response = session.get(url).json()
 
-              ## Gather wanted data fields from JSON response
-              row['TEMP']         = owm_response['data'][0].get('temp',       'NULL_VALUE')
-              row['FEELS_LIKE']   = owm_response['data'][0].get('feels_like', 'NULL_VALUE')
-              row['PRESSURE']     = owm_response['data'][0].get('pressure',   'NULL_VALUE')
-              row['HUMIDITY']     = owm_response['data'][0].get('humidity',   'NULL_VALUE')
-              row['DEW_POINT']    = owm_response['data'][0].get('dew_point',  'NULL_VALUE')
-              row['CLOUDS']       = owm_response['data'][0].get('clouds',     'NULL_VALUE')
-              row['VISIBILITY']   = owm_response['data'][0].get('visibility', 'NULL_VALUE')
-              row['WIND_SPEED']   = owm_response['data'][0].get('wind_speed', 'NULL_VALUE')
-              row['WIND_DEG']     = owm_response['data'][0].get('wind_deg',   'NULL_VALUE')
-              row['WEATHER_MAIN'] = owm_response['data'][0]['weather'][0].get('main',        'NULL_VALUE')
-              row['WEATHER_DESC'] = owm_response['data'][0]['weather'][0].get('description', 'NULL_VALUE')
+                     ## Gather wanted data fields from JSON response
+                     row['TEMP']         = owm_response['data'][0].get('temp',       'NULL_VALUE')
+                     row['FEELS_LIKE']   = owm_response['data'][0].get('feels_like', 'NULL_VALUE')
+                     row['PRESSURE']     = owm_response['data'][0].get('pressure',   'NULL_VALUE')
+                     row['HUMIDITY']     = owm_response['data'][0].get('humidity',   'NULL_VALUE')
+                     row['DEW_POINT']    = owm_response['data'][0].get('dew_point',  'NULL_VALUE')
+                     row['CLOUDS']       = owm_response['data'][0].get('clouds',     'NULL_VALUE')
+                     row['VISIBILITY']   = owm_response['data'][0].get('visibility', 'NULL_VALUE')
+                     row['WIND_SPEED']   = owm_response['data'][0].get('wind_speed', 'NULL_VALUE')
+                     row['WIND_DEG']     = owm_response['data'][0].get('wind_deg',   'NULL_VALUE')
+                     row['WEATHER_MAIN'] = owm_response['data'][0]['weather'][0].get('main',        'NULL_VALUE')
+                     row['WEATHER_DESC'] = owm_response['data'][0]['weather'][0].get('description', 'NULL_VALUE')
 
-              return row
+                     return row
+              except:
+                     print(f"ID: {row.GAME_ID}")
 
 
        def pull_weather_data(self, year ,OWM_API_KEY):

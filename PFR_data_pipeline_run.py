@@ -22,7 +22,7 @@ def main():
 
     # with open(args.config_path) as file:
     #     config_dict = yaml.load(file, Loader=yaml.FullLoader)
-    with open('../../configs/config.yaml') as file:
+    with open('configs/config.yaml') as file:
         config_dict = yaml.load(file, Loader=yaml.FullLoader)
 
     ## Collect Data ##
