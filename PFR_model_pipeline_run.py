@@ -59,8 +59,8 @@ if __name__ == '__main__':
     """
     "Usage:"
     python PFR_model_pipeline_run.py
-        --ELO_only '2023-2024' 1
+        --ELO_only '2023-2024' int(curr_wk_#) 
         --eval_elo 0
-        --ranks_and_betting '2023-2024' 1
+        --ranks_and_betting '2023-2024' int(last_wk_#) 
     """
     main()

@@ -82,7 +82,9 @@ class Historical_PFR_Spider(Spider):
 		item['yards_lose'] 		 = response.meta["yards_lose_meta"] 	  # Yards gained by losing team
 		item['to_lose'] 		 = response.meta["to_lose_meta"]   		  # Turnovers by the losing team
 		item['year']			 = response.meta["year_meta"]			  # Ex: '91-92'
-		if re.findall('\d+', response.xpath('//div[@class="scorebox_meta"]/div/a/text()').extract_first()) != []:
+		if response.xpath('//div[@class="scorebox_meta"]/div/a/text()') == []:
+			item['stadium'] = 'NULL_VALUE'
+		elif re.findall('\d+', response.xpath('//div[@class="scorebox_meta"]/div/a/text()').extract_first()) != []:
 			item['stadium'] = 'NULL_VALUE'
 		else:
 			item['stadium']		 = response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() if response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() else "NULL_VALUE"
@@ -233,7 +235,9 @@ class Append_New_PFR_Spider(Spider):
 		item['yards_lose'] 		 = response.meta["yards_lose_meta"] 	  # Yards gained by losing team
 		item['to_lose'] 		 = response.meta["to_lose_meta"]   		  # Turnovers by the losing team
 		item['year']			 = response.meta["year_meta"]			  # Ex: '91-92'
-		if re.findall('\d+', response.xpath('//div[@class="scorebox_meta"]/div/a/text()').extract_first()) != []:
+		if response.xpath('//div[@class="scorebox_meta"]/div/a/text()') == []:
+			item['stadium'] = 'NULL_VALUE'
+		elif re.findall('\d+', response.xpath('//div[@class="scorebox_meta"]/div/a/text()').extract_first()) != []:
 			item['stadium'] = 'NULL_VALUE'
 		else:
 			item['stadium']		 = response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() if response.xpath('//body/div[1]/div[@class="box"]/div[@class="scorebox"]/div[@class="scorebox_meta"]/div/a/text()').extract_first() else "NULL_VALUE"

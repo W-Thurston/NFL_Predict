@@ -287,9 +287,13 @@ class model_input_feature_builder(object):
             ## go from 4 columns like ['winner','loser','winner_elo','loser_elo'] to 2 columns ['team','elo']
             temp_df = pd.DataFrame(list(zip(pd.DataFrame(df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR)&(df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].reset_index(drop=True).stack())[0].values,
                                             pd.DataFrame(pd.DataFrame(elo_series.tolist()).reset_index(drop=True).stack())[0].values)), columns=['NFL_TEAM','ELO'])
+            temp_df = pd.concat(   [temp_df,
+                        df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
+                                   (df_elo['NFL_WEEK']==NFL_WEEK)&
+                                   (~df_elo['NFL_TEAM'].isin(temp_df['NFL_TEAM'])),:]], ignore_index=True)
             temp_df['NFL_YEAR'] = NFL_YEAR
             temp_df['NFL_WEEK'] = NFL_WEEK+1
-            temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM')
+            temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM', ignore_index=True)
 
             ## Update the newest weeks data with the above calculated elo
             df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&(df_elo['NFL_WEEK']==NFL_WEEK+1),'ELO'] = temp_df['ELO'].values
