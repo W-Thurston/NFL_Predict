@@ -128,7 +128,8 @@ class PFR_Data_Collector(object):
 
               ## Game Date to datetime
               try:
-                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d", dayfirst=False, yearfirst=True)
+                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="mixed", dayfirst=False, yearfirst=True)
+                     # df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d", dayfirst=False, yearfirst=True)
               except:
                      df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%m/%d/%Y", dayfirst=False, yearfirst=False)
 

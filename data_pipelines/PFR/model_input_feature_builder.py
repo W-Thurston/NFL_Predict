@@ -507,7 +507,7 @@ class model_input_feature_builder(object):
             df_modeling_file.loc[(df_modeling_file['YEAR']==NFL_YEAR)&(df_modeling_file['WEEK_NUM']==NFL_WEEK),'TEAM_A_TZ_TRAVELED'] = temp_df['TEAM_A_TZ_TRAVELED'].values
 
             ## Save data
-            df_modeling_file.to_csv(self.modeling_file)
+            df_modeling_file.to_csv(self.modeling_file, index=False)
             print(f"> Travel and Timezone distance written for {NFL_YEAR} week {NFL_WEEK} to file: {self.modeling_file}")
             print(f'> Calculating travel and timezone distances -- END')
 
