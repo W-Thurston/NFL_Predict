@@ -1,5 +1,5 @@
 # NFL_Predict
-The beginnings of a project to predict NFL scores and potentially fantasy football output  
+The beginnings of a project to predict NFL Game Winners, Spreads, and potentially fantasy football output.
 
 
 How to update data:  
