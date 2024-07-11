@@ -9,8 +9,8 @@
 
 BOT_NAME = 'PFR_scraper'
 
-SPIDER_MODULES = ['PFR_scraper.spiders']
-NEWSPIDER_MODULE = 'PFR_scraper.spiders'
+SPIDER_MODULES = ['src.PFR_scraper.spiders']
+NEWSPIDER_MODULE = 'src.PFR_scraper.spiders'
 
 # RETRY_HTTP_CODES = [429]
 

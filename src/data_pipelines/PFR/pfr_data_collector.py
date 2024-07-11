@@ -13,7 +13,7 @@ from urllib3.util.retry import Retry
 from datetime import datetime
 import timezonefinder, pytz
 
-from PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
+from src.PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
 from utils.stadium_loc_dist_calc import _convert
 
 class PFR_Data_Collector(object):
@@ -31,13 +31,10 @@ class PFR_Data_Collector(object):
 
 
        def fetch_historical_data(self, all_data:bool = False, scrape_year:str = '2023'):
-              print(f"{all_data} || {scrape_year}")
-              print()
-              print()
-              print()
+              print(f"{all_data} || {scrape_year}\n\n\n")
               if all_data:
                      settings = Settings()
-                     os.environ['SCRAPY_SETTINGS_MODULE'] = 'PFR_scraper.settings'
+                     os.environ['SCRAPY_SETTINGS_MODULE'] = 'src.PFR_scraper.settings'
                      settings_module_path = os.environ['SCRAPY_SETTINGS_MODULE']
                      settings.setmodule(settings_module_path, priority='project')
                      self.process = CrawlerProcess(settings)
@@ -45,7 +42,7 @@ class PFR_Data_Collector(object):
                      self.process.start(self)
               else:
                      settings = Settings()
-                     os.environ['SCRAPY_SETTINGS_MODULE'] = 'PFR_scraper.settings'
+                     os.environ['SCRAPY_SETTINGS_MODULE'] = 'src.PFR_scraper.settings'
                      settings_module_path = os.environ['SCRAPY_SETTINGS_MODULE']
                      settings.setmodule(settings_module_path, priority='project')
                      self.process = CrawlerProcess(settings)
@@ -54,7 +51,7 @@ class PFR_Data_Collector(object):
 
        def fetch_upcoming_schedule_data(self):
               settings = Settings()
-              os.environ['SCRAPY_SETTINGS_MODULE'] = 'PFR_scraper.settings'
+              os.environ['SCRAPY_SETTINGS_MODULE'] = 'src.PFR_scraper.settings'
               settings_module_path = os.environ['SCRAPY_SETTINGS_MODULE']
               settings.setmodule(settings_module_path, priority='project')
               self.process = CrawlerProcess(settings)
@@ -98,33 +95,33 @@ class PFR_Data_Collector(object):
               df['VEGAS_LINE'] = df['VEGAS_LINE'].apply(lambda x: x[x.index(' -'):] if '-' in x else x)
 
               ## Replace old team names with the newest version
-              df['WINNER'].replace({      'St. Louis Rams'           : 'Los Angeles Rams',
-                                          'San Diego Chargers'       : 'Los Angeles Chargers',
-                                          'Houston Oilers'           : 'Tennessee Titans',
-                                          'Tennessee Oilers'         : 'Tennessee Titans',
-                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
-                                          'Oakland Raiders'          : 'Las Vegas Raiders',
-                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
-                                          'Washington Redskins'      : 'Washington Commanders',
-                                          'Washington Football Team' : 'Washington Commanders'},inplace=True)
-              df['LOSER'].replace({       'St. Louis Rams'           : 'Los Angeles Rams',
-                                          'San Diego Chargers'       : 'Los Angeles Chargers',
-                                          'Houston Oilers'           : 'Tennessee Titans',
-                                          'Tennessee Oilers'         : 'Tennessee Titans',
-                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
-                                          'Oakland Raiders'          : 'Las Vegas Raiders',
-                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
-                                          'Washington Redskins'      : 'Washington Commanders',
-                                          'Washington Football Team' : 'Washington Commanders'},inplace=True)
-              df['FAVORITED'].replace({   'St. Louis Rams'           : 'Los Angeles Rams',
-                                          'San Diego Chargers'       : 'Los Angeles Chargers',
-                                          'Houston Oilers'           : 'Tennessee Titans',
-                                          'Tennessee Oilers'         : 'Tennessee Titans',
-                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
-                                          'Oakland Raiders'          : 'Las Vegas Raiders',
-                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
-                                          'Washington Redskins'      : 'Washington Commanders',
-                                          'Washington Football Team' : 'Washington Commanders'}, inplace=True)
+              df['WINNER'] = df['WINNER'].replace({       'St. Louis Rams'           : 'Los Angeles Rams',
+                                                          'San Diego Chargers'       : 'Los Angeles Chargers',
+                                                          'Houston Oilers'           : 'Tennessee Titans',
+                                                          'Tennessee Oilers'         : 'Tennessee Titans',
+                                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                                          'Oakland Raiders'          : 'Las Vegas Raiders',
+                                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                                          'Washington Redskins'      : 'Washington Commanders',
+                                                          'Washington Football Team' : 'Washington Commanders'})
+              df['LOSER'] = df['LOSER'].replace({         'St. Louis Rams'           : 'Los Angeles Rams',
+                                                          'San Diego Chargers'       : 'Los Angeles Chargers',
+                                                          'Houston Oilers'           : 'Tennessee Titans',
+                                                          'Tennessee Oilers'         : 'Tennessee Titans',
+                                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                                          'Oakland Raiders'          : 'Las Vegas Raiders',
+                                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                                          'Washington Redskins'      : 'Washington Commanders',
+                                                          'Washington Football Team' : 'Washington Commanders'})
+              df['FAVORITED'] = df['FAVORITED'].replace({ 'St. Louis Rams'           : 'Los Angeles Rams',
+                                                          'San Diego Chargers'       : 'Los Angeles Chargers',
+                                                          'Houston Oilers'           : 'Tennessee Titans',
+                                                          'Tennessee Oilers'         : 'Tennessee Titans',
+                                                          'Los Angeles Raiders'      : 'Las Vegas Raiders',
+                                                          'Oakland Raiders'          : 'Las Vegas Raiders',
+                                                          'Phoenix Cardinals'        : 'Arizona Cardinals',
+                                                          'Washington Redskins'      : 'Washington Commanders',
+                                                          'Washington Football Team' : 'Washington Commanders'})
 
               ## Game Date to datetime
               try:
@@ -165,6 +162,7 @@ class PFR_Data_Collector(object):
 
               df['VEGAS_LINE']  = df['VEGAS_LINE'].replace('Pick',np.nan)
               df['FAVORITED']   = df['FAVORITED'].replace('Pick',np.nan)
+              df['OVER_UNDER']  = df['OVER_UNDER'].replace('NULL_VALUE',np.nan)
 
               ## Change values to be numeric
               df['WEEK_NUM']         = df['WEEK_NUM'].astype('int')
@@ -179,7 +177,7 @@ class PFR_Data_Collector(object):
 
               ## Create a column that denotes a win or a tie (could be used for prediction measuring)
               df.loc[df['PTS_WINNER']>df['PTS_LOSER'],'WIN_OR_TIE'] = 1
-              df['WIN_OR_TIE'].fillna(0,inplace=True)
+              df['WIN_OR_TIE'] = df['WIN_OR_TIE'].fillna(0)
 
               ## Since the web scraper doesn't want to correctly pull the tie info, I am manually going to set the ties.  
 
@@ -268,7 +266,7 @@ class PFR_Data_Collector(object):
 
               ## Create a GAME_ID column
               # create series of "YYYY-Wk-Away_team-Home_team" to use as an ID column
-              temp_id = df.apply(lambda row:  f"{row['YEAR'][:4]}_{row['WEEK_NUM']:02}_{row['WINNER'] if row['GAME_LOCATION']=='@' else row['LOSER']}_{row['WINNER'] if row['GAME_LOCATION']=='NULL_VALUE' else row['LOSER']}" ,axis=1)
+              temp_id = df.apply(lambda row:  f"{row['YEAR'][:4]}_{row['WEEK_NUM']:02}_{row['WINNER'] if row['GAME_LOCATION']=='@' else (row['WINNER'] if row['GAME_LOCATION']=='N' else row['LOSER'])}_{row['WINNER'] if row['GAME_LOCATION']=='NULL_VALUE' else row['LOSER']}" ,axis=1)
               temp_id = pd.DataFrame(temp_id, columns=['LONG_ID'])
               
               # Read in data that maps NFL's Long team name (ex: Arizona Cardinals) to NFL's short team name (ex: ARI)
@@ -287,7 +285,7 @@ class PFR_Data_Collector(object):
               df_short, df_short_dict, temp_id = None, None, None
               del df_short, df_short_dict, temp_id
 
-              df['STADIUM'].replace({'Dolphin Stadium':'Dolphins Stadium'}, inplace=True)
+              df['STADIUM'] = df['STADIUM'].replace({'Dolphin Stadium':'Dolphins Stadium'})
 
               ## Sort wk_by_wk file
               df.sort_values(['GAME_DATE','GAMETIME', 'GAME_ID'], ascending=True, inplace=True, ignore_index=True)

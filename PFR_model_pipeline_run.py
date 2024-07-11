@@ -1,7 +1,7 @@
 import yaml
 from argparse import ArgumentParser
 
-from model_pipelines.PFR.pfr_model_builder import pfr_model_builder
+from src.model_pipelines.PFR.pfr_model_builder import pfr_model_builder
 
 def main():
 

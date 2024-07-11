@@ -5,7 +5,9 @@ from scrapy.selector import Selector
 import re
 import pandas as pd
 
-from PFR_scraper.item import NFL_ProFootballReference, NFL_PFR_Upcoming_Schedule
+from datetime import date, datetime
+
+from src.PFR_scraper.item import NFL_ProFootballReference, NFL_PFR_Upcoming_Schedule
 
 class Historical_PFR_Spider(Spider):
 	'''
@@ -15,12 +17,12 @@ class Historical_PFR_Spider(Spider):
 
 	custom_settings = {
         'ITEM_PIPELINES': {
-            'PFR_scraper.pipelines.HistoricalPFRWriteItemPipeline': 100
+            'src.PFR_scraper.pipelines.HistoricalPFRWriteItemPipeline': 100
         }
     }
 
 	allowed_urls = [ 'https://www.pro-football-reference.com']
-	start_urls   = [f'https://www.pro-football-reference.com/years/{x}/games.htm' for x in range(1991,2023)]
+	start_urls   = [f'https://www.pro-football-reference.com/years/{x}/games.htm' for x in range(1991,date.today().year)]
 
 	def parse(self, response):
 
@@ -156,7 +158,7 @@ class Append_New_PFR_Spider(Spider):
 
 	custom_settings = {
         'ITEM_PIPELINES': {
-            'PFR_scraper.pipelines.AppendNewPFRWriteItemPipeline': 100
+            'src.PFR_scraper.pipelines.AppendNewPFRWriteItemPipeline': 100
         }
     }
 
@@ -308,11 +310,11 @@ class Upcoming_Schedule_NFLSpider(Spider):
 
 	custom_settings = {
         'ITEM_PIPELINES': {
-            'PFR_scraper.pipelines.UpcomingScheduleWriteItemPipeline': 100
+            'src.PFR_scraper.pipelines.UpcomingScheduleWriteItemPipeline': 100
         }
     }
 
-	CURR_YEAR = 2023
+	CURR_YEAR = datetime.now().year
 
 	allowed_urls = [ 'https://www.pro-football-reference.com']
 	start_urls   = [f'https://www.pro-football-reference.com/years/{CURR_YEAR}/games.htm']

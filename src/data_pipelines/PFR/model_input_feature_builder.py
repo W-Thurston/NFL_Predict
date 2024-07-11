@@ -6,7 +6,7 @@ from geopy.distance import distance
 from tqdm import tqdm
 tqdm.pandas()
 
-import datetime
+from datetime import datetime
 import timezonefinder, pytz
 
 import utils.elo as elo
@@ -72,14 +72,17 @@ class model_input_feature_builder(object):
             NFL_TEAMS = sorted(df['WINNER'].unique())
 
             ## Pull out Years and Week numbers
-            NFL_YEARS = sorted(df['YEAR'].unique())
+            if df.loc[df['YEAR']==max(df['YEAR']),'WEEK_NUM'].max() == 22:
+                NFL_YEARS = sorted(df['YEAR'].unique())+[f"{datetime.now().year}-{datetime.now().year+1}"]
+            else:
+                NFL_YEARS = sorted(df['YEAR'].unique())
             NFL_WEEKS = sorted(df['WEEK_NUM'].unique())
 
             ## Game Date to datetime
             df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
 
             ## Create sorted year list like '91-92' to use as categorical ordering list
-            sorted_years = sorted(df['YEAR'].unique())
+            sorted_years = NFL_YEARS.copy()
             increase_in_number_of_weeks_in_season = sorted_years.index('2021-2022')
 
             dataframe_builder_list = []
@@ -131,10 +134,10 @@ class model_input_feature_builder(object):
             houston_texans_year_list_to_remove = df_team_elo[(df_team_elo['NFL_TEAM']=='Houston Texans')&
                                                             (df_team_elo['NFL_YEAR'].isin(sorted_years[:sorted_years.index(houston_texans_start_year)]))].index.values
 
-            idx_to_remove = np.concatenate( (carolina_panthers_year_list_to_remove,
-                                            jacksonville_jaguars_year_list_to_remove,
-                                            baltimore_ravens_year_list_to_remove, 
-                                            houston_texans_year_list_to_remove), axis=None)
+            idx_to_remove = np.concatenate( (carolina_panthers_year_list_to_remove   ,
+                                             jacksonville_jaguars_year_list_to_remove,
+                                             baltimore_ravens_year_list_to_remove    , 
+                                             houston_texans_year_list_to_remove)     , axis=None)
 
             df_team_elo.drop(idx_to_remove, inplace=True)
             
@@ -238,7 +241,7 @@ class model_input_feature_builder(object):
                                             (df_team_elo['NFL_YEAR'] == curr_year   )&
                                             (df_team_elo['NFL_WEEK'].isin([wk,wk+1])),'ELO'] = df_team_elo.loc[(df_team_elo['NFL_TEAM'] == team        )&
                                                                                                             (df_team_elo['NFL_YEAR'] == curr_year   )&
-                                                                                                            (df_team_elo['NFL_WEEK'].isin([wk,wk+1])),'ELO'].fillna(method='ffill')
+                                                                                                            (df_team_elo['NFL_WEEK'].isin([wk,wk+1])),'ELO'].ffill()
 
                 if next_year is not None:
                     ## Take the mean ELO of week 1 of next_year

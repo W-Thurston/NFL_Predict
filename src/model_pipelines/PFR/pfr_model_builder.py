@@ -77,7 +77,7 @@ class pfr_model_builder(object):
         df['ELO_PROB'] = elo_prob
 
         df.loc[(df['WIN_OR_TIE']==1)&(df['ELO_PROB']>.5),'CORRECT'] = 1
-        df['CORRECT'].fillna(0,inplace=True)
+        df['CORRECT'] = df['CORRECT'].fillna(0)
 
         if time_period == 'YEAR':
             for i in df['YEAR'].unique():
@@ -121,11 +121,14 @@ class pfr_model_builder(object):
         
         print(f"> Saving updated Elo Ranks to: {self.ELO_visualization_file}")
             
-    def build_new_weeks_prediction_file(self, year:str, week:int):
+    def play_out_rest_of_season(self, year:str, week:int):
         '''
-        Used to aggregate date for the up coming week into a format that matches the modeling file.
+        Used to simulate the rest of the season based on inputed year and week.
 
         '''
-        self.modeling_file         = 'data/modeling/modeling_file.csv'
-        self.stadium_file          = 'data/cleaned/NFL_stadium_reference.csv'
-        self.upcoming_schedule_filename  = 'data/cleaned/NFL_upcoming_schedule_cleaned.csv'
+        
+        ## Read in Elo and upcoming schedule data
+        df_elo      = pd.read_csv(self.ELO_data_file)
+        df_schedule = pd.read_csv(self.upcoming_schedule_filename)
+
+        

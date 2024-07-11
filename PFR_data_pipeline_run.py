@@ -1,8 +1,8 @@
 import yaml
 from argparse import ArgumentParser
 
-from data_pipelines.PFR.pfr_data_collector import PFR_Data_Collector
-from data_pipelines.PFR.model_input_feature_builder import model_input_feature_builder
+from src.data_pipelines.PFR.pfr_data_collector import PFR_Data_Collector
+from src.data_pipelines.PFR.model_input_feature_builder import model_input_feature_builder
 
 def main():
 
