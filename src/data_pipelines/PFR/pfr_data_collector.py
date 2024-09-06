@@ -13,6 +13,8 @@ from urllib3.util.retry import Retry
 from datetime import datetime
 import timezonefinder, pytz
 
+from tqdm import tqdm
+
 from src.PFR_scraper.spiders.NFL_PFR_spider import Historical_PFR_Spider, Append_New_PFR_Spider, Upcoming_Schedule_NFLSpider
 from utils.stadium_loc_dist_calc import _convert
 
@@ -407,11 +409,13 @@ class PFR_Data_Collector(object):
               Scrapes current NFL game lines on Draftkings Sportsbook.
 
               """
-              dk_api = requests.get("https://sportsbook.draftkings.com/sites/US-CO/api/v5/eventgroups/88808?format=json").json()
+              ## DK is now blocking 'python-requests', have to edit the user-agent
+              dk_api = requests.get("https://sportsbook.draftkings.com//sites/US-NJ-SB/api/v5/eventgroups/88808?format=json",
+                                     headers={'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0'}).json()
               dk_markets = dk_api['eventGroup']['offerCategories'][0]['offerSubcategoryDescriptors'][0]['offerSubcategory']['offers']
 
               games = {}
-              for i in dk_markets:
+              for i in tqdm(dk_markets):
                      if i[0]['outcomes'][0]['oddsDecimal'] == 0: # Skip this if there is no spread
                             continue
                      away_team = i[0]['outcomes'][0]['label']
