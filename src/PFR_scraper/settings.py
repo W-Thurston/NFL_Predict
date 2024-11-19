@@ -15,7 +15,7 @@ NEWSPIDER_MODULE = 'src.PFR_scraper.spiders'
 # RETRY_HTTP_CODES = [429]
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0'
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False

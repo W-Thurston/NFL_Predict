@@ -127,10 +127,13 @@ class PFR_Data_Collector(object):
 
               ## Game Date to datetime
               try:
-                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="mixed", dayfirst=False, yearfirst=True)
-                     # df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d", dayfirst=False, yearfirst=True)
+                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
               except:
-                     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%m/%d/%Y", dayfirst=False, yearfirst=False)
+                     try:     
+                            df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="mixed", dayfirst=False, yearfirst=True)
+                            # df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%Y-%m-%d", dayfirst=False, yearfirst=True)
+                     except:
+                            df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'], format="%m/%d/%Y", dayfirst=False, yearfirst=False)
 
               ## Overwrite Year column
               df['YEAR'] = df['GAME_DATE'].apply(lambda x: f"{x.year}-{x.year+1}" if x.month in [8,9,10,11,12] else f"{x.year-1}-{x.year}")
@@ -298,6 +301,8 @@ class PFR_Data_Collector(object):
                                    'PTS_LOSER', 'YARDS_WINNER', 'TURNOVERS_WINNER', 'YARDS_LOSER', 
                                    'TURNOVERS_LOSER', 'YEAR', 'STADIUM', 'ROOF', 'SURFACE', 'VEGAS_LINE', 
                                    'OVER_UNDER', 'FAVORITED', 'WIN_OR_TIE']]
+              
+              df = df.drop_duplicates()
 
               ## Save cleaned data to 'cleaned_' file
               df.to_csv(self.cleaned_historical_data_file, index=False)

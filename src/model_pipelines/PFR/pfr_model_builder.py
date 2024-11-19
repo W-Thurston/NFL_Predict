@@ -87,6 +87,7 @@ class pfr_model_builder(object):
                 print(f"{i:02}: {(df.loc[df['WEEK_NUM']==i,'CORRECT'].sum()/df.loc[df['WEEK_NUM']==i,:].shape[0]):.0%} correct for this week in season")
 
         print(f"Overall: {(df['CORRECT'].sum()/df.shape[0]):.0%}")
+        print()
 
     def build_new_ranks(self, year:str, week:int):
         '''

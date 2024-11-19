@@ -174,7 +174,7 @@ class Append_New_PFR_Spider(Spider):
 
 		df = pd.read_csv(self.cleaned_historical_data_file)
 		already_pulled_weeks = df.loc[df['YEAR'].str.startswith(self.year), 'WEEK_NUM'].unique()
-
+		
 		rows = response.xpath('//tbody/tr')
 		for row in rows:
 			week_num 		 = row.xpath('./th[@data-stat="week_num"]/text()').extract_first()         if row.xpath('./th[@data-stat="week_num"]/text()').extract_first() else "NULL_VALUE"

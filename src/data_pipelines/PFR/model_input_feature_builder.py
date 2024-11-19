@@ -265,46 +265,53 @@ class model_input_feature_builder(object):
         else:
 
             ## Read in Wk_by_Wk and Elo data
+            print(f"> Reading in cleaned PFR data from: {self.pfr_cleaned_data_file}")
             df_wk_by_wk = pd.read_csv(self.pfr_cleaned_data_file)
             df_elo      = pd.read_csv(self.ELO_data_file)
 
             ## Pull out Years and Week numbers
             NFL_YEAR = df_wk_by_wk.loc[df_wk_by_wk.index[-1],'YEAR']
-            NFL_WEEK = df_wk_by_wk.loc[df_wk_by_wk.index[-1],'WEEK_NUM']
+            curr_nfl_week = df_wk_by_wk.loc[df_wk_by_wk.index[-1],'WEEK_NUM']
 
-            print(f"> Generating ELO data for {NFL_YEAR} Week {NFL_WEEK}")
+            missing_elo_weeks = [x for x in df_elo.loc[df_elo.isna().any(axis=1),'NFL_WEEK'].unique().tolist() if x<=curr_nfl_week]
+            if missing_elo_weeks == []:
+                missing_elo_weeks = [curr_nfl_week]
+            else:
+                missing_elo_weeks = [min(missing_elo_weeks)-1] + missing_elo_weeks
 
-            ## Create a pd.Series of (winner_elo, loser_elo) for each game this week
-            elo_series = df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR)&(df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].progress_apply(lambda row: elo.update_elo( df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
-                                                                                                                                                                                        (df_elo['NFL_WEEK']==NFL_WEEK)&
-                                                                                                                                                                                        (df_elo['NFL_TEAM']==row.WINNER),'ELO'].values[0],
-                                                                                                                                                                             df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
-                                                                                                                                                                                        (df_elo['NFL_WEEK']==NFL_WEEK)&
-                                                                                                                                                                                        (df_elo['NFL_TEAM']==row.LOSER ),'ELO'].values[0], win_or_tie=1 ), axis=1)
-            ## Strap together the NFL_TEAM names and the (winner_elo, loser_elo) data
-            temp_df = pd.concat([df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR    )&
-                                                 (df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].reset_index(drop=True),
-                                pd.DataFrame(elo_series.tolist()).reset_index(drop=True)],
-                                axis=1)
+            print(f"> Generating ELO data for {NFL_YEAR} Week(s) {', '.join([str(x) for x in missing_elo_weeks])}")
+            for NFL_WEEK in missing_elo_weeks:
+                ## Create a pd.Series of (winner_elo, loser_elo) for each game this week
+                elo_series = df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR)&(df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].progress_apply(lambda row: elo.update_elo( df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
+                                                                                                                                                                                            (df_elo['NFL_WEEK']==NFL_WEEK)&
+                                                                                                                                                                                            (df_elo['NFL_TEAM']==row.WINNER),'ELO'].values[0],
+                                                                                                                                                                                df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
+                                                                                                                                                                                            (df_elo['NFL_WEEK']==NFL_WEEK)&
+                                                                                                                                                                                            (df_elo['NFL_TEAM']==row.LOSER ),'ELO'].values[0], win_or_tie=1 ), axis=1)
+                ## Strap together the NFL_TEAM names and the (winner_elo, loser_elo) data
+                temp_df = pd.concat([df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR    )&
+                                                    (df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].reset_index(drop=True),
+                                    pd.DataFrame(elo_series.tolist()).reset_index(drop=True)],
+                                    axis=1)
 
-            ## go from 4 columns like ['winner','loser','winner_elo','loser_elo'] to 2 columns ['team','elo']
-            temp_df = pd.DataFrame(list(zip(pd.DataFrame(df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR)&(df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].reset_index(drop=True).stack())[0].values,
-                                            pd.DataFrame(pd.DataFrame(elo_series.tolist()).reset_index(drop=True).stack())[0].values)), columns=['NFL_TEAM','ELO'])
-            temp_df = pd.concat(   [temp_df,
-                        df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
-                                   (df_elo['NFL_WEEK']==NFL_WEEK)&
-                                   (~df_elo['NFL_TEAM'].isin(temp_df['NFL_TEAM'])),:]], ignore_index=True)
-            temp_df['NFL_YEAR'] = NFL_YEAR
-            temp_df['NFL_WEEK'] = NFL_WEEK+1
-            temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM', ignore_index=True)
+                ## go from 4 columns like ['winner','loser','winner_elo','loser_elo'] to 2 columns ['team','elo']
+                temp_df = pd.DataFrame(list(zip(pd.DataFrame(df_wk_by_wk.loc[(df_wk_by_wk['YEAR']==NFL_YEAR)&(df_wk_by_wk['WEEK_NUM']==NFL_WEEK), ['WINNER','LOSER']].reset_index(drop=True).stack())[0].values,
+                                                pd.DataFrame(pd.DataFrame(elo_series.tolist()).reset_index(drop=True).stack())[0].values)), columns=['NFL_TEAM','ELO'])
+                temp_df = pd.concat([temp_df,
+                                        df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
+                                                (df_elo['NFL_WEEK']==NFL_WEEK)&
+                                                (~df_elo['NFL_TEAM'].isin(temp_df['NFL_TEAM'])),:]], ignore_index=True)
+                temp_df['NFL_YEAR'] = NFL_YEAR
+                temp_df['NFL_WEEK'] = NFL_WEEK+1
+                temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM', ignore_index=True)
 
-            ## Update the newest weeks data with the above calculated elo
-            df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&(df_elo['NFL_WEEK']==NFL_WEEK+1),'ELO'] = temp_df['ELO'].values
+                ## Update the newest weeks data with the above calculated elo
+                df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&(df_elo['NFL_WEEK']==NFL_WEEK+1),'ELO'] = temp_df['ELO'].values
 
-            ## Save data
-            df_elo.to_csv(self.ELO_data_file, index=False)
-            print(f"> ELO filled data written to file: {self.ELO_data_file}")
-            print()
+                ## Save data
+                df_elo.to_csv(self.ELO_data_file, index=False)
+                print(f"> ELO filled data written to file: {self.ELO_data_file}")
+                print()
 
     @staticmethod
     def _append_elo_data(self, all_data):
@@ -316,24 +323,32 @@ class model_input_feature_builder(object):
 
         if not all_data:
 
-            NFL_YEAR = elo_data.loc[~elo_data['ELO'].isnull()].tail(1)['NFL_YEAR'].values[0]
-            NFL_WEEK = elo_data.loc[~elo_data['ELO'].isnull()].tail(1)['NFL_WEEK'].values[0]-1
+            curr_modeling_file = pd.read_csv(self.modeling_file)
+            last_week_in_modeling_file = curr_modeling_file.tail(1).WEEK_NUM.values[0]
+            if last_week_in_modeling_file == 22:
+                last_week_in_modeling_file = 1
 
-            base_modeling_file = base_modeling_file.loc[(base_modeling_file['YEAR']==NFL_YEAR)&(base_modeling_file['WEEK_NUM']==NFL_WEEK),:]
-            elo_data = elo_data.loc[(elo_data['NFL_YEAR']==NFL_YEAR)&(elo_data['NFL_WEEK']==NFL_WEEK),:]
+            NFL_YEAR = elo_data.loc[~elo_data['ELO'].isnull()].tail(1)['NFL_YEAR'].values[0]
+            NFL_WEEK = elo_data.loc[~elo_data['ELO'].isnull()].tail(1)['NFL_WEEK'].values[0]
+
+            weeks_to_append = [x for x in range(last_week_in_modeling_file+1,NFL_WEEK+1)]
+            
+            base_modeling_file = base_modeling_file.loc[(base_modeling_file['YEAR']==NFL_YEAR)&(base_modeling_file['WEEK_NUM'].isin(weeks_to_append)),:]
+            elo_data = elo_data.loc[(elo_data['NFL_YEAR']==NFL_YEAR)&(elo_data['NFL_WEEK'].isin(weeks_to_append)),:]
+
 
         ## Add Team_A's elo data to base modeling file data
         model_data = pd.merge(base_modeling_file,elo_data, how='left', left_on=['TEAM_A','YEAR','WEEK_NUM'], right_on=['NFL_TEAM','NFL_YEAR','NFL_WEEK'])
-        model_data.drop(['NFL_TEAM','NFL_YEAR','NFL_WEEK'], axis=1, inplace=True)
+        model_data = model_data.drop(['NFL_TEAM','NFL_YEAR','NFL_WEEK'], axis=1)
         model_data.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT','TEAM_A_ELO']
 
         ## Add Team_B's elo data to base modeling file data
         model_data = pd.merge(model_data,elo_data, how='left', left_on=['TEAM_B','YEAR','WEEK_NUM'], right_on=['NFL_TEAM','NFL_YEAR','NFL_WEEK'])
-        model_data.drop(['NFL_TEAM','NFL_YEAR','NFL_WEEK'], axis=1, inplace=True)
+        model_data = model_data.drop(['NFL_TEAM','NFL_YEAR','NFL_WEEK'], axis=1)
         model_data.columns = ['GAME_ID','TEAM_A','TEAM_B','YEAR','WEEK_NUM', 'RESULT','TEAM_A_ELO','TEAM_B_ELO']
 
         ## just make sure there are no duplicates
-        model_data.drop_duplicates(inplace=True)
+        model_data = model_data.drop_duplicates()
 
         if all_data:
             ## ouptput data to file
@@ -343,8 +358,9 @@ class model_input_feature_builder(object):
         else:
             ## ouptput data to file
             model_data.to_csv(self.modeling_file, header=False, index=False, mode='a')
-            print(f'> ELO data for {NFL_YEAR} week {NFL_WEEK} appended to modeling_file: {self.modeling_file}')
+            print(f'> ELO data for {NFL_YEAR} week(s) {",".join([str(x) for x in weeks_to_append])} appended to modeling_file: {self.modeling_file}')
             print()
+            
 
     def handle_elo_data(self, all_data):
 
@@ -363,10 +379,18 @@ class model_input_feature_builder(object):
         modeling_file = pd.read_csv(self.modeling_file)
         
         if not all_data:
+
+            curr_modeling_file = pd.read_csv(self.modeling_file)
+            last_week_in_modeling_file = curr_modeling_file.loc[~curr_modeling_file['HOME_FIELD'].isnull()].tail(1).WEEK_NUM.values[0]
+            if last_week_in_modeling_file == 22:
+                last_week_in_modeling_file = 1
+
             NFL_YEAR = game_data.tail(1)['YEAR'].values[0]
             NFL_WEEK = game_data.tail(1)['WEEK_NUM'].values[0]
 
-            game_data = game_data.loc[(game_data['YEAR']==NFL_YEAR)&(game_data['WEEK_NUM']==NFL_WEEK),:]
+            weeks_to_append = [x for x in range(last_week_in_modeling_file+1,NFL_WEEK+1)]
+
+            game_data = game_data.loc[(game_data['YEAR']==NFL_YEAR)&(game_data['WEEK_NUM'].isin(weeks_to_append)),:]
 
         ## Reduce data to just columns we want to look at here
         game_data = game_data.loc[:,['GAME_ID','WINNER','LOSER','YEAR','WEEK_NUM','GAME_LOCATION']]
@@ -391,9 +415,9 @@ class model_input_feature_builder(object):
             modeling_file.to_csv(self.modeling_file, index=False)
             print(f'> All Home or Away Feature written to {self.modeling_file}')
         else:
-            modeling_file.loc[(modeling_file['YEAR']==NFL_YEAR)&(modeling_file['WEEK_NUM']==NFL_WEEK),'HOME_FIELD'] = game_data['HOME_FIELD'].values
+            modeling_file.loc[(modeling_file['YEAR']==NFL_YEAR)&(modeling_file['WEEK_NUM'].isin(weeks_to_append)),'HOME_FIELD'] = game_data['HOME_FIELD'].values
             modeling_file.to_csv(self.modeling_file, index=False)
-            print(f'> Home or Away Feature for {NFL_YEAR} week {NFL_WEEK} written to {self.modeling_file}')
+            print(f'> Home or Away Feature for {NFL_YEAR} week(s) {",".join([str(x) for x in weeks_to_append])} written to {self.modeling_file}')
 
         print(f'> Building Home or Away feature -- END')
         print()
@@ -407,12 +431,22 @@ class model_input_feature_builder(object):
         df_wk_by_wk      = pd.read_csv(self.pfr_cleaned_data_file)
 
         if not all_data:
+
+            last_week_in_modeling_file = df_modeling_file.loc[~df_modeling_file['LATITUDE_A'].isnull()].tail(1).WEEK_NUM.values[0]
+            if last_week_in_modeling_file == 22:
+                last_week_in_modeling_file = 1
+
             ## Pull out Years and Week numbers
             NFL_YEAR = df_wk_by_wk.loc[df_wk_by_wk.index[-1],'YEAR']
             NFL_WEEK = df_wk_by_wk.loc[df_wk_by_wk.index[-1],'WEEK_NUM']
 
+            weeks_to_append = range(last_week_in_modeling_file,NFL_WEEK+1)
+            if len(weeks_to_append) == 1:
+                print()
+                return
+
             df_wk_by_wk = df_wk_by_wk.loc[  (df_wk_by_wk['YEAR']==NFL_YEAR    )&
-                                            (df_wk_by_wk['WEEK_NUM']==NFL_WEEK),:]
+                                            (df_wk_by_wk['WEEK_NUM'].isin(weeks_to_append)),:]
             
         ## Create temporary Dataframe to hold ['TEAM_A','TEAM_B','YEAR','WEEK_NUM','HOME_FIELD','LATITUDE_TEAM_A','LONGITUDE_TEAM_A','LATITUDE_TEAM_B','LONGITUDE_TEAM_B']
         #    Used for easily applying distance & tz calculations
@@ -422,9 +456,11 @@ class model_input_feature_builder(object):
         temp_df = pd.merge( temp_df, 
                             df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE']],
                             how='left', left_on=['TEAM_B','YEAR'], right_on=['HOME_TEAM','YEAR']).drop('HOME_TEAM',axis=1)
+        temp_df = temp_df.drop_duplicates()
+
         if not all_data:
             temp_df = temp_df.loc[  (temp_df['YEAR']==NFL_YEAR    )&
-                                    (temp_df['WEEK_NUM']==NFL_WEEK),:]
+                                    (temp_df['WEEK_NUM'].isin(weeks_to_append)),:]
         
         ## Calculate Team A's Kilometers of travel
         temp_df['TEAM_A_KM_TRAVELED'] = temp_df.progress_apply(lambda row: dist_calc._measure_distance( [row['LATITUDE_x'], row['LONGITUDE_x']],
@@ -438,16 +474,16 @@ class model_input_feature_builder(object):
                                                                                                                         tz_find = timezone_finder) if row['HOME_FIELD']==0 else 0 , axis=1)
         ## Assign approximate altitude of the stadium the game was played in
         temp_df['ALTITUDE'] = np.nan
+
         temp_df.loc[temp_df['HOME_FIELD']==1,'ALTITUDE'] = temp_df.loc[temp_df['HOME_FIELD']==1,:].merge(   df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE','ALTITUDE']], 
                                                                                                             how='left',
                                                                                                             left_on=['TEAM_A','YEAR','LATITUDE_x','LONGITUDE_x'],
-                                                                                                            right_on=['HOME_TEAM','YEAR','LATITUDE','LONGITUDE'])['ALTITUDE_y'].values
+                                                                                                            right_on=['HOME_TEAM','YEAR','LATITUDE','LONGITUDE']).ALTITUDE_y.values
 
         temp_df.loc[temp_df['HOME_FIELD']==0,'ALTITUDE'] = temp_df.loc[temp_df['HOME_FIELD']==0,:].merge(   df_stadium.loc[:,['HOME_TEAM','YEAR','LATITUDE','LONGITUDE','ALTITUDE']], 
                                                                                                             how='left',
                                                                                                             left_on=['TEAM_A','YEAR','LATITUDE_x','LONGITUDE_x'],
-                                                                                                            right_on=['HOME_TEAM','YEAR','LATITUDE','LONGITUDE'])['ALTITUDE_y'].values
-
+                                                                                                            right_on=['HOME_TEAM','YEAR','LATITUDE','LONGITUDE']).ALTITUDE_y.values
 
         ## For International games, we need to adjust the Travel distance and timezone difference
         for row in df_wk_by_wk.loc[df_wk_by_wk['STADIUM'].isin(df_stadium.loc[(df_stadium['HOME_TEAM'].isin(['International', 'Alternate'])),'STADIUM']),:].itertuples():
@@ -506,12 +542,17 @@ class model_input_feature_builder(object):
         
         else:
             ## Set KM/TZ values from temp_df
-            df_modeling_file.loc[(df_modeling_file['YEAR']==NFL_YEAR)&(df_modeling_file['WEEK_NUM']==NFL_WEEK),'TEAM_A_KM_TRAVELED'] = temp_df['TEAM_A_KM_TRAVELED'].values
-            df_modeling_file.loc[(df_modeling_file['YEAR']==NFL_YEAR)&(df_modeling_file['WEEK_NUM']==NFL_WEEK),'TEAM_A_TZ_TRAVELED'] = temp_df['TEAM_A_TZ_TRAVELED'].values
+            df_modeling_file.loc[(df_modeling_file['YEAR']==NFL_YEAR)&
+                                 (df_modeling_file['WEEK_NUM'].isin(weeks_to_append)),
+                                 ['LATITUDE_A', 'LONGITUDE_A', 'LATITUDE_B', 'LONGITUDE_B',
+                                  'TEAM_A_KM_TRAVELED', 'TEAM_A_TZ_TRAVELED', 'ALTITUDE']] = temp_df.loc[:,['LATITUDE_A', 'LONGITUDE_A',
+                                                                                                            'LATITUDE_B', 'LONGITUDE_B',
+                                                                                                            'TEAM_A_KM_TRAVELED', 'TEAM_A_TZ_TRAVELED',
+                                                                                                            'ALTITUDE']].values
 
             ## Save data
             df_modeling_file.to_csv(self.modeling_file, index=False)
-            print(f"> Travel and Timezone distance written for {NFL_YEAR} week {NFL_WEEK} to file: {self.modeling_file}")
+            print(f'> Travel and Timezone distance written for {NFL_YEAR} week(s) {",".join([str(x) for x in weeks_to_append])} to file: {self.modeling_file}')
             print(f'> Calculating travel and timezone distances -- END')
 
     def handle_location_data(self, all_data):
