@@ -2,9 +2,10 @@ data/
 TODO.txt
 *.pyc 
 
-notebooks/exploratory/*.ipynb
+#notebooks/exploratory/*.ipynb
 notebooks/modeling/*.ipynb
 configs/
 credentials/
 
 .ipynb_checkpoints/
+.vscode/*
