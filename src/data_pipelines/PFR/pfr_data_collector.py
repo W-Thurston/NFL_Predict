@@ -71,6 +71,12 @@ class PFR_Data_Collector(object):
               ## In the data pull the header shows up multiple times
               df = df[((df['WEEK_NUM']!='Week')&(df['WEEK_NUM']!='NULL_VALUE')&(~df['WEEK_NUM'].str.contains('Pre')))]
 
+              ## If we are within the season and updating the upcoming schedule
+              if 1 not in df['WEEK_NUM'].values:
+                     df_upcoming_schedule = pd.read_csv(self.cleaned_upcoming_schedule_data_file)
+                     df_upcoming_schedule.loc[df_upcoming_schedule['WEEK_NUM'].isin(df['WEEK_NUM'].values)] = df.copy()
+                     df = df_upcoming_schedule.copy()
+
               ## Save cleaned data to 'cleaned_' file
               df.to_csv(self.cleaned_upcoming_schedule_data_file, index=False)
               print(f'> PFR Scrapy data cleaned and written to file: {self.cleaned_upcoming_schedule_data_file}')

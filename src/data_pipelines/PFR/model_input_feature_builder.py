@@ -301,16 +301,50 @@ class model_input_feature_builder(object):
                                         df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&
                                                 (df_elo['NFL_WEEK']==NFL_WEEK)&
                                                 (~df_elo['NFL_TEAM'].isin(temp_df['NFL_TEAM'])),:]], ignore_index=True)
-                temp_df['NFL_YEAR'] = NFL_YEAR
-                temp_df['NFL_WEEK'] = NFL_WEEK+1
-                temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM', ignore_index=True)
+                
+                ## Update the Next year's week 1 elo
+                if NFL_WEEK == 22:
+                    ## Pull out Years and Week numbers
+                    if df_wk_by_wk.loc[df_wk_by_wk['YEAR']==max(df_wk_by_wk['YEAR']),'WEEK_NUM'].max() == 22:
+                        NFL_YEARS = sorted(df_wk_by_wk['YEAR'].unique())+[f"{datetime.now().year}-{datetime.now().year+1}"]
+                    else:
+                        NFL_YEARS = sorted(df_wk_by_wk['YEAR'].unique())
+                    NFL_WEEKS = sorted(df_wk_by_wk['WEEK_NUM'].unique())
+                    NFL_TEAMS = sorted(df_wk_by_wk['WINNER'].unique())
 
+                    sorted_years = NFL_YEARS.copy()
+
+                    dataframe_builder_list = []
+                    for team in NFL_TEAMS:
+                            for week in NFL_WEEKS:
+                                dataframe_builder_list.append( (team, NFL_YEARS[-1], week) )
+
+                    df_team_elo = pd.DataFrame.from_records(dataframe_builder_list, columns=['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK']).drop_duplicates()
+                    df_team_elo['ELO'] = np.nan
+                    df_team_elo['NFL_YEAR'] = pd.Categorical(df_team_elo['NFL_YEAR'], sorted_years)
+                    df_team_elo = df_team_elo.sort_values(['NFL_YEAR','NFL_WEEK','NFL_TEAM'], ignore_index=True)
+
+                    dataframe_builder_list = None
+                    del dataframe_builder_list
+
+                    df_elo = pd.concat([df_elo, df_team_elo])
+                    temp_df['NFL_YEAR'] = NFL_YEARS[-1]
+                    temp_df['NFL_WEEK'] = 1
+                    temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM', ignore_index=True)
+
+                    df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEARS[-1])&(df_elo['NFL_WEEK']==1),'ELO'] = temp_df['ELO'].values
+                
                 ## Update the newest weeks data with the above calculated elo
-                df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&(df_elo['NFL_WEEK']==NFL_WEEK+1),'ELO'] = temp_df['ELO'].values
+                else:
+                    temp_df['NFL_YEAR'] = NFL_YEAR
+                    temp_df['NFL_WEEK'] = NFL_WEEK+1
+                    temp_df = temp_df.loc[:,['NFL_TEAM', 'NFL_YEAR', 'NFL_WEEK','ELO']].sort_values('NFL_TEAM', ignore_index=True)
+
+                    df_elo.loc[(df_elo['NFL_YEAR']==NFL_YEAR)&(df_elo['NFL_WEEK']==NFL_WEEK+1),'ELO'] = temp_df['ELO'].values
 
                 ## Save data
                 df_elo.to_csv(self.ELO_data_file, index=False)
-                print(f"> ELO filled data written to file: {self.ELO_data_file}")
+                print(f"> ELO filled data for week {NFL_WEEK} written to file: {self.ELO_data_file}")
                 print()
 
     @staticmethod

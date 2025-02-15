@@ -304,7 +304,7 @@ class Append_New_PFR_Spider(Spider):
 
 class Upcoming_Schedule_NFLSpider(Spider):
 	'''
-		This spider is used to pull historical NFL data from PFR.
+		This spider is used to the upcoming schedule for the current year from NFL data hosted on PFR.
 	'''
 	name = 'NFL_PFR_Upcoming_Bot'
 
