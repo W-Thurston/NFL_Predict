@@ -1,0 +1,13 @@
+[Unit]
+Description=Check the selected Gridiron Edge quote plan every five minutes
+Documentation=man:systemd.timer(5)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Persistent=true
+Unit=gridiron-edge-collector.service
+
+[Install]
+WantedBy=timers.target

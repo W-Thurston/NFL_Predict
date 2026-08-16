@@ -7,6 +7,79 @@ Each entry documents *why* a choice was made, not just *what* changed
 Format: newest entry at top. Each entry self-contained.
 
 ---
+## D26. Quote-worker deployment is repository-owned but operator-activated
+
+**Status:** Accepted
+
+**Date:** 2026-08-16
+
+### Decision
+
+Own the quote-collection worker's systemd service, timer, invocation wrapper,
+installation logic, verification logic, and operational guidance in the
+repository.
+
+Keep weekly plan generation, active-plan selection, artifact transfer,
+credential provisioning, installation, and timer activation as explicit
+operator actions. Deployment does not infer a season, week, repository path,
+runtime executable, deployment identity, or credential path.
+
+The installed service remains a non-root `Type=oneshot` unit with no automatic
+restart. Its wrapper generates the current UTC evaluation timestamp and invokes
+the existing selected-plan executor. The timer wakes every five minutes, while
+due-time eligibility, the inclusive fifteen-minute grace period, provider
+quota, execution claims, terminal results, and quote persistence remain owned
+by the existing domain boundary.
+
+Installation validates the complete staged deployment before replacing live
+files. If systemd reload fails after replacement, installation restores the
+prior files and permission modes and reloads the restored state. Explicit timer
+activation is a separate post-install operation and does not roll back a valid
+installation if activation fails.
+
+The provider key remains in a root-owned mode-0600 environment file. The
+installer validates that the file contains exactly one nonempty
+`ODDS_API_KEY` assignment. Read-only verification validates only file type,
+ownership, and permissions and never opens the credential file.
+
+### Rationale
+
+Collection-plan and execution semantics were already validated independently of
+deployment hardware. Repository ownership makes the worker reproducible and
+recoverable without moving policy into systemd or creating a second execution
+path.
+
+Separating installation from activation prevents a valid deployed
+configuration from being destroyed because activation fails. Staged validation
+and restoration prevent malformed or unloadable units from replacing the last
+known-good worker configuration.
+
+Keeping credentials and weekly selection outside repository files preserves
+secret isolation and explicit operational intent.
+
+### Consequences
+
+- Machine-specific inputs are required explicitly during installation and
+  verification.
+- The timer never selects or infers a weekly plan.
+- The service never embeds a static evaluation timestamp.
+- Installation may update deployed files without enabling the timer.
+- A failed installation reload restores the prior deployment.
+- A failed explicit activation leaves the installed files intact.
+- Verification can report credential-file security without reading the secret.
+- The Raspberry Pi deployment is validated only as a quote-collection worker,
+  not as a full API, frontend, training, or prediction appliance.
+
+### References
+
+- `deploy/bin/install_quote_collection_worker.py`
+- `deploy/bin/verify_quote_collection_worker.py`
+- `deploy/systemd/gridiron-edge-collector.service`
+- `deploy/systemd/gridiron-edge-collector.timer`
+- `src/gridiron_edge/deployment/quote_collection_worker.py`
+- `tests/unit/deployment/test_quote_collection_worker.py`
+- `HANDOFF.md`
+- `PLAN.md`
 
 ## D25. The Odds API v4 is the supported current-market provider
 

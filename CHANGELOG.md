@@ -1,5 +1,70 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-16 - Quote collection worker deployment
+
+### Added
+
+- Added repository-owned systemd service and timer templates for the selected
+  weekly quote-collection plan.
+- Added explicit administrative entry points for installation and read-only
+  verification under `deploy/bin/`.
+- Added a generated invocation wrapper that resolves no season or week and
+  creates a current UTC evaluation timestamp for every service invocation.
+- Added a deployment package with explicit path, identity, credential,
+  selection, schedule, systemd, artifact, journal, clock, throttling, and
+  storage-health checks.
+- Added explicit installation and activation error types.
+- Added 13 focused deployment tests.
+
+### Deployment safety
+
+- Validate the complete staged service and timer before replacing deployed
+  files.
+- Require destination parent directories rather than silently creating
+  system-level paths.
+- Preserve prior deployment bytes and permission modes.
+- Restore the previous deployment and reload systemd if the installation reload
+  fails.
+- Keep timer activation as a separate post-install operation; activation
+  failure does not roll back a valid installation.
+- Validate exactly one nonempty API-key assignment during installation.
+- Keep read-only verification from opening the protected credential file.
+- Keep credentials out of repository files, command arguments, generated units,
+  wrapper contents, and journal output.
+
+### Raspberry Pi validation
+
+- Installed the repository-owned deployment on the Raspberry Pi 4 quote worker.
+- Verified the service and timer with `systemd-analyze verify`.
+- Verified the selected 2026 Week 1 plan with 34 planned polls.
+- Verified the timer is enabled and active with a five-minute cadence.
+- Verified repeated managed executions return `not_due` with exit status zero
+  before the first planned poll.
+- Verified no execution claim, terminal result, quote-history, or current
+  snapshot artifact was created by `not_due`.
+- Verified the environment file remains root-owned mode 0600.
+- Verified the service runs as the non-root deployment user.
+- Verified the worker reports `ready`.
+- Verified root storage on the 2 TB SSD, temperature of 46.2 C,
+  `throttled=0x0`, and no configured current USB or storage error markers.
+
+### Verification
+
+- Focused Ruff passed.
+- Focused Pyrefly passed with zero errors.
+- All 13 deployment tests passed.
+- Repository Ruff and the selected repository test suite passed.
+- Corrected the canonical repository type-check command to
+  `uvx pyrefly check .`.
+- The corrected repository-wide type check reported 524 existing errors.
+  Restoring that complete boundary is recorded separately in `ROADMAP.md`.
+
+### Scope
+
+- No collection policy, due-time, quota, claim, receipt, provider-ingest,
+  historical interpretation, API, frontend, model, qualification, or
+  recommendation behavior changed.
+
 ## 2026-08-05 - Weekly prediction architecture and operational closeout
 
 ### Added

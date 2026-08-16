@@ -122,35 +122,59 @@ Program sequence:
   through historical market evidence to a recorded wager. They do not yet
   promote candidates into recommended bets, calculate validated CLV, or define
   empirical edge and exposure thresholds.
-- **Recommended-bet qualification [Planned].** Complete the remaining evidence
-and policy work that promotes a positive-EV candidate into a qualified
-opportunity or recommended bet.
+- **Recommended-bet qualification [Planned].** Complete the remaining evidence,
+  analytical, and policy work that promotes a positive-EV candidate into a
+  qualified opportunity or recommended bet.
+
+  Completed foundations:
+
+  - Exact reference-backed bet matching preserves provider, provider event,
+    sportsbook, game, market, side, fetch timestamp, line, price, sportsbook
+    update time, and kickoff evidence with explicit manual, missing, ambiguous,
+    conflicting, and matched states.
+  - Historical observations are stored in deterministic season-and-week
+    partitions with exact-replay idempotence, same-fetch conflict rejection,
+    canonical ordering, and explicit repeated-observation depth.
+  - Leakage-safe boundaries preserve earliest-observed and latest-eligible
+    non-live pregame observations for each exact provider-aware market identity.
+  - Kickoff-aware weekly collection planning, atomic single-shot execution, and
+    explicit active-plan selection are implemented.
+  - A Raspberry Pi quote-collection worker has been deployed and validated
+    manually; repository-owned installation, verification, documentation, and
+    recovery remain the active implementation unit.
 
   Remaining sequence:
-  1. Match reference-backed bets to the exact provider, provider event,
-     sportsbook, game, market, side, fetch timestamp, line, and price recorded
-     in historical quote evidence. Preserve explicit manual, missing,
-     conflicting, and matched states.
-  2. Acquire repeated exact-identity observations through scheduled collection
-     or supported historical provider backfill. Current history contains
-     observations but does not yet provide repeated temporal evidence for an
-     exact market identity.
-  3. Implement validated same-source, same-sportsbook bet closeout using the
+
+  1. Codify the deployed quote-collection worker as repository-owned systemd,
+     installation, verification, secret-handling, monitoring, and recovery
+     assets.
+  2. Accumulate repeated exact-identity pregame quote observations through the
+     selected weekly collection plans.
+  3. Persist immutable pregame candidate issuance so later analysis evaluates
+     only the offers and evidence available before kickoff.
+  4. Implement validated same-provider, same-sportsbook closeout using the
      latest eligible pregame boundary. Populate closing fields and calculate
      price or point CLV only when the required evidence exists.
-  4. Evaluate model reliability, realized outcomes, CLV, and performance across
-     empirical EV cohorts. Derive thresholds from observed results rather than
-     intuitive cutoffs.
-  5. Define quote-freshness, fractional-Kelly sizing, duplicate exposure,
-     conflicting exposure, per-game concentration, portfolio concentration,
-     and correlation policies.
-  6. Promote an offer only when every mandatory check passes. Preserve explicit
-     failed and unavailable reasons when recommendation qualification cannot be
-     completed.
+  5. Evaluate model reliability, realized outcomes, CLV, and performance across
+     empirical EV cohorts independently for Moneyline, Spread, and Total.
+     Derive thresholds from observed results rather than intuitive cutoffs.
+  6. Define versioned quote-freshness, fractional-Kelly sizing, duplicate
+     exposure, conflicting exposure, per-game concentration, portfolio
+     concentration, and correlation policies.
+  7. Promote an exact offer only when every mandatory evidence and policy check
+     passes. Preserve explicit failed and unavailable reasons when
+     recommendation qualification cannot be completed.
+
+  The intermediate goal is satisfied when one exact current sportsbook offer
+  can produce a persisted recommended-bet result with exact offer identity,
+  selected-product and forecast provenance, evaluated timestamp, policy
+  version, supporting checks, unavailable reasons, and suggested stake. The
+  system does not place a sportsbook wager.
 
   Model-favorite status remains descriptive and is not a universal
   recommendation requirement. A positive-EV candidate remains necessary but
   insufficient for recommendation.
+
 10. **Recommendation product integration [Planned].** Add the qualified and
   recommended states to the backend contract, Line Shopping, Available Edges,
   Bet Slip, and recorded-bet workflow only after the qualification policy is
@@ -171,22 +195,58 @@ program. The current-market workstream comes first because it unlocks immediate
 weekly operation and frontend usability. Historical archive and evaluation
 follow after the provider and normalized quote contract are stable.
 
-- **Recurring quote acquisition policy [Planned].** Treat the weekly quote
-  allowance as a bounded budget rather than applying one fixed calendar
-  schedule to every NFL week. Generate and validate an explicit collection
-  plan from the canonical kickoff timestamps for the selected season and week.
+- **Recurring quote acquisition [Implementation complete; deployment codification active].**
+  Kickoff-aware weekly collection planning, bounded
+  provider-credit allocation, versioned plan persistence, atomic single-shot
+  execution, immutable claims and terminal results, quota-reserve safeguards,
+  partial-persistence reporting, and explicit global active-plan selection are
+  implemented.
 
-  Use a default ramp guideline of approximately twelve-hour baseline
-  observations, three-hour observations inside twenty-four hours of the next
-  kickoff, and hourly observations inside six hours, subject to the configured
-  weekly poll and provider-credit limits. Reallocate capacity for weeks with
-  international, Saturday, holiday, postseason, missing, or otherwise unusual
-  kickoff windows.
+  A Raspberry Pi 4 worker has been validated against the selected 2026 Week 1
+  plan using a systemd oneshot service and five-minute timer. The worker runs
+  from a 2 TB SSD over the proven stable USB 2 path, resolves the selected plan,
+  generates an explicit UTC evaluation time, preserves the provider secret in a
+  root-owned environment file, and returns `not_due` without provider access or
+  execution artifacts before the first planned poll.
 
-  Keep planning independent from execution hardware. A later deployment unit
-  may execute validated plans through a systemd timer on an always-on Linux
-  host, including a Raspberry Pi, without changing the collection-policy or
-  quote-evidence contracts.
+  The active implementation work is to make this deployment reproducible and
+  repository-owned. It must preserve:
+
+  - explicit plan generation and selection outside the timer;
+  - no season or week inference;
+  - no implicit retry or catch-up request;
+  - one provider request at most per claimed due poll;
+  - non-root service execution;
+  - protected secret configuration;
+  - systemd journal observability;
+  - installation, verification, disablement, and recovery guidance;
+  - explicit storage-health checks for the deployed Raspberry Pi worker.
+
+  Full API and frontend appliance hosting on the Raspberry Pi remains a
+  separate future deployment decision.
+
+- **Moneyline, Spread, and Total production recommendation proof [Planned].**
+  Confirm the complete production chain independently for all three game-market
+  families:
+
+  1. canonical schedule and selected weekly prediction product;
+  2. repeated exact timestamped multi-book quote observations;
+  3. immutable pregame candidate issuance;
+  4. versioned qualification, freshness, sizing, and exposure policy;
+  5. persisted recommended or explicitly unavailable result;
+  6. backend serialization and frontend presentation;
+  7. explicit optional recorded-bet action with duplicate protection and
+     bankroll transaction semantics;
+  8. completed outcome and same-source, same-sportsbook closeout;
+  9. Moneyline price CLV or Spread and Total point CLV;
+  10. realized performance and a reproducible end-to-end audit trail.
+
+  Moneyline, Spread, and Total require separate empirical acceptance. A policy
+  validated for one family must not be assumed valid for another. Production
+  confirmation requires a real-week rehearsal proving identity, chronology,
+  evidence, recommendation state, presentation, optional recording, closeout,
+  and performance without request-time model computation or fabricated market
+  evidence.
 
 Current-market scope:
 
@@ -200,15 +260,28 @@ Current-market scope:
 - `verify-week`, unified edge service, API, Dashboard, Games, Game Detail, and
   BetSlip integration.
 
-Historical-market scope, planned separately:
+Historical-market foundations implemented:
 
-- append-only timestamped quote storage;
-- idempotent provider backfill and coverage reporting;
-- opening, intermediate, and closing quote definitions;
-- leakage-safe pre-kickoff quote selection;
-- closing-line value, model-versus-market evaluation, line movement, strategy
-  backtesting, and consensus policies;
-- partitioning and retention based on observed provider volume.
+- append-only timestamped provider-aware quote observations;
+- deterministic season-and-week partitioning;
+- exact-replay idempotence and same-fetch conflict rejection;
+- explicit temporal coverage and repeated-observation depth;
+- leakage-safe earliest-observed and latest-eligible-pregame boundaries;
+- exact reference-backed bet matching;
+- preservation of missing, conflicting, live, and post-kickoff states.
+
+Historical-market work remaining:
+
+- sufficient repeated real pregame coverage;
+- immutable pregame candidate issuance;
+- validated same-source, same-sportsbook closeout;
+- price and point CLV;
+- line and price movement interpretation;
+- empirical market-family cohort analysis;
+- recommendation-policy calibration;
+- supported provider historical backfill if operational collection does not
+  provide sufficient coverage;
+- strategy backtesting and consensus policies.
 
 The initial normalized quote contract must support both current snapshots and a
 future historical archive, but historical ingestion and evaluation are not
@@ -334,24 +407,46 @@ Every new feature must preserve chronological construction, avoid leakage, and u
 
 Future tooling work:
 
+- restore the intended repository-wide Pyrefly boundary using
+  `uvx pyrefly check .`;
+- define the production, test, script, and exploratory-notebook type-check
+  scope explicitly;
+- correct repository and test import roots before treating missing test-fixture
+  imports as source defects;
+- triage configuration failures, production-source findings, shared fixture
+  annotations, negative validation tests, Pandas inference limitations, and
+  exploratory notebook diagnostics separately;
+- establish and enforce a zero-error repository-wide baseline without
+  suppressing genuine production defects;
+- preserve focused Pyrefly checks during bounded implementation units while the
+  repository-wide baseline is being restored;
 - exercise `gridiron verify --strict` in a real CI surface;
 - run the separate frontend lint, build, and test gates in CI;
 - consider performance baselines if test or training runtime regresses;
 - maintain generated OpenAPI and TypeScript contract checks;
 - improve long-running composite resume diagnostics where needed;
-- clamp current-season PBP requests to the maximum season published by the upstream source once that policy is defined;
+- clamp current-season PBP requests to the maximum season published by the
+  upstream source once that policy is defined;
 - verify and repair any remaining baseline-report parser edge cases;
-- review repository-wide lint exclusions only through dedicated, behavior-preserving work.
+- review repository-wide lint exclusions only through dedicated,
+  behavior-preserving work.
 
 ## Known Limitations
 
 ### Market data
 
-The Odds API v4 client, parser, explicit ingest command, sportsbook-specific
-recommendation evaluation, operational edge integration, frontend sportsbook
-preferences, and Bet Slip quote identity are implemented. Real-data frontend
-validation, automatic refresh policy, and dedicated multi-book execution
-features remain active program work.
+The Odds API v4 client, parser, provider-aware quote contract, partitioned
+historical observations, explicit ingest command, sportsbook-specific offer
+evaluation, operational edge integration, frontend sportsbook preferences,
+Line Shopping, Bet Slip quote identity, kickoff-aware collection planning,
+single-shot execution, and active-plan selection are implemented.
+
+A Raspberry Pi quote-collection worker is running through a systemd timer.
+Repository-owned deployment assets, installation verification, monitoring,
+recovery, and operational artifact synchronization remain active work.
+Repeated real quote coverage, validated closeout and CLV, empirical
+recommendation thresholds, recommendation product integration, and full
+Moneyline, Spread, and Total production proof remain incomplete.
 
 ### Injury, news, and live state
 

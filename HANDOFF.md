@@ -284,6 +284,189 @@ returned positive edges
 
 Missing market data is not “No play.” `No play` is reserved for a completed evaluation with no positive edge. Blocked or analytically empty results remove stale scope-specific edge CSV output.
 
+## Quote Collection Worker Deployment
+
+The supported recurring quote collector is a dedicated Raspberry Pi worker. It
+executes explicitly selected weekly collection plans and does not choose or
+infer a season or week.
+
+### Validated worker
+
+```text
+Hardware: Raspberry Pi 4 Model B Rev 1.4
+Architecture: aarch64
+Memory: 8 GB
+Storage: 2 TB SanDisk Extreme SSD
+Boot: SSD-only
+Stable storage transport: black USB 2 port
+Repository: /home/thursty/apps/gridiron-edge
+Python: /home/thursty/apps/gridiron-edge/.venv/bin/python
+uv: /home/thursty/.local/bin/uv
+```
+
+The microSD installation is offline recovery media. The Raspberry Pi is not validated as a full API, frontend, model-training, or prediction appliance.
+
+Repository-owned deployment assets
+deploy/bin/install_quote_collection_worker.py
+deploy/bin/verify_quote_collection_worker.py
+deploy/systemd/gridiron-edge-collector.service
+deploy/systemd/gridiron-edge-collector.timer
+src/gridiron_edge/deployment/quote_collection_worker.py
+
+Installed paths
+/usr/local/libexec/gridiron-edge-collector
+/etc/systemd/system/gridiron-edge-collector.service
+/etc/systemd/system/gridiron-edge-collector.timer
+/etc/gridiron-edge-collector.env
+
+
+The environment file must be a regular root-owned, root-group mode-0600 file containing exactly one nonempty ODDS_API_KEY assignment.
+
+Installation validates the secret assignment. Read-only verification checks only file type, owner, group, and mode and never opens the credential file.
+
+Install or reinstall
+
+Run from /home/thursty/apps/gridiron-edge:
+
+sudo \
+  /home/thursty/apps/gridiron-edge/.venv/bin/python \
+  -B \
+  deploy/bin/install_quote_collection_worker.py \
+  --repository /home/thursty/apps/gridiron-edge \
+  --user thursty \
+  --group thursty \
+  --uv-path /home/thursty/.local/bin/uv \
+  --environment-file /etc/gridiron-edge-collector.env \
+  --wrapper-path /usr/local/libexec/gridiron-edge-collector \
+  --service-path /etc/systemd/system/gridiron-edge-collector.service \
+  --timer-path /etc/systemd/system/gridiron-edge-collector.timer \
+  --service-template deploy/systemd/gridiron-edge-collector.service \
+  --timer-template deploy/systemd/gridiron-edge-collector.timer
+
+
+Installation:
+
+requires the rich upcoming schedule and global current-plan selection;
+validates the complete staged deployment set before replacement;
+preserves prior files and permission modes;
+restores the prior deployment if systemd reload fails;
+does not select or transfer a weekly plan;
+does not enable the timer unless --enable-timer is supplied.
+
+Activation is intentionally separate from installation.
+
+Verify
+sudo \
+  /home/thursty/apps/gridiron-edge/.venv/bin/python \
+  -B \
+  deploy/bin/verify_quote_collection_worker.py \
+  --repository /home/thursty/apps/gridiron-edge \
+  --user thursty \
+  --group thursty \
+  --uv-path /home/thursty/.local/bin/uv \
+  --environment-file /etc/gridiron-edge-collector.env \
+  --wrapper-path /usr/local/libexec/gridiron-edge-collector \
+  --service-path /etc/systemd/system/gridiron-edge-collector.service \
+  --timer-path /etc/systemd/system/gridiron-edge-collector.timer
+
+
+A healthy deployment reports Worker status: ready.
+
+Verification covers:
+
+repository, schedule, selection, and selected-plan resolution;
+unresolved execution claims;
+installed paths;
+credential-file metadata;
+secret assignment disclosure in deployed files and journal output;
+systemd unit syntax;
+timer enablement and activity;
+clock synchronization;
+root filesystem capacity;
+Raspberry Pi throttling;
+latest service result;
+configured storage-error markers.
+Service and timer semantics
+
+The service is a non-root Type=oneshot unit with no automatic restart. The wrapper generates the current UTC evaluation timestamp and calls:
+
+gridiron ingest execute-selected-odds-plan
+
+
+with:
+
+grace minutes: 15
+minimum provider-credit reserve: 30
+provider timeout seconds: 15
+
+
+The timer wakes every five minutes. Due-time eligibility remains owned by the selected-plan executor. A wake that is not due exits successfully without provider access or execution artifacts.
+
+The service is normally inactive (dead) between runs. The timer, not the service, is the persistent active unit.
+
+Operate
+
+Inspect state:
+
+systemctl is-enabled gridiron-edge-collector.timer
+systemctl is-active gridiron-edge-collector.timer
+systemctl list-timers gridiron-edge-collector.timer --all
+sudo systemctl status gridiron-edge-collector.service --no-pager
+sudo journalctl -u gridiron-edge-collector.service -n 50 --no-pager
+
+
+Run one managed execution:
+
+sudo systemctl start gridiron-edge-collector.service
+
+
+Pause recurring execution:
+
+sudo systemctl disable --now gridiron-edge-collector.timer
+
+
+Resume recurring execution:
+
+sudo systemctl enable --now gridiron-edge-collector.timer
+
+
+Disabling the timer does not delete plans, selections, claims, terminal results, or quote artifacts.
+
+Weekly rollover
+
+Generate and validate the new weekly plan on the reviewed development checkout. Transfer the rich upcoming schedule, scoped plan, and global current selection to the worker. Compare source and destination identities before enabling or continuing the timer.
+
+The installer does not generate, select, or transfer weekly plans.
+
+Verify after every plan rollover:
+
+sudo \
+  /home/thursty/apps/gridiron-edge/.venv/bin/python \
+  -B \
+  deploy/bin/verify_quote_collection_worker.py \
+  --repository /home/thursty/apps/gridiron-edge \
+  --user thursty \
+  --group thursty \
+  --uv-path /home/thursty/.local/bin/uv \
+  --environment-file /etc/gridiron-edge-collector.env \
+  --wrapper-path /usr/local/libexec/gridiron-edge-collector \
+  --service-path /etc/systemd/system/gridiron-edge-collector.service \
+  --timer-path /etc/systemd/system/gridiron-edge-collector.timer
+
+Health checks
+vcgencmd measure_temp
+vcgencmd get_throttled
+findmnt -no SOURCE,FSTYPE,AVAIL,TARGET /
+
+sudo dmesg |
+  grep -iE \
+    'usb disconnect|reset|timeout|I/O error|capacity change|Synchronize Cache'
+
+
+The validated healthy state had throttled=0x0, root storage on /dev/sda2, and no configured current USB disconnect, reset, timeout, I/O, capacity-change, or cache-synchronization errors.
+
+The SSD must remain on the proven stable USB 2 path.
+
 ## Postgame Workflow
 
 Run only after completed outcomes are available:
@@ -458,7 +641,7 @@ Preferred Python boundary:
 
 ```bash
 uv run ruff check . --fix && \
-uvx pyrefly check && \
+uvx pyrefly check . && \
 uv run pytest -m "unit and not slow"
 ```
 
@@ -476,8 +659,8 @@ Pre-commit runs Python lint, type checking, and unit tests. Pre-push adds integr
 
 ## Known Limitations
 
-- The Odds API v4 client, parser, and explicit current-market ingest command are implemented. Same-book recommendation evaluation, automatic refresh policy, broader operational integration, and multi-book shopping remain future work.
-- Multi-book line shopping, arbitrage, middles, and book selectors remain future product work after supported ingestion and same-book evaluation are complete.
+- The Odds API v4 current-market path, provider-aware quote storage, recurring selected-plan acquisition, same-book offer evaluation, operational edge integration, multi-book Line Shopping, sportsbook selection, and repository-owned Raspberry Pi worker deployment are implemented. Sufficient repeated real pregame quote coverage still must accumulate.
+- Validated same-provider, same-sportsbook closeout, price and point CLV, empirical recommendation thresholds, qualified recommendation integration, arbitrage, middles, and movement analysis remain incomplete.
 - Injury and news data are not integrated.
 - Scenario analysis, feature attribution, and historical comparable retrieval remain future capabilities.
 - Live game state, live odds, in-game win probability, and WebSocket updates are not implemented.

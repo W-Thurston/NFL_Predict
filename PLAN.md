@@ -63,7 +63,7 @@ should read this section before planning or modifying the repository.
 
    ```bash
    uv run ruff check . --fix && \
-   uvx pyrefly check && \
+   uvx pyrefly check . && \
    uv run pytest -m "unit and not slow"
    ```
 
@@ -1425,3 +1425,84 @@ states remain explicit. Exact-plan manual execution remains available. No
 scheduler installation, automatic retry, catch-up polling, provider backfill,
 movement, CLV, qualification, or recommendation behavior was introduced.
 Market Unit 17 is complete.
+
+---
+
+#### Market Unit 18: Codify the Quote Collection Worker Deployment [Completed]
+
+##### Completed
+
+2026-08-16
+
+##### Goal
+
+Make the validated Raspberry Pi quote-collection worker reproducible,
+repository-owned, verifiable, transactional, and recoverable without changing
+collection-plan, selection, due-time, quota, claim, receipt, provider-ingest,
+historical interpretation, or recommendation semantics.
+
+##### Files Added/Removed/Changed
+
+Added:
+
+- `deploy/bin/install_quote_collection_worker.py`
+- `deploy/bin/verify_quote_collection_worker.py`
+- `deploy/systemd/gridiron-edge-collector.service`
+- `deploy/systemd/gridiron-edge-collector.timer`
+- `src/gridiron_edge/deployment/__init__.py`
+- `src/gridiron_edge/deployment/quote_collection_worker.py`
+- `tests/unit/deployment/test_quote_collection_worker.py`
+
+Changed:
+
+- `CHANGELOG.md`
+- `DECISIONS.md`
+- `HANDOFF.md`
+- `PLAN.md`
+- `ROADMAP.md`
+
+Removed:
+
+- None.
+
+##### Tests
+
+- `uv run ruff check src/gridiron_edge/deployment tests/unit/deployment --fix`
+  passed.
+- `uvx pyrefly check src/gridiron_edge/deployment tests/unit/deployment`
+  passed with zero errors.
+- `uv run pytest tests/unit/deployment/test_quote_collection_worker.py`
+  passed with 13 tests.
+- Repository Ruff and the selected repository test suite passed.
+- The corrected repository-wide `uvx pyrefly check .` command was executed and
+  reported 524 existing errors. Restoring that boundary is recorded separately
+  in `ROADMAP.md`.
+- Repository-owned installation completed on the target Raspberry Pi.
+- `systemd-analyze verify` passed with exit status zero.
+- Repository-owned verification reported `ready`.
+- The selected 2026 Week 1 plan resolved with 34 planned polls and zero
+  unresolved claims.
+- The timer remained enabled and active with a five-minute cadence.
+- Managed execution returned `not_due`, exited successfully, and created no
+  execution or quote artifacts.
+- The worker reported `throttled=0x0`, 46.2 C, root storage on the 2 TB SSD,
+  and no configured current transport or storage error markers.
+
+##### Acceptance
+
+The quote-collection worker deployment is repository-owned, reproducible,
+transactional, independently verifiable, and validated on the target Raspberry
+Pi. The installed non-root oneshot service resolves the explicitly selected
+weekly plan, generates a current UTC evaluation timestamp, loads the provider
+credential from a protected root-owned environment file, and is triggered by
+an enabled five-minute systemd timer.
+
+Installation validates the complete staged deployment before replacement,
+restores prior files and modes if systemd reload fails, and keeps explicit timer
+activation separate. Read-only verification does not open the credential file.
+
+Managed execution before the first planned poll returns `not_due`, exits
+successfully, and creates no execution or quote artifacts. No collection
+policy, due-time, quota, claim, receipt, provider-ingest, historical
+interpretation, API, frontend, model, qualification, or recommendation behavior
+was introduced.
