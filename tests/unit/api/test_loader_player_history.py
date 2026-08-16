@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from gridiron_edge.core.settings import Settings
+
 
 def _make_logs() -> pd.DataFrame:
     """Two players, one with 3 REG games in 2024 + 1 in 2023."""
@@ -71,16 +73,23 @@ def _write(tmp_path: Path, df: pd.DataFrame) -> None:
     df.to_parquet(d / "player_game_logs.parquet", index=False)
 
 
-class _Settings:
-    def __init__(self, repo: Path) -> None:
-        self.repo_root = repo
-
-
 def test_unknown_stat_returns_none(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_player_history
 
     _write(tmp_path, _make_logs())
-    result = load_player_history(_Settings(tmp_path), player_id="P1", stat="bogus_stat")
+    result = load_player_history(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        ),
+        player_id="P1",
+        stat="bogus_stat",
+    )
     assert result is None
 
 
@@ -88,7 +97,19 @@ def test_unknown_player_returns_none(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_player_history
 
     _write(tmp_path, _make_logs())
-    result = load_player_history(_Settings(tmp_path), player_id="NOPE", stat="rush_yards")
+    result = load_player_history(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        ),
+        player_id="NOPE",
+        stat="rush_yards",
+    )
     assert result is None
 
 
@@ -96,7 +117,19 @@ def test_defaults_to_latest_season(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_player_history
 
     _write(tmp_path, _make_logs())
-    result = load_player_history(_Settings(tmp_path), player_id="P1", stat="rush_yards")
+    result = load_player_history(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        ),
+        player_id="P1",
+        stat="rush_yards",
+    )
     assert result is not None
     assert result["season"] == 2024
     assert len(result["rows"]) == 3  # 2024 only, not 2023
@@ -106,7 +139,19 @@ def test_rows_sorted_by_week_with_values(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_player_history
 
     _write(tmp_path, _make_logs())
-    result = load_player_history(_Settings(tmp_path), player_id="P1", stat="rush_yards")
+    result = load_player_history(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        ),
+        player_id="P1",
+        stat="rush_yards",
+    )
     assert result is not None
     weeks = [r["week"] for r in result["rows"]]
     assert weeks == [1, 2, 3]
@@ -118,7 +163,19 @@ def test_is_home_passed_through_from_column(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_player_history
 
     _write(tmp_path, _make_logs())
-    result = load_player_history(_Settings(tmp_path), player_id="P1", stat="rush_yards")
+    result = load_player_history(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        ),
+        player_id="P1",
+        stat="rush_yards",
+    )
     assert result is not None
     by_week = {r["week"]: r for r in result["rows"]}
     # is_home now read directly from the (fixed) column, not parsed.
@@ -131,7 +188,20 @@ def test_limit_returns_last_n(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_player_history
 
     _write(tmp_path, _make_logs())
-    result = load_player_history(_Settings(tmp_path), player_id="P1", stat="rush_yards", limit=2)
+    result = load_player_history(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        ),
+        player_id="P1",
+        stat="rush_yards",
+        limit=2,
+    )
     assert result is not None
     weeks = [r["week"] for r in result["rows"]]
     assert weeks == [2, 3]  # last 2 by week

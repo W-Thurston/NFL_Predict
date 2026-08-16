@@ -184,7 +184,8 @@ boundary.
 
 #### Market Unit 19: Restore the Repository-Wide Pyrefly Boundary
 
-Restore `uvx pyrefly check .` as a truthful zero-error repository quality gate.
+Restore the configured `uvx pyrefly check` boundary as a truthful zero-error
+quality gate across `src/`, `tests/`, and `deploy/bin/`.
 
 Required work:
 
@@ -197,11 +198,11 @@ Required work:
 - resolve production-source findings before test-only debt;
 - establish explicit conventions for deliberately invalid test inputs, frozen
   object mutation tests, protocol fakes, and typed fixture construction;
-- repair exploratory notebooks or explicitly exclude them through a documented
-  ownership decision;
+- exclude non-authoritative exploratory notebooks from automated quality gates
+  through explicit documented configuration;
 - update hooks, verification commands, and operational documentation to use the
   complete repository target;
-- require `uvx pyrefly check .` to report zero errors at acceptance.
+- require configured `uvx pyrefly check` to report zero errors at acceptance.
 
 Focused type checks remain required during this restoration work. Existing
 errors must not become a blanket suppression baseline.
@@ -565,7 +566,7 @@ Every new feature must preserve chronological construction, avoid leakage, and u
 Future tooling work:
 
 - restore the intended repository-wide Pyrefly boundary using
-  `uvx pyrefly check .`;
+  `uvx pyrefly check`;
 - define the production, test, script, and exploratory-notebook type-check
   scope explicitly;
 - correct repository and test import roots before treating missing test-fixture

@@ -1,3 +1,5 @@
+# src/gridiron_edge/evaluation/live_forecast_closeout.py
+
 """Close out the exact live forecasts selected for one weekly product."""
 
 from __future__ import annotations
@@ -5,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -166,8 +169,14 @@ def _win_metrics(rows: DataFrame) -> WinCloseoutMetrics:
     count = len(evaluable)
     if count == 0:
         return WinCloseoutMetrics(0, None, None, None)
-    probability = pd.to_numeric(evaluable["home_win_prob"], errors="coerce").astype(float)
-    outcome = pd.to_numeric(evaluable["actual_home_win"], errors="coerce").astype(float)
+    probability = cast(
+        Series,
+        pd.to_numeric(evaluable["home_win_prob"], errors="coerce"),
+    ).astype(float)
+    outcome = cast(
+        Series,
+        pd.to_numeric(evaluable["actual_home_win"], errors="coerce"),
+    ).astype(float)
     clipped = probability.clip(1e-7, 1 - 1e-7)
     brier = float(((probability - outcome) ** 2).mean())
     loss = float(-(outcome * np.log(clipped) + (1 - outcome) * np.log(1 - clipped)).mean())
@@ -180,8 +189,14 @@ def _total_metrics(rows: DataFrame) -> TotalCloseoutMetrics:
     count = len(evaluable)
     if count == 0:
         return TotalCloseoutMetrics(0, None, None, None)
-    prediction = pd.to_numeric(evaluable["model_total"], errors="coerce").astype(float)
-    actual = pd.to_numeric(evaluable["actual_total"], errors="coerce").astype(float)
+    prediction = cast(
+        Series,
+        pd.to_numeric(evaluable["model_total"], errors="coerce"),
+    ).astype(float)
+    actual = cast(
+        Series,
+        pd.to_numeric(evaluable["actual_total"], errors="coerce"),
+    ).astype(float)
     error = prediction - actual
     return TotalCloseoutMetrics(
         count,
@@ -211,14 +226,21 @@ def close_live_forecasts(  # noqa: PLR0915
     season = _single_text(product, "season", label="Weekly product")
     product_id = _single_text(product, "product_id", label="Weekly product")
     product_run_id = _single_text(product, "product_run_id", label="Weekly product")
-    weeks = pd.to_numeric(product["week"], errors="coerce").dropna().astype(int).unique().tolist()
+    numeric_weeks = cast(
+        Series,
+        pd.to_numeric(product["week"], errors="coerce"),
+    )
+    weeks = numeric_weeks.dropna().astype(int).unique().tolist()
     if len(weeks) != 1:
         raise ValueError("Weekly product must contain one week value.")
     week = int(weeks[0])
 
+    numeric_game_weeks = cast(
+        Series,
+        pd.to_numeric(games["WEEK_NUM"], errors="coerce"),
+    )
     scoped_games = games.loc[
-        games["YEAR"].astype(str).eq(season)
-        & pd.to_numeric(games["WEEK_NUM"], errors="coerce").eq(week),
+        games["YEAR"].astype(str).eq(season) & numeric_game_weeks.eq(week),
         ["GAME_ID", "AWAY_SCORE", "HOME_SCORE"],
     ].copy()
     if scoped_games["GAME_ID"].astype(str).duplicated().any():
@@ -226,22 +248,8 @@ def close_live_forecasts(  # noqa: PLR0915
     outcome_by_game_id: dict[str, tuple[float, float]] = {}
     for game in scoped_games.itertuples(index=False):
         if pd.notna(game.AWAY_SCORE) and pd.notna(game.HOME_SCORE):
-            away_score = (
-                pd.to_numeric(
-                    Series([game.AWAY_SCORE]),
-                    errors="raise",
-                )
-                .astype(float)
-                .iloc[0]
-            )
-            home_score = (
-                pd.to_numeric(
-                    Series([game.HOME_SCORE]),
-                    errors="raise",
-                )
-                .astype(float)
-                .iloc[0]
-            )
+            away_score = float(cast(float | int, game.AWAY_SCORE))
+            home_score = float(cast(float | int, game.HOME_SCORE))
             outcome_by_game_id[str(game.GAME_ID)] = (
                 away_score,
                 home_score,

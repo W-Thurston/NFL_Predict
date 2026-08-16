@@ -12,6 +12,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -343,7 +344,7 @@ class TestMetadataValidation:
         artifact_dir = tmp_path / "data" / "models" / "win_prob" / "random_forest"
         artifact_dir.mkdir(parents=True)
 
-        payload: dict[str, object] = asdict(_make_game_meta())
+        payload = cast(dict[str, object], asdict(_make_game_meta()))
         payload.pop("kind")
 
         (artifact_dir / "metadata.json").write_text(json.dumps(payload))
@@ -366,7 +367,7 @@ class TestMetadataValidation:
         artifact_dir = tmp_path / "data" / "models" / "win_prob" / "random_forest"
         artifact_dir.mkdir(parents=True)
 
-        payload: dict[str, object] = asdict(_make_game_meta())
+        payload = cast(dict[str, object], asdict(_make_game_meta()))
         payload["kind"] = "unknown"
 
         (artifact_dir / "metadata.json").write_text(json.dumps(payload))
@@ -389,10 +390,13 @@ class TestMetadataValidation:
         artifact_dir: Path = tmp_path / "data" / "models" / "win_prob" / "logistic"
         artifact_dir.mkdir(parents=True)
 
-        payload: dict[str, object] = asdict(
-            _make_game_meta(
-                model_type="logistic",
-            )
+        payload = cast(
+            dict[str, object],
+            asdict(
+                _make_game_meta(
+                    model_type="logistic",
+                )
+            ),
         )
         payload["metrics"] = {}
         payload["holdout_brier"] = 0.22

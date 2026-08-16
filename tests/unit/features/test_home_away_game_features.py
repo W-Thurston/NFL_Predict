@@ -418,7 +418,9 @@ class TestHomeAwayWeatherFeature:
         HomeAwayWeatherFeature(),
     ],
 )
-def test_missing_game_id_is_rejected(feature: object) -> None:
+def test_missing_game_id_is_rejected(
+    feature: HomeAwayDivisionalFeature | HomeAwayPrimetimeFeature | HomeAwayWeatherFeature,
+) -> None:
     target = _target("historical").drop(columns=["GAME_ID"])
 
     with pytest.raises(

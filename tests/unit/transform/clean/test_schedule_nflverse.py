@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -185,7 +186,10 @@ def test_location_context_is_preserved() -> None:
 
 
 def test_empty_source_produces_exact_rich_schema() -> None:
-    raw = _raw_upcoming().iloc[0:0].copy()
+    raw = cast(
+        pd.DataFrame,
+        _raw_upcoming().iloc[0:0].copy(),
+    )
     rich = build_rich_upcoming_schedule(
         raw,
         ingested_at=datetime(2026, 7, 30, 18, tzinfo=UTC),

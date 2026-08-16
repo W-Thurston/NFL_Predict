@@ -55,7 +55,7 @@
 - All 13 deployment tests passed.
 - Repository Ruff and the selected repository test suite passed.
 - Corrected the canonical repository type-check command to
-  `uvx pyrefly check .`.
+  `uvx pyrefly check`.
 - The corrected repository-wide type check reported 524 existing errors.
   Restoring that complete boundary is recorded separately in `ROADMAP.md`.
 

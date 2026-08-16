@@ -42,6 +42,7 @@ class TestTeamRankingRow:
             record=TeamRecord(wins=10, losses=2),
         )
         assert row.rank == 1
+        assert row.record is not None
         assert row.record.wins == 10
 
 
@@ -91,6 +92,7 @@ class TestTeamProfile:
             ],
         )
         assert p.rating == 1642.3
+        assert p.recent_results is not None
         assert p.recent_results[0].opponent == "CLE"
 
 
@@ -103,4 +105,4 @@ class TestRecentResult:
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            RecentResult(week=1, foo="bar")
+            RecentResult.model_validate({"week": 1, "foo": "bar"})

@@ -25,11 +25,13 @@ def _blocks():
 
 
 def test_unavailable_component_blocks_remain_present() -> None:
-    summary = GameSummary(
-        game_id="2026_01_KC_LAC",
-        away_team="Kansas City Chiefs",
-        home_team="Los Angeles Chargers",
-        **_blocks(),
+    summary = GameSummary.model_validate(
+        {
+            "game_id": "2026_01_KC_LAC",
+            "away_team": "Kansas City Chiefs",
+            "home_team": "Los Angeles Chargers",
+            **_blocks(),
+        }
     )
 
     assert summary.win.status == "forecast_missing"
@@ -74,16 +76,18 @@ def test_spread_schema_documents_runtime_sign_convention() -> None:
 
 def test_game_detail_requires_component_status_blocks() -> None:
     with pytest.raises(ValidationError):
-        GameDetail(
-            game_id="2026_01_KC_LAC",
-            away_team="Kansas City Chiefs",
-            home_team="Los Angeles Chargers",
+        GameDetail.model_validate(
+            {
+                "game_id": "2026_01_KC_LAC",
+                "away_team": "Kansas City Chiefs",
+                "home_team": "Los Angeles Chargers",
+            }
         )
 
 
 def test_component_blocks_are_frozen_and_forbid_extras() -> None:
     block = WinPredictionBlock(status="available")
     with pytest.raises(ValidationError):
-        block.status = "other"  # type: ignore[misc]
+        setattr(block, "status", "other")  # noqa: B010
     with pytest.raises(ValidationError):
-        WinPredictionBlock(status="available", mystery=True)  # type: ignore[call-arg]
+        WinPredictionBlock.model_validate({"status": "available", "mystery": True})

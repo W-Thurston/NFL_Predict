@@ -17,7 +17,7 @@ from tests.fixtures.dataframes import (
 )
 
 from gridiron_edge.datasets.loaders import load_csv, load_games, load_stadiums
-from gridiron_edge.datasets.registry import dataset_path
+from gridiron_edge.datasets.registry import DatasetKey, dataset_path
 from gridiron_edge.datasets.writers import write_csv, write_parquet
 
 
@@ -33,7 +33,9 @@ class TestCsvRoundtrip:
             ("weather_enriched", make_weather_enriched),
         ],
     )
-    def test_csv_roundtrip_preserves_columns(self, tmp_path: Path, key: str, factory) -> None:
+    def test_csv_roundtrip_preserves_columns(
+        self, tmp_path: Path, key: DatasetKey, factory
+    ) -> None:
         original = factory()
         write_csv(tmp_path, key, original)
         loaded: DataFrame = load_csv(tmp_path, key)
@@ -47,7 +49,9 @@ class TestCsvRoundtrip:
             ("elo_state", make_elo_state),
         ],
     )
-    def test_csv_roundtrip_preserves_row_count(self, tmp_path: Path, key: str, factory) -> None:
+    def test_csv_roundtrip_preserves_row_count(
+        self, tmp_path: Path, key: DatasetKey, factory
+    ) -> None:
         original = factory()
         write_csv(tmp_path, key, original)
         loaded: DataFrame = load_csv(tmp_path, key)

@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pandas as pd
 from pandas import DataFrame
 import pytest
@@ -101,7 +103,7 @@ def test_missing_inputs_produce_granular_status() -> None:
 
 
 def test_uncertainty_unavailable_total_still_projects_scores() -> None:
-    source = _product().iloc[[0]].copy()
+    source = cast(DataFrame, _product().iloc[[0]].copy())
     source["total_status"] = WeeklyTotalStatus.UNCERTAINTY_UNAVAILABLE.value
     source["total_uncertainty"] = pd.NA
     source["total_uncertainty_trained_at"] = pd.NA
@@ -179,7 +181,7 @@ def test_validator_rejects_duplicate_game_ids() -> None:
 
 
 def test_both_missing_inputs_have_combined_status() -> None:
-    source = _product().iloc[[2]].copy()
+    source = cast(DataFrame, _product().iloc[[2]].copy())
     source["spread_status"] = WeeklySpreadStatus.CALIBRATION_UNAVAILABLE.value
     source["model_spread"] = pd.NA
     source["spread_uncertainty"] = pd.NA

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -196,7 +197,10 @@ class TestRollingDefAllowed:
         def_allowed = _compute_def_allowed_per_game(logs)
         result = _rolling_def_allowed(def_allowed, window=3)
 
-        lv = result[result["team"] == "LV"].sort_values("week")
+        lv = cast(
+            pd.DataFrame,
+            result.loc[result["team"] == "LV", :].copy(),
+        ).sort_values("week")
         w1_raw = lv[lv["week"] == 1]["pass_yards_allowed"].iloc[0]
         w2_roll = lv[lv["week"] == 2]["opp_pass_yards_allowed_L3"].iloc[0]
         assert w2_roll == pytest.approx(w1_raw)

@@ -37,11 +37,11 @@ class TestTeamProjectionRow:
     def test_frozen(self) -> None:
         row = TeamProjectionRow(abbr="SEA", name="Seattle Seahawks")
         with pytest.raises(ValidationError):
-            row.abbr = "BUF"
+            setattr(row, "abbr", "BUF")  # noqa: B010
 
     def test_rejects_unknown(self) -> None:
         with pytest.raises(ValidationError):
-            TeamProjectionRow(abbr="SEA", name="Seahawks", foo="bar")
+            TeamProjectionRow.model_validate({"abbr": "SEA", "name": "Seahawks", "foo": "bar"})
 
 
 class TestProjectionsList:
@@ -125,24 +125,16 @@ class TestProjectionGridWeek:
 
     def test_rejects_invalid_state(self) -> None:
         with pytest.raises(ValidationError):
-            ProjectionGridWeek(
-                week=1,
-                state="unknown",
-            )
+            ProjectionGridWeek.model_validate({"week": 1, "state": "unknown"})
 
     def test_rejects_invalid_week(self) -> None:
         with pytest.raises(ValidationError):
-            ProjectionGridWeek(
-                week=19,
-                state="projected",
-            )
+            ProjectionGridWeek.model_validate({"week": 19, "state": "projected"})
 
     def test_rejects_out_of_range_probability(self) -> None:
         with pytest.raises(ValidationError):
-            ProjectionGridWeek(
-                week=1,
-                state="projected",
-                win_probability=1.01,
+            ProjectionGridWeek.model_validate(
+                {"week": 1, "state": "projected", "win_probability": 1.01}
             )
 
     def test_frozen(self) -> None:
@@ -152,7 +144,7 @@ class TestProjectionGridWeek:
         )
 
         with pytest.raises(ValidationError):
-            week.state = "bye"
+            setattr(week, "state", "bye")  # noqa: B010
 
 
 class TestProjectionGridTeam:
@@ -180,11 +172,8 @@ class TestProjectionGridTeam:
 
     def test_rejects_unknown_field(self) -> None:
         with pytest.raises(ValidationError):
-            ProjectionGridTeam(
-                abbr="SEA",
-                name="Seattle Seahawks",
-                weeks=[],
-                foo="bar",
+            ProjectionGridTeam.model_validate(
+                {"abbr": "SEA", "name": "Seattle Seahawks", "weeks": [], "foo": "bar"}
             )
 
 
@@ -225,6 +214,4 @@ class TestProjectionGridResponse:
 
     def test_rejects_invalid_completed_week(self) -> None:
         with pytest.raises(ValidationError):
-            ProjectionGridResponse(
-                completed_through_week=19,
-            )
+            ProjectionGridResponse.model_validate({"completed_through_week": 19})

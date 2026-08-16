@@ -19,14 +19,25 @@ class TestPropShopConstruction:
 
     def test_with_meta(self) -> None:
         meta = ResponseMeta().with_blocked("books", *Blocker.MULTI_BOOK)
-        shop = PropShop(prop_id="lamar-rush", response_meta=meta)
+        shop = PropShop.model_validate(
+            {
+                "prop_id": "lamar-rush",
+                "response_meta": meta,
+            }
+        )
+        assert shop.response_meta is not None
         status = shop.response_meta.field_status["books"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "multi_book_ingest"
 
     def test_meta_serializes_with_wire_alias(self) -> None:
         meta = ResponseMeta().with_blocked("books", *Blocker.MULTI_BOOK)
-        shop = PropShop(prop_id="lamar-rush", response_meta=meta)
+        shop = PropShop.model_validate(
+            {
+                "prop_id": "lamar-rush",
+                "response_meta": meta,
+            }
+        )
         dumped = shop.model_dump(by_alias=True)
         assert "_meta" in dumped
 
@@ -34,12 +45,17 @@ class TestPropShopConstruction:
 class TestPropShopStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            PropShop(prop_id="lamar-rush", unexpected="x")
+            PropShop.model_validate(
+                {
+                    "prop_id": "lamar-rush",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         shop = PropShop(prop_id="lamar-rush")
         with pytest.raises(ValidationError):
-            shop.prop_id = "other"
+            setattr(shop, "prop_id", "other")  # noqa: B010
 
 
 class TestPropBookLine:
@@ -60,11 +76,15 @@ class TestPropBookLine:
     def test_is_frozen(self) -> None:
         line = PropBookLine()
         with pytest.raises(ValidationError):
-            line.book = "dk"
+            setattr(line, "book", "dk")  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            PropBookLine(unexpected="x")
+            PropBookLine.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestPropShopComposition:
@@ -77,5 +97,7 @@ class TestPropShopComposition:
             ],
             best_over=PropBookLine(book="Pinnacle", line=49.5, price=-115),
         )
+        assert shop.books is not None
         assert len(shop.books) == 2
+        assert shop.best_over is not None
         assert shop.best_over.book == "Pinnacle"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -140,7 +141,11 @@ def test_apply_is_atomic_and_preserves_history(tmp_path: Path) -> None:
 
     result = apply_approved_stadium_updates(original, updates, path=path)
 
-    pd.testing.assert_frame_equal(result.iloc[: len(original)].reset_index(drop=True), original)
+    preserved = cast(
+        DataFrame,
+        result.iloc[: len(original)].reset_index(drop=True),
+    )
+    pd.testing.assert_frame_equal(preserved, original)
     assert path.is_file()
     assert not path.with_name(f"{path.name}.tmp").exists()
     assert len(result) == len(original) + 1

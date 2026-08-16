@@ -27,7 +27,7 @@ from tests.fixtures.dataframes import (
     make_weather_enriched,
 )
 
-from gridiron_edge.datasets.registry import DATASETS
+from gridiron_edge.datasets.registry import DATASETS, DatasetKey
 from gridiron_edge.datasets.writers import write_csv
 from gridiron_edge.features.manifest import (
     CURRENT_SCHEMA_VERSION,
@@ -54,7 +54,7 @@ class MiniRepoBuilder:
         for spec in DATASETS.values():
             (self._root / spec.relpath).parent.mkdir(parents=True, exist_ok=True)
 
-    def _write(self, key: str, df: pd.DataFrame) -> MiniRepoBuilder:
+    def _write(self, key: DatasetKey, df: pd.DataFrame) -> MiniRepoBuilder:
         """Write a DataFrame to the registry-defined path.
 
         Uses write_csv for .csv targets and to_parquet for .parquet targets.

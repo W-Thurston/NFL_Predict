@@ -25,6 +25,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from gridiron_edge.models.game_prediction._columns import FeatureSet
 from gridiron_edge.models.game_prediction.base import (
     GameModelMetadata,
     GameModelSpec,
@@ -73,7 +74,11 @@ class TestGameModelSpec:
             task="classification",
             target_col=HOME_WIN_TARGET,
             feature_set={
-                GameModelType.LOGISTIC: object(),
+                GameModelType.LOGISTIC: FeatureSet(
+                    name="test",
+                    feature_fn=lambda df: df,
+                    feature_names=[],
+                ),
             },
         )
 
@@ -90,7 +95,7 @@ class TestGameModelSpec:
             feature_set={},
         )
         with pytest.raises(FrozenInstanceError):
-            spec.name = "other"  # type: ignore[misc]
+            setattr(spec, "name", "other")  # noqa: B010
 
 
 # ---------------------------------------------------------------------------

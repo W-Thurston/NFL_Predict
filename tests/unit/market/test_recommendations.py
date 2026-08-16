@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -206,7 +206,10 @@ class TestPivotOddsToWide:
     def test_missing_spread_market(self) -> None:
         """Game with only ML and total -> spread columns are NaN."""
         odds: DataFrame = _make_long_odds()
-        odds = odds[odds["market"] != "spread"].copy()
+        odds = cast(
+            DataFrame,
+            odds.loc[odds["market"] != "spread", :].copy(),
+        )
         wide: DataFrame = pivot_odds_to_wide(odds)
         assert len(wide) == 1
         assert np.isnan(wide.iloc[0]["spread_line_home"])
@@ -215,7 +218,10 @@ class TestPivotOddsToWide:
     def test_missing_total_market(self) -> None:
         """Game with only ML and spread -> total columns are NaN."""
         odds: DataFrame = _make_long_odds()
-        odds = odds[odds["market"] != "total"].copy()
+        odds = cast(
+            DataFrame,
+            odds.loc[odds["market"] != "total", :].copy(),
+        )
         wide: DataFrame = pivot_odds_to_wide(odds)
         assert len(wide) == 1
         assert np.isnan(wide.iloc[0]["total_line"])
@@ -517,7 +523,10 @@ class TestComputeGameEdges:
         preds: DataFrame = _make_predictions(home_win_prob=0.70)
         odds: DataFrame = _make_long_odds()
         # Remove spread and total from odds
-        odds = odds[odds["market"] == "moneyline"].copy()
+        odds = cast(
+            DataFrame,
+            odds.loc[odds["market"] == "moneyline", :].copy(),
+        )
         joined: DataFrame = join_predictions_to_odds(preds, odds)
         row: Series = joined.iloc[0]
         edges: list[MoneylineEdge | SpreadEdge | TotalEdge] = compute_game_edges(
@@ -916,7 +925,7 @@ class TestComputeGameEdgesHomeProbDerivation:
             }
         )
         edges = compute_game_edges(row, margin_std=10.0, total_std=10.0)
-        ml_edges = [e for e in edges if hasattr(e, "model_prob")]
+        ml_edges = [e for e in edges if isinstance(e, MoneylineEdge)]
         assert len(ml_edges) == 1
         assert ml_edges[0].model_prob == pytest.approx(0.65)
 
@@ -929,7 +938,7 @@ class TestComputeGameEdgesHomeProbDerivation:
             }
         )
         edges = compute_game_edges(row, margin_std=10.0, total_std=10.0)
-        ml_edges = [e for e in edges if hasattr(e, "model_prob")]
+        ml_edges = [e for e in edges if isinstance(e, MoneylineEdge)]
         assert len(ml_edges) == 1
         assert ml_edges[0].model_prob == pytest.approx(0.65)
 
@@ -941,5 +950,5 @@ class TestComputeGameEdgesHomeProbDerivation:
             }
         )
         edges = compute_game_edges(row, margin_std=10.0, total_std=10.0)
-        ml_edges = [e for e in edges if hasattr(e, "model_prob")]
+        ml_edges = [e for e in edges if isinstance(e, MoneylineEdge)]
         assert len(ml_edges) == 0

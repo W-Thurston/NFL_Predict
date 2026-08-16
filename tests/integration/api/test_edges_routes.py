@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import Response
 from fastapi.testclient import TestClient
 import pandas as pd
 import pytest
@@ -216,7 +215,7 @@ class TestListEdgesRoute:
             repo=tmp_path,
         )
 
-        response: Response = client.get(
+        response = client.get(
             "/edges",
             params={
                 "season": SEASON,

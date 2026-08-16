@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -359,7 +361,7 @@ class TestExtractFixedPlayoffWinners:
 
         fixed = extract_fixed_playoff_winners(
             df_wk_by_wk=results,
-            df_schedule=_playoff_schedule().iloc[[0]],
+            df_schedule=cast(pd.DataFrame, _playoff_schedule().iloc[[0]]),
             team_index=team_index,
             season_year="2026-2027",
         )
@@ -388,8 +390,8 @@ class TestExtractFixedPlayoffWinners:
         team_index: TeamIndex,
     ) -> None:
         fixed = extract_fixed_playoff_winners(
-            df_wk_by_wk=_playoff_results().iloc[[0]],
-            df_schedule=_playoff_schedule().iloc[[0]],
+            df_wk_by_wk=cast(pd.DataFrame, _playoff_results().iloc[[0]]),
+            df_schedule=cast(pd.DataFrame, _playoff_schedule().iloc[[0]]),
             team_index=team_index,
             season_year="2026-2027",
         )

@@ -16,7 +16,7 @@ class TestModelSpec:
     def test_is_frozen(self) -> None:
         spec = ModelSpec(name="test_a", description="A test model")
         with pytest.raises(dataclasses.FrozenInstanceError):
-            spec.name = "changed"  # type: ignore[misc]
+            setattr(spec, "name", "changed")  # noqa: B010
 
     def test_name_and_description(self) -> None:
         spec = ModelSpec(name="test_a", description="Test model A")
@@ -41,10 +41,20 @@ class TestGameModelProtocol:
         class DummyGameModel:
             spec = ModelSpec(name="dummy", description="Dummy")
 
-            def predict_historical(self, *, repo: Path) -> pd.DataFrame:
+            def predict_historical(
+                self,
+                games: pd.DataFrame,
+                *,
+                repo: Path | None = None,
+            ) -> pd.DataFrame:
                 return pd.DataFrame()
 
-            def predict_upcoming(self, *, repo: Path) -> pd.DataFrame:
+            def predict_upcoming(
+                self,
+                schedule: pd.DataFrame,
+                *,
+                repo: Path | None = None,
+            ) -> pd.DataFrame:
                 return pd.DataFrame()
 
         dummy = DummyGameModel()
@@ -62,10 +72,20 @@ class TestTrainableProtocol:
         class DummyTrainable:
             spec = ModelSpec(name="trainable_dummy", description="Trainable dummy")
 
-            def predict_historical(self, *, repo: Path) -> pd.DataFrame:
+            def predict_historical(
+                self,
+                games: pd.DataFrame,
+                *,
+                repo: Path | None = None,
+            ) -> pd.DataFrame:
                 return pd.DataFrame()
 
-            def predict_upcoming(self, *, repo: Path) -> pd.DataFrame:
+            def predict_upcoming(
+                self,
+                schedule: pd.DataFrame,
+                *,
+                repo: Path | None = None,
+            ) -> pd.DataFrame:
                 return pd.DataFrame()
 
             def is_trained(self, *, repo: Path | None = None) -> bool:
@@ -78,10 +98,20 @@ class TestTrainableProtocol:
         class GameModelOnly:
             spec = ModelSpec(name="predict_only", description="Predict only")
 
-            def predict_historical(self, *, repo: Path) -> pd.DataFrame:
+            def predict_historical(
+                self,
+                games: pd.DataFrame,
+                *,
+                repo: Path | None = None,
+            ) -> pd.DataFrame:
                 return pd.DataFrame()
 
-            def predict_upcoming(self, *, repo: Path) -> pd.DataFrame:
+            def predict_upcoming(
+                self,
+                schedule: pd.DataFrame,
+                *,
+                repo: Path | None = None,
+            ) -> pd.DataFrame:
                 return pd.DataFrame()
 
         assert isinstance(GameModelOnly(), GameModel)

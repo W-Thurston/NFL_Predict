@@ -22,7 +22,13 @@ class TestGameComparablesConstruction:
             "comparables",
             *Blocker.COMPARABLES,
         )
-        comps = GameComparables(game_id="sf-bal", response_meta=meta)
+        comps = GameComparables.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
+        assert comps.response_meta is not None
         status = comps.response_meta.field_status["comparables"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "comparables_retrieval"
@@ -32,7 +38,12 @@ class TestGameComparablesConstruction:
             "comparables",
             *Blocker.COMPARABLES,
         )
-        comps = GameComparables(game_id="sf-bal", response_meta=meta)
+        comps = GameComparables.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
         dumped = comps.model_dump(by_alias=True)
         assert "_meta" in dumped
 
@@ -40,12 +51,17 @@ class TestGameComparablesConstruction:
 class TestGameComparablesStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            GameComparables(game_id="sf-bal", unexpected="x")
+            GameComparables.model_validate(
+                {
+                    "game_id": "sf-bal",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         comps = GameComparables(game_id="sf-bal")
         with pytest.raises(ValidationError):
-            comps.game_id = "other"
+            setattr(comps, "game_id", "other")  # noqa: B010
 
 
 class TestComparableGame:
@@ -69,11 +85,15 @@ class TestComparableGame:
     def test_is_frozen(self) -> None:
         comp = ComparableGame()
         with pytest.raises(ValidationError):
-            comp.favorite = "PIT"
+            setattr(comp, "favorite", "PIT")  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            ComparableGame(unexpected="x")
+            ComparableGame.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestGameComparablesComposition:
@@ -88,6 +108,7 @@ class TestGameComparablesComposition:
             favorite_win_rate=0.71,
             favorite_cover_rate=0.59,
         )
+        assert comps.comparables is not None
         assert len(comps.comparables) == 2
         assert comps.sample_size == 17
         assert comps.favorite_win_rate == 0.71

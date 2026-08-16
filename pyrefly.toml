@@ -1,2 +1,7 @@
-project-includes = ["src"]
+project-includes = [
+    "src",
+]
+project-excludes = [
+    "notebooks",
+]
 python-version = "3.12"

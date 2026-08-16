@@ -71,7 +71,11 @@ class TestEdgeRow:
         assert row.american_odds == 125
 
     def test_full_moneyline_row(self) -> None:
-        row = EdgeRow(**_valid_edge_row())
+        row = EdgeRow.model_validate(
+            {
+                **_valid_edge_row(),
+            }
+        )
         assert row.market_type == "moneyline"
         assert row.provider == "the_odds_api"
         assert row.provider_event_id == "event-1"
@@ -85,16 +89,18 @@ class TestEdgeRow:
         assert row.american_odds == -110
 
     def test_full_spread_row(self) -> None:
-        row = EdgeRow(
-            **{
-                **_valid_edge_row(),
-                "market_type": "spread",
-                "side": "home",
-                "model_value": -7.0,
-                "market_value": -3.5,
-                "american_odds": -108,
-                "point_edge": -3.5,
-                "cover_prob": 0.62,
+        row = EdgeRow.model_validate(
+            {
+                **{
+                    **_valid_edge_row(),
+                    "market_type": "spread",
+                    "side": "home",
+                    "model_value": -7.0,
+                    "market_value": -3.5,
+                    "american_odds": -108,
+                    "point_edge": -3.5,
+                    "cover_prob": 0.62,
+                },
             }
         )
         assert row.market_type == "spread"
@@ -104,16 +110,18 @@ class TestEdgeRow:
         assert row.american_odds == -108
 
     def test_full_total_row(self) -> None:
-        row = EdgeRow(
-            **{
-                **_valid_edge_row(),
-                "market_type": "total",
-                "side": "over",
-                "model_value": 50.0,
-                "market_value": 44.0,
-                "american_odds": 102,
-                "point_edge": 6.0,
-                "cover_prob": 0.68,
+        row = EdgeRow.model_validate(
+            {
+                **{
+                    **_valid_edge_row(),
+                    "market_type": "total",
+                    "side": "over",
+                    "model_value": 50.0,
+                    "market_value": 44.0,
+                    "american_odds": 102,
+                    "point_edge": 6.0,
+                    "cover_prob": 0.68,
+                },
             }
         )
         assert row.market_type == "total"
@@ -130,46 +138,60 @@ class TestEdgeRow:
         self,
         edge_strength: str,
     ) -> None:
-        row = EdgeRow(
-            **{
-                **_valid_edge_row(),
-                "edge_strength": edge_strength,
+        row = EdgeRow.model_validate(
+            {
+                **{
+                    **_valid_edge_row(),
+                    "edge_strength": edge_strength,
+                },
             }
         )
         assert row.edge_strength == edge_strength
 
     def test_rejects_retired_weak_edge_strength(self) -> None:
         with pytest.raises(ValidationError):
-            EdgeRow(
-                **{
-                    **_valid_edge_row(),
-                    "edge_strength": "weak",
+            EdgeRow.model_validate(
+                {
+                    **{
+                        **_valid_edge_row(),
+                        "edge_strength": "weak",
+                    },
                 }
             )
 
     def test_rejects_missing_required_fields(self) -> None:
         with pytest.raises(ValidationError):
-            EdgeRow(game_id="2026_01_KC_LAC")  # type: ignore[call-arg]
+            EdgeRow.model_validate({"game_id": "2026_01_KC_LAC"})
 
     def test_rejects_missing_ev(self) -> None:
         row_data = _valid_edge_row()
         del row_data["ev"]
         with pytest.raises(ValidationError):
-            EdgeRow(**row_data)
+            EdgeRow.model_validate(
+                {
+                    **row_data,
+                }
+            )
 
     def test_rejects_extra_fields(self) -> None:
         with pytest.raises(ValidationError):
-            EdgeRow(
-                **{
-                    **_valid_edge_row(),
-                    "surprise_field": "oops",
+            EdgeRow.model_validate(
+                {
+                    **{
+                        **_valid_edge_row(),
+                        "surprise_field": "oops",
+                    },
                 }
-            )  # type: ignore[call-arg]
+            )
 
     def test_frozen(self) -> None:
-        row = EdgeRow(**_valid_edge_row())
+        row = EdgeRow.model_validate(
+            {
+                **_valid_edge_row(),
+            }
+        )
         with pytest.raises(ValidationError):
-            row.ev = 0.99  # type: ignore[misc]
+            setattr(row, "ev", 0.99)  # noqa: B010
 
 
 class TestEdgeDiagnosticsResponse:
@@ -295,11 +317,17 @@ class TestEdgeList:
     def test_with_edges(self) -> None:
         response = EdgeList(
             items=[
-                EdgeRow(**_valid_edge_row()),
-                EdgeRow(
-                    **{
+                EdgeRow.model_validate(
+                    {
                         **_valid_edge_row(),
-                        "game_id": "2026_01_BUF_MIA",
+                    }
+                ),
+                EdgeRow.model_validate(
+                    {
+                        **{
+                            **_valid_edge_row(),
+                            "game_id": "2026_01_BUF_MIA",
+                        },
                     }
                 ),
             ],

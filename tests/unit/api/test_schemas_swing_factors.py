@@ -19,14 +19,25 @@ class TestGameSwingFactorsConstruction:
 
     def test_with_meta(self) -> None:
         meta = ResponseMeta().with_blocked("factors", *Blocker.FEATURE_ATTRIBUTION)
-        factors = GameSwingFactors(game_id="sf-bal", response_meta=meta)
+        factors = GameSwingFactors.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
+        assert factors.response_meta is not None
         status = factors.response_meta.field_status["factors"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "feature_attribution"
 
     def test_meta_serializes_with_wire_alias(self) -> None:
         meta = ResponseMeta().with_blocked("factors", *Blocker.FEATURE_ATTRIBUTION)
-        factors = GameSwingFactors(game_id="sf-bal", response_meta=meta)
+        factors = GameSwingFactors.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
         dumped = factors.model_dump(by_alias=True)
         assert "_meta" in dumped
 
@@ -34,12 +45,17 @@ class TestGameSwingFactorsConstruction:
 class TestGameSwingFactorsStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            GameSwingFactors(game_id="sf-bal", unexpected="x")
+            GameSwingFactors.model_validate(
+                {
+                    "game_id": "sf-bal",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         factors = GameSwingFactors(game_id="sf-bal")
         with pytest.raises(ValidationError):
-            factors.game_id = "other"
+            setattr(factors, "game_id", "other")  # noqa: B010
 
 
 class TestSwingFactor:
@@ -58,11 +74,15 @@ class TestSwingFactor:
     def test_is_frozen(self) -> None:
         factor = SwingFactor()
         with pytest.raises(ValidationError):
-            factor.tag = "Pass rush"
+            setattr(factor, "tag", "Pass rush")  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            SwingFactor(unexpected="x")
+            SwingFactor.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestGameSwingFactorsComposition:
@@ -74,5 +94,6 @@ class TestGameSwingFactorsComposition:
                 SwingFactor(tag="Pass rush", text="...", leans_to=None),
             ],
         )
+        assert factors.factors is not None
         assert len(factors.factors) == 2
         assert factors.factors[0].leans_to == "BAL"

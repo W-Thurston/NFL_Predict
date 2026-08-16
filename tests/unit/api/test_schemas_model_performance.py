@@ -33,12 +33,12 @@ class TestModelPerformanceFilters:
 
     def test_group_by_required(self) -> None:
         with pytest.raises(ValidationError):
-            ModelPerformanceFilters()
+            ModelPerformanceFilters.model_validate({})
 
     def test_is_frozen(self) -> None:
         f = ModelPerformanceFilters(group_by="season")
         with pytest.raises(ValidationError):
-            f.group_by = "week"
+            setattr(f, "group_by", "week")  # noqa: B010
 
 
 class TestModelQualityBlock:
@@ -69,7 +69,7 @@ class TestGroupedMetricRow:
 
     def test_group_key_required(self) -> None:
         with pytest.raises(ValidationError):
-            GroupedMetricRow()
+            GroupedMetricRow.model_validate({})
 
 
 class TestModelPerformance:

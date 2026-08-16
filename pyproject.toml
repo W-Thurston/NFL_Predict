@@ -206,15 +206,3 @@ force-sort-within-sections = true
 quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
-
-# ===========================================================================
-# PYREFLY
-# ===========================================================================
-
-[tool.pyrefly]
-project-includes = ["src"]
-python-version = "3.12"
-project-excludes = [
-    "scripts/**",
-    "skills/**"
-]

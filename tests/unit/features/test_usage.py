@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -201,7 +202,10 @@ class TestRollingShares:
         df = _compute_per_game_shares(df)
         result = _rolling_shares(df, windows=[3])
 
-        wr = result[result["player_id"] == "WR1_KC"].sort_values("week")
+        wr = cast(
+            pd.DataFrame,
+            result.loc[result["player_id"] == "WR1_KC", :].copy(),
+        ).sort_values("week")
         wk1_share = wr[wr["week"] == 1]["usage_target_share"].iloc[0]
         wk2_rolling = wr[wr["week"] == 2]["usage_target_share_L3"].iloc[0]
         assert wk2_rolling == pytest.approx(wk1_share)

@@ -1,3 +1,5 @@
+# src/gridiron_edge/evaluation/weekly_readiness.py
+
 """Domain contracts and pure evaluation for weekly game-prediction readiness."""
 
 from __future__ import annotations
@@ -5,10 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Final
+from typing import Final, cast
 
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 
 class WeeklyReadinessBlocker(StrEnum):
@@ -510,10 +512,13 @@ def _market_provenance_is_ambiguous(markets: DataFrame) -> bool:
     if len(_market_providers(markets)) > 1:
         return True
     if "fetched_at" in markets.columns:
-        timestamps = pd.to_datetime(
-            markets["fetched_at"],
-            utc=True,
-            errors="coerce",
+        timestamps = cast(
+            Series,
+            pd.to_datetime(
+                markets["fetched_at"],
+                utc=True,
+                errors="coerce",
+            ),
         ).dropna()
         if timestamps.nunique() > 1:
             return True

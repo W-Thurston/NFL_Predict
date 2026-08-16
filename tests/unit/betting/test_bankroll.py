@@ -282,6 +282,9 @@ class TestSignedAmountSeries:
         amounts = pd.Series([100.0, 50.0, 25.0, 75.0])
 
         vectorized = _signed_amount_series(types, amounts)
-        scalar = [signed_amount(t, a) for t, a in zip(types, amounts, strict=True)]
+        scalar = [
+            signed_amount(str(txn_type), float(amount))
+            for txn_type, amount in zip(types, amounts, strict=True)
+        ]
 
         assert list(vectorized) == scalar

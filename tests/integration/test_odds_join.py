@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -70,7 +71,7 @@ def test_nflverse_markets_roundtrip_and_join_by_schedule_game_id(
     """Persist adapted markets and retain complete and incomplete joins."""
     schedule = _rich_schedule()
     adapted = adapt_nflverse_schedule_markets(
-        schedule.iloc[:2].copy(),
+        cast(DataFrame, schedule.iloc[:2].copy()),
         season="2026-2027",
         week=1,
     )
@@ -129,7 +130,7 @@ def test_loaded_spread_and_total_sides_preserve_normalized_values(
 ) -> None:
     """Round-trip normalized spread orientation and total-side values."""
     adapted = adapt_nflverse_schedule_markets(
-        _rich_schedule().iloc[:1].copy(),
+        cast(DataFrame, _rich_schedule().iloc[:1].copy()),
         season="2026-2027",
         week=1,
     )
@@ -228,7 +229,7 @@ def _persist_selected_product(repo: Path) -> None:
 def _persist_edge_markets(repo: Path) -> None:
     """Adapt and persist the matching nflverse market snapshot."""
     adapted = adapt_nflverse_schedule_markets(
-        _rich_schedule().iloc[:1].copy(),
+        cast(DataFrame, _rich_schedule().iloc[:1].copy()),
         season="2026-2027",
         week=1,
     )

@@ -25,14 +25,25 @@ class TestLiveGameConstruction:
 
     def test_with_meta(self) -> None:
         meta = ResponseMeta().with_blocked("status", *Blocker.LIVE_STATE)
-        game = LiveGame(game_id="sf-bal", response_meta=meta)
+        game = LiveGame.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
+        assert game.response_meta is not None
         status = game.response_meta.field_status["status"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "live_state_ingest"
 
     def test_meta_serializes_with_wire_alias(self) -> None:
         meta = ResponseMeta().with_blocked("status", *Blocker.LIVE_STATE)
-        game = LiveGame(game_id="sf-bal", response_meta=meta)
+        game = LiveGame.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
         dumped = game.model_dump(by_alias=True)
         assert "_meta" in dumped
         assert "response_meta" not in dumped
@@ -41,12 +52,17 @@ class TestLiveGameConstruction:
 class TestLiveGameStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            LiveGame(game_id="sf-bal", unexpected="x")
+            LiveGame.model_validate(
+                {
+                    "game_id": "sf-bal",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         game = LiveGame(game_id="sf-bal")
         with pytest.raises(ValidationError):
-            game.game_id = "other"
+            setattr(game, "game_id", "other")  # noqa: B010
 
 
 class TestElementShapes:
@@ -70,11 +86,15 @@ class TestElementShapes:
     def test_live_score_frozen(self) -> None:
         score = LiveScore()
         with pytest.raises(ValidationError):
-            score.home = 7
+            setattr(score, "home", 7)  # noqa: B010
 
     def test_live_score_rejects_unknown(self) -> None:
         with pytest.raises(ValidationError):
-            LiveScore(unexpected="x")
+            LiveScore.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestLiveGameComposition:
@@ -88,6 +108,9 @@ class TestLiveGameComposition:
             ],
             odds=[LiveOdds(market="spread", home_line="-4.5", away_line="+4.5")],
         )
+        assert game.score is not None
         assert game.score.home == 14
+        assert game.drives is not None
         assert game.drives[0].team == "BAL"
+        assert game.odds is not None
         assert game.odds[0].market == "spread"

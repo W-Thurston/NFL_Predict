@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import inspect
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -321,7 +322,7 @@ def test_missing_elo_column_is_rejected(
 
 
 def test_empty_game_frame_preserves_schema() -> None:
-    games = _games().iloc[0:0,].copy()
+    games = cast(DataFrame, _games().iloc[0:0,].copy())
 
     result = HomeAwayEloFeature().compute(
         df=games,

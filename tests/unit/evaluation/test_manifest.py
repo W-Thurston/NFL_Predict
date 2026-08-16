@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -35,7 +37,7 @@ def _make_df() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def test_write_and_read_manifest(tmp_path: pytest.FixtureValue) -> None:
+def test_write_and_read_manifest(tmp_path: Path) -> None:
     df = _make_df()
     write_manifest(
         df,
@@ -59,12 +61,12 @@ def test_write_and_read_manifest(tmp_path: pytest.FixtureValue) -> None:
     assert "created_at" in manifest
 
 
-def test_read_manifest_raises_if_missing(tmp_path: pytest.FixtureValue) -> None:
+def test_read_manifest_raises_if_missing(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="No feature manifest"):
         read_manifest(tmp_path)
 
 
-def test_write_manifest_creates_json_file(tmp_path: pytest.FixtureValue) -> None:
+def test_write_manifest_creates_json_file(tmp_path: Path) -> None:
     write_manifest(
         _make_df(),
         feature_names=["home_away_elo"],

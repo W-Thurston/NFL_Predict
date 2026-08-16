@@ -19,7 +19,13 @@ class TestGameInjuriesConstruction:
 
     def test_with_meta(self) -> None:
         meta = ResponseMeta().with_blocked("reports", *Blocker.INJURY_DATA)
-        injuries = GameInjuries(game_id="sf-bal", response_meta=meta)
+        injuries = GameInjuries.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
+        assert injuries.response_meta is not None
         status = injuries.response_meta.field_status["reports"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "injury_data_source"
@@ -27,7 +33,12 @@ class TestGameInjuriesConstruction:
 
     def test_meta_serializes_with_wire_alias(self) -> None:
         meta = ResponseMeta().with_blocked("reports", *Blocker.INJURY_DATA)
-        injuries = GameInjuries(game_id="sf-bal", response_meta=meta)
+        injuries = GameInjuries.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
         dumped = injuries.model_dump(by_alias=True)
         assert "_meta" in dumped
 
@@ -35,12 +46,17 @@ class TestGameInjuriesConstruction:
 class TestGameInjuriesStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            GameInjuries(game_id="sf-bal", unexpected="x")
+            GameInjuries.model_validate(
+                {
+                    "game_id": "sf-bal",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         injuries = GameInjuries(game_id="sf-bal")
         with pytest.raises(ValidationError):
-            injuries.game_id = "other"
+            setattr(injuries, "game_id", "other")  # noqa: B010
 
 
 class TestInjuryReport:
@@ -61,11 +77,15 @@ class TestInjuryReport:
     def test_is_frozen(self) -> None:
         report = InjuryReport()
         with pytest.raises(ValidationError):
-            report.team = "BAL"
+            setattr(report, "team", "BAL")  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            InjuryReport(unexpected="x")
+            InjuryReport.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestGameInjuriesComposition:
@@ -77,5 +97,6 @@ class TestGameInjuriesComposition:
                 InjuryReport(team="SF", player="N. Bosa", status="OUT"),
             ],
         )
+        assert injuries.reports is not None
         assert len(injuries.reports) == 2
         assert injuries.reports[1].status == "OUT"

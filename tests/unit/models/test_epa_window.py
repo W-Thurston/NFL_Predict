@@ -13,7 +13,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import numpy as np
@@ -36,7 +35,7 @@ from gridiron_edge.models.game_prediction._epa_window import (
 @pytest.fixture()
 def synthetic_modeling_df() -> pd.DataFrame:
     """Return canonical modeling rows with window-four EPA values."""
-    rng: Generator = np.random.default_rng(0)
+    rng: np.random.Generator = np.random.default_rng(0)
     row_count = 400
 
     seasons = (
@@ -120,9 +119,9 @@ def synthetic_modeling_df() -> pd.DataFrame:
 @pytest.fixture()
 def synthetic_epa_by_game() -> pd.DataFrame:
     """Minimal epa_by_game DataFrame for window rebuild tests."""
-    rng: Generator = np.random.default_rng(1)
+    rng: np.random.Generator = np.random.default_rng(1)
     teams: list[str] = ["KC", "SF", "BUF", "PHI", "DAL", "NYG", "MIA", "LAR"]
-    rows: list[dict[str, int | str]] = []
+    rows: list[dict[str, object]] = []
     for season in [2006, 2007, 2008, 2023, 2024]:
         for week in range(1, 19):
             for team in teams:

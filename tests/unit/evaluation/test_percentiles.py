@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 import pytest
@@ -169,7 +170,10 @@ class TestComputeTeamPercentiles:
         from gridiron_edge.evaluation.percentiles import compute_team_percentiles
 
         proj = _make_projections()
-        proj = proj[proj["TEAM"] != "MIA"]  # Drop MIA from projections
+        proj = cast(
+            pd.DataFrame,
+            proj.loc[proj["TEAM"] != "MIA", :].copy(),
+        )  # Drop MIA from projections
 
         result = compute_team_percentiles(_make_elo_state(), proj, LONG_TO_SHORT)
         by_team = {row["team_abbr"]: row for _, row in result.iterrows()}

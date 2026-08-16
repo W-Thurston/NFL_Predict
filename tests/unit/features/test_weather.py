@@ -45,7 +45,7 @@ def _make_accessor(
 
 
 def _make_games(
-    roof: str = "outdoors",
+    roof: object = "outdoors",
     game_id: str = "2024_01_KC_LV",
 ) -> pd.DataFrame:
     return pd.DataFrame(

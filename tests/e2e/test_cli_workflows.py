@@ -9,8 +9,22 @@ import pytest
 from typer.testing import CliRunner
 
 from gridiron_edge.cli import app
+from gridiron_edge.core.settings import Settings
 
 runner = CliRunner()
+
+
+def _settings_for_repo(repo: Path) -> Settings:
+    """Return complete settings rooted at one isolated test repository."""
+    return Settings(
+        repo_root=repo,
+        owm_api_key=None,
+        odds_api_key=None,
+        data_raw=repo / "data/raw",
+        data_cleaned=repo / "data/cleaned",
+        data_modeling=repo / "data/modeling",
+        data_output=repo / "data/output",
+    )
 
 
 class TestCliHelp:
@@ -72,26 +86,24 @@ class TestModelsListSmoke:
     show "(not trained)" and the command should exit 0.
     """
 
-    def test_models_list_exits_zero(self, tmp_path: pytest.TempPathFactory) -> None:
-        import os
-
+    def test_models_list_exits_zero(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         from tests.fixtures.repos import MiniRepoBuilder
 
-        # Build a clean repo with no model artifacts
-        repo: Path = MiniRepoBuilder(tmp_path).build()
+        repo = MiniRepoBuilder(tmp_path).build()
+        settings = _settings_for_repo(repo)
+        monkeypatch.setattr(
+            "gridiron_edge.core.settings.get_settings",
+            lambda: settings,
+        )
 
-        # Run with the repo's working directory so get_settings() resolves
-        # to it. We do this rather than mocking get_settings to keep the
-        # test close to the actual CLI invocation surface.
-        old_cwd: str = os.getcwd()
-        os.chdir(repo)
-        try:
-            result = runner.invoke(app, ["models", "list"])
-        finally:
-            os.chdir(old_cwd)
+        result = runner.invoke(app, ["models", "list"])
 
         assert result.exit_code == 0
-        # Composite-key registrations should all appear
+        assert result.exception is None
         assert "win_prob" in result.stdout
         assert "model_name" in result.stdout
         assert "model_type" in result.stdout
@@ -121,29 +133,32 @@ class TestEvaluateSelectModelSmoke:
 
     def test_empty_archive_exits_with_message(
         self,
-        tmp_path: pytest.TempPathFactory,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        import os
-
         from tests.fixtures.repos import MiniRepoBuilder
 
-        repo: Path = MiniRepoBuilder(tmp_path).build()
+        repo = MiniRepoBuilder(tmp_path).build()
+        settings = _settings_for_repo(repo)
+        monkeypatch.setattr(
+            "gridiron_edge.core.settings.get_settings",
+            lambda: settings,
+        )
 
-        old_cwd: str = os.getcwd()
-        os.chdir(repo)
-        try:
-            result = runner.invoke(app, ["evaluate", "select-model"])
-        finally:
-            os.chdir(old_cwd)
+        result = runner.invoke(
+            app,
+            ["evaluate", "select-model"],
+        )
 
-        # When no models have archived predictions, the command exits with
-        # code 1 and a clear message. Both are acceptable signals here -
-        # the test verifies the command runs end-to-end without crashing.
-        assert result.exit_code in (0, 1)
-        # If exiting cleanly, should mention either "No models" or a table
-        # header. The error path mentions "backfill" as the remediation.
-        combined: str = result.stdout + result.stderr
-        assert any(marker in combined.lower() for marker in ("backfill", "no models", "model_key"))
+        combined = result.stdout + result.stderr
+
+        assert result.exit_code == 1
+        assert isinstance(result.exception, SystemExit)
+        assert result.exception.code == 1
+        assert (
+            "No models with archived predictions found. Run evaluate backfill first."
+        ) in combined
+        assert "Recommendation:" not in combined
 
 
 class TestEvaluateBackfillHelpSmoke:

@@ -24,14 +24,25 @@ class TestGameExplainConstruction:
 
     def test_with_meta(self) -> None:
         meta = ResponseMeta().with_blocked("factors", *Blocker.SCENARIO_ENGINE)
-        explain = GameExplain(game_id="sf-bal", response_meta=meta)
+        explain = GameExplain.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
+        assert explain.response_meta is not None
         status = explain.response_meta.field_status["factors"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "scenario_engine"
 
     def test_meta_serializes_with_wire_alias(self) -> None:
         meta = ResponseMeta().with_blocked("factors", *Blocker.SCENARIO_ENGINE)
-        explain = GameExplain(game_id="sf-bal", response_meta=meta)
+        explain = GameExplain.model_validate(
+            {
+                "game_id": "sf-bal",
+                "response_meta": meta,
+            }
+        )
         dumped = explain.model_dump(by_alias=True)
         assert "_meta" in dumped
 
@@ -39,12 +50,17 @@ class TestGameExplainConstruction:
 class TestGameExplainStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            GameExplain(game_id="sf-bal", unexpected="x")
+            GameExplain.model_validate(
+                {
+                    "game_id": "sf-bal",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         explain = GameExplain(game_id="sf-bal")
         with pytest.raises(ValidationError):
-            explain.game_id = "other"
+            setattr(explain, "game_id", "other")  # noqa: B010
 
 
 class TestElementShapes:
@@ -66,11 +82,15 @@ class TestElementShapes:
     def test_credible_band_frozen(self) -> None:
         band = CredibleBand()
         with pytest.raises(ValidationError):
-            band.point = 0.5
+            setattr(band, "point", 0.5)  # noqa: B010
 
     def test_credible_band_rejects_unknown(self) -> None:
         with pytest.raises(ValidationError):
-            CredibleBand(unexpected="x")
+            CredibleBand.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestGameExplainComposition:
@@ -84,6 +104,9 @@ class TestGameExplainComposition:
             ],
             distribution=ExplainDistribution(samples=2000, mean_margin=5.8, sd=10.5),
         )
+        assert explain.band is not None
         assert explain.band.point == 0.71
+        assert explain.factors is not None
         assert explain.factors[0].key == "rush"
+        assert explain.distribution is not None
         assert explain.distribution.samples == 2000

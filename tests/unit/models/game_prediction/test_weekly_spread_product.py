@@ -153,7 +153,7 @@ def test_calibration_identity_mismatch_is_rejected() -> None:
 
 
 def test_strict_parser_requires_complete_persisted_payload() -> None:
-    registry = {
+    registry: dict[str, dict[str, object]] = {
         "win_prob_elo": {
             "sigma": 13.6,
             "margin_std": 13.89,

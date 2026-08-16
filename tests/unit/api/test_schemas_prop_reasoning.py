@@ -22,7 +22,13 @@ class TestPropReasoningConstruction:
             "entries",
             *Blocker.FEATURE_ATTRIBUTION,
         )
-        reasoning = PropReasoning(prop_id="lamar-rush", response_meta=meta)
+        reasoning = PropReasoning.model_validate(
+            {
+                "prop_id": "lamar-rush",
+                "response_meta": meta,
+            }
+        )
+        assert reasoning.response_meta is not None
         status = reasoning.response_meta.field_status["entries"]
         assert isinstance(status, BlockedStatus)
         assert status.blocker == "feature_attribution"
@@ -32,7 +38,12 @@ class TestPropReasoningConstruction:
             "entries",
             *Blocker.FEATURE_ATTRIBUTION,
         )
-        reasoning = PropReasoning(prop_id="lamar-rush", response_meta=meta)
+        reasoning = PropReasoning.model_validate(
+            {
+                "prop_id": "lamar-rush",
+                "response_meta": meta,
+            }
+        )
         dumped = reasoning.model_dump(by_alias=True)
         assert "_meta" in dumped
 
@@ -40,12 +51,17 @@ class TestPropReasoningConstruction:
 class TestPropReasoningStrict:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            PropReasoning(prop_id="lamar-rush", unexpected="x")
+            PropReasoning.model_validate(
+                {
+                    "prop_id": "lamar-rush",
+                    "unexpected": "x",
+                }
+            )
 
     def test_is_frozen(self) -> None:
         reasoning = PropReasoning(prop_id="lamar-rush")
         with pytest.raises(ValidationError):
-            reasoning.prop_id = "other"
+            setattr(reasoning, "prop_id", "other")  # noqa: B010
 
 
 class TestReasoningEntry:
@@ -64,11 +80,15 @@ class TestReasoningEntry:
     def test_is_frozen(self) -> None:
         entry = ReasoningEntry()
         with pytest.raises(ValidationError):
-            entry.tag = "Matchup"
+            setattr(entry, "tag", "Matchup")  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            ReasoningEntry(unexpected="x")
+            ReasoningEntry.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestPropReasoningComposition:
@@ -83,5 +103,6 @@ class TestPropReasoningComposition:
             ],
         )
         assert reasoning.lean == "OVER"
+        assert reasoning.entries is not None
         assert len(reasoning.entries) == 3
         assert reasoning.entries[0].weight == "high"

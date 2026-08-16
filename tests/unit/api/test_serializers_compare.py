@@ -249,6 +249,7 @@ class TestSerializeComparePlayerOpponentAllowed:
             opponent_allowed=opponent_allowed,
         )
 
+        assert result.response_meta is not None
         fs = result.response_meta.field_status
         # 3 defense rows no longer blocked.
         assert "avg_allowed" not in fs
@@ -262,6 +263,7 @@ class TestSerializeComparePlayerOpponentAllowed:
 
         result = serialize_compare_player(self._valid_row(), opponent_allowed=None)
 
+        assert result.response_meta is not None
         fs = result.response_meta.field_status
         assert "avg_allowed" in fs
         assert "rank_against_position" in fs
@@ -273,6 +275,7 @@ class TestSerializeComparePlayerOpponentAllowed:
 
         result = serialize_compare_player(self._valid_row(), opponent_allowed={})
 
+        assert result.response_meta is not None
         fs = result.response_meta.field_status
         assert "avg_allowed" in fs
         assert "rank_against_position" in fs
@@ -311,4 +314,5 @@ class TestCompareTeamsCohortSplits:
             cohort_splits=None,
         )
         assert result.cohort_splits is None
+        assert result.response_meta is not None
         assert "cohort_splits" in result.response_meta.field_status

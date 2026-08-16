@@ -63,7 +63,7 @@ should read this section before planning or modifying the repository.
 
    ```bash
    uv run ruff check . --fix && \
-   uvx pyrefly check . && \
+   uvx pyrefly check && \
    uv run pytest -m "unit and not slow"
    ```
 
@@ -1302,7 +1302,7 @@ CLI boundary.
 Validated the complete Python project with:
 
 - `uv run ruff check . --fix`
-- `uvx pyrefly check`
+- `uvx pyrefly check src tests deploy/bin --search-path src`
 - `uv run pytest -m "unit and not slow"`
 
 All quality gates passed and all selected tests are green.
@@ -1474,7 +1474,7 @@ Removed:
 - `uv run pytest tests/unit/deployment/test_quote_collection_worker.py`
   passed with 13 tests.
 - Repository Ruff and the selected repository test suite passed.
-- The corrected repository-wide `uvx pyrefly check .` command was executed and
+- The corrected repository-wide `uvx pyrefly check` command was executed and
   reported 524 existing errors. Restoring that boundary is recorded separately
   in `ROADMAP.md`.
 - Repository-owned installation completed on the target Raspberry Pi.
@@ -1509,73 +1509,160 @@ was introduced.
 
 ---
 
-### Market Unit 19: Restore the Repository-Wide Pyrefly Boundary [Active]
+### Market Unit 19: Restore the Repository-Wide Pyrefly Boundary [Completed]
+
+#### Completed
+
+2026-08-16
 
 #### Goal
 
-Restore `uvx pyrefly check .` as a truthful, documented, and enforced
-zero-error repository quality gate without hiding genuine production defects
-behind a blanket suppression baseline.
+Restore the explicit repository-owned Pyrefly boundary as a truthful,
+documented, and enforced zero-error repository quality gate without hiding
+genuine production defects behind a blanket suppression baseline.
 
-#### Design Decisions
+The canonical owned boundary is:
 
-- Treat `uvx pyrefly check .` as the canonical repository-wide type-check
-  command.
-- Preserve focused Pyrefly checks for bounded implementation work.
-- Establish the intended repository-wide scope before changing source solely to
-  satisfy diagnostics.
-- Inspect the current Pyrefly configuration, inferred import roots, repository
-  layout, and diagnostic categories before implementing fixes.
-- Separate configuration and scope findings from production-source, shared
-  fixture, test annotation, deliberate invalid-input, Pandas inference, and
-  exploratory-notebook findings.
-- Correct repository and test import roots before treating unresolved
-  `tests.fixtures` imports as code defects.
-- Prioritize production-source errors ahead of test-only and exploratory
-  content.
-- Do not weaken concrete production types merely to accommodate loosely typed
-  test doubles.
-- Use explicit typed fakes, protocols, casts, or narrowly documented ignores
-  only when they represent the real static contract.
-- Preserve deliberate negative tests while making their static intent explicit.
-- Decide exploratory-notebook ownership explicitly: repair notebooks included
-  in the enforced gate or exclude them through documented configuration.
-- Do not mass-suppress the existing diagnostic set.
-- Update hooks, verification commands, `HANDOFF.md`, and other current
-  documentation only after the enforced boundary is locked.
-- Keep candidate issuance, closeout, CLV, recommendation policy, and product
-  work outside this unit.
+`uvx pyrefly check src tests deploy/bin --search-path src --search-path .`
+
+Exploratory notebooks remain outside Ruff, Pyrefly, and automated test gates
+because they are non-authoritative testing-ground artifacts.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- None.
+
+Changed:
+
+- `PLAN.md`
+- `pyproject.toml`
+- `pyrefly.toml`
+- `src/gridiron_edge/cli/evaluate.py`
+- `src/gridiron_edge/features/team/elo.py`
+- `src/gridiron_edge/models/base.py`
+- `src/gridiron_edge/models/game_prediction/model.py`
+- `tests/fixtures/repos.py`
+- `tests/integration/api/test_edges_routes.py`
+- `tests/integration/api/test_teams_routes.py`
+- `tests/integration/test_dataset_roundtrip.py`
+- `tests/integration/test_odds_join.py`
+- `tests/unit/api/test_edges_route_diagnostics.py`
+- `tests/unit/api/test_loader_player_history.py`
+- `tests/unit/api/test_loader_players_list.py`
+- `tests/unit/api/test_loaders.py`
+- `tests/unit/api/test_schema_base.py`
+- `tests/unit/api/test_schemas_comparables.py`
+- `tests/unit/api/test_schemas_edges.py`
+- `tests/unit/api/test_schemas_explain.py`
+- `tests/unit/api/test_schemas_games.py`
+- `tests/unit/api/test_schemas_injuries.py`
+- `tests/unit/api/test_schemas_lines.py`
+- `tests/unit/api/test_schemas_live.py`
+- `tests/unit/api/test_schemas_model_performance.py`
+- `tests/unit/api/test_schemas_news.py`
+- `tests/unit/api/test_schemas_portfolio.py`
+- `tests/unit/api/test_schemas_projections.py`
+- `tests/unit/api/test_schemas_prop_reasoning.py`
+- `tests/unit/api/test_schemas_prop_shop.py`
+- `tests/unit/api/test_schemas_props.py`
+- `tests/unit/api/test_schemas_swing_factors.py`
+- `tests/unit/api/test_schemas_teams.py`
+- `tests/unit/api/test_schemas_weeks.py`
+- `tests/unit/api/test_serializers_compare.py`
+- `tests/unit/api/test_serializers_model_performance.py`
+- `tests/unit/api/test_serializers_projections.py`
+- `tests/unit/betting/test_bankroll.py`
+- `tests/unit/evaluation/test_archive.py`
+- `tests/unit/evaluation/test_diagnostics.py`
+- `tests/unit/evaluation/test_forecast_events.py`
+- `tests/unit/evaluation/test_forecast_selection.py`
+- `tests/unit/evaluation/test_forecast_store.py`
+- `tests/unit/evaluation/test_manifest.py`
+- `tests/unit/evaluation/test_percentiles.py`
+- `tests/unit/evaluation/test_situational_splits.py`
+- `tests/unit/features/test_canonical_feature_sequence.py`
+- `tests/unit/features/test_home_away_elo_feature.py`
+- `tests/unit/features/test_home_away_game_features.py`
+- `tests/unit/features/test_player_matchup.py`
+- `tests/unit/features/test_usage.py`
+- `tests/unit/features/test_weather.py`
+- `tests/unit/fixtures/test_game_modeling_dataframes.py`
+- `tests/unit/ingest/odds/test_the_odds_api_parser.py`
+- `tests/unit/market/test_recommendations.py`
+- `tests/unit/metadata/test_stadium_sync.py`
+- `tests/unit/models/game_prediction/test_weekly_game_product.py`
+- `tests/unit/models/game_prediction/test_weekly_product_store.py`
+- `tests/unit/models/game_prediction/test_weekly_spread_product.py`
+- `tests/unit/models/test_artifact.py`
+- `tests/unit/models/test_base.py`
+- `tests/unit/models/test_epa_window.py`
+- `tests/unit/models/test_games_model.py`
+- `tests/unit/models/test_games_trainer.py`
+- `tests/unit/models/test_metadata.py`
+- `tests/unit/models/test_model_registry.py`
+- `tests/unit/models/test_post_process.py`
+- `tests/unit/models/test_prop_base.py`
+- `tests/unit/ratings/test_elo_predict.py`
+- `tests/unit/ratings/test_simulator.py`
+- `tests/unit/sim/test_season.py`
+- `tests/unit/transform/clean/test_schedule_nflverse.py`
+- `tests/unit/viz/test_predictions.py`
+- `tests/e2e/test_cli_workflows.py`
+
+Removed:
+
+- None.
 
 #### Tests
 
-- Capture the initial `uvx pyrefly check .` result and classify every diagnostic
-  by owning boundary.
-- Validate the configured repository and test import roots.
-- Run focused Pyrefly checks after each bounded correction.
-- Run affected unit, integration, and end-to-end tests after production or
-  shared-fixture changes.
-- Run Ruff across the repository.
-- Run the complete selected Python test suite.
-- Run `uvx pyrefly check .` and require zero errors.
-- Verify no blanket suppression baseline or broad exclusion hides production
-  source.
-- Verify hooks and documented quality commands use the complete repository
-  target.
+- The initial explicit repository-owned Pyrefly boundary reported 431 errors
+  across `src/`, `tests/`, and `deploy/bin/`.
+- Production-source diagnostics were corrected before test-only diagnostics.
+- Shared fixtures, API schemas, loader tests, serializer tests, model tests,
+  feature tests, integration tests, and end-to-end CLI tests passed after their
+  respective bounded corrections.
+- Deliberately invalid Pydantic construction remained covered through dynamic
+  runtime validation boundaries.
+- Frozen-model mutation tests remained covered through narrowly documented
+  dynamic mutation calls.
+- Pandas slices, filters, datetime accessors, heterogeneous payloads, optional
+  values, dataset identities, and protocol test doubles received explicit
+  static contracts without changing their runtime behavior.
+- `HomeAwayEloFeature` now declares the narrower Elo dataset dependency it
+  actually consumes.
+- Runtime-checkable model protocols and `GamesModel.spec` now agree on their
+  structural contract.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check src tests deploy/bin --search-path src --search-path .`
+  passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- No temporary repository-update scripts remain at the repository root.
 
 #### Acceptance
 
-`uvx pyrefly check .` reports zero errors across the explicitly documented
-repository scope. Production source, tests, fixtures, administrative tools, and
-exploratory content are either type-correct within that scope or excluded only
-through a deliberate documented ownership decision.
+The explicit repository-owned Pyrefly boundary reports zero errors across
+`src/`, `tests/`, and `deploy/bin/`. The enforced backlog was reduced from 431
+errors to zero without introducing a blanket suppression baseline or excluding
+maintained production, test, fixture, integration, end-to-end, or deployment
+code.
 
-Repository and test import roots resolve correctly. Deliberate negative tests
-retain their behavioral intent without weakening production contracts. No
-blanket suppression baseline hides existing errors.
+Production source, tests, shared fixtures, and deployment administrative tools
+are type-correct within the owned boundary. Repository and test import roots
+resolve correctly. Exploratory notebooks remain explicitly outside automated
+quality gates because they are non-authoritative testing-ground artifacts.
 
-Ruff, the applicable Python test suites, and the complete repository-wide
-Pyrefly gate pass. Current quality-gate documentation and hooks invoke the
-correct complete command.
+Deliberate negative tests retain their runtime validation behavior. Frozen-model
+tests continue to verify immutability. Pandas typing boundaries are explicit.
+Concrete production types were not weakened solely to accommodate loosely typed
+test doubles. Feature dataset dependencies and runtime-checkable model protocols
+now reflect the capabilities their implementations actually consume.
+
+Ruff, the complete repository-wide Pyrefly gate, and the non-slow unit test
+suite pass. No temporary update scripts remain in the repository.
 
 No market candidate, closeout, CLV, recommendation-policy, API, frontend,
-model, or operational worker behavior is changed.
+model-output, or operational worker behavior was introduced.
+
+---

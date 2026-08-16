@@ -641,7 +641,7 @@ Preferred Python boundary:
 
 ```bash
 uv run ruff check . --fix && \
-uvx pyrefly check . && \
+uvx pyrefly check && \
 uv run pytest -m "unit and not slow"
 ```
 

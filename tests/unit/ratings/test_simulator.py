@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pandas as pd
 import pytest
 
@@ -171,7 +173,10 @@ def test_tie_records_half_outcome_and_preserves_ratings() -> None:
 
 
 def test_zero_sum_invariant_within_a_game() -> None:
-    games = _make_games().iloc[[0]].copy()
+    games = cast(
+        pd.DataFrame,
+        _make_games().iloc[[0]].copy(),
+    )
     sorted_years = ["2023-2024"]
     teams_by_year = {"2023-2024": {"KC", "LAC"}}
 

@@ -22,7 +22,6 @@ Usage::
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -143,7 +142,7 @@ def make_elo_state(
         DataFrame with columns NFL_TEAM, NFL_YEAR, NFL_WEEK, ELO.
     """
     teams = teams or ["Team A", "Team B"]
-    rng: Generator = np.random.default_rng(seed)
+    rng: np.random.Generator = np.random.default_rng(seed)
     rows: list[dict[str, Any]] = []
     for team in teams:
         elo: float = base_elo
@@ -185,7 +184,7 @@ def make_epa_by_game(
     """
     teams = teams or ["KC", "SF", "BUF", "PHI", "DAL", "NYG", "MIA", "LAR"]
     seasons = seasons or [2006, 2007, 2008, 2023, 2024]
-    rng: Generator = np.random.default_rng(seed)
+    rng: np.random.Generator = np.random.default_rng(seed)
 
     rows: list[dict[str, Any]] = []
     for season in seasons:
@@ -293,7 +292,7 @@ def make_eval_df(
     Returns:
         DataFrame matching the evaluation metrics schema.
     """
-    rng: Generator = np.random.default_rng(seed)
+    rng: np.random.Generator = np.random.default_rng(seed)
     defaults: list[dict[str, Any]] = [
         {
             "game_id": f"2024_01_AWAY_HOME_{i}",
@@ -447,7 +446,7 @@ _GAMES_MODELING_COLS: list[str] = _build_games_modeling_cols()
 
 def _synthetic_game_feature_value(
     column: str,
-    rng: Generator,
+    rng: np.random.Generator,
 ) -> int | float:
     """Return a schema-appropriate synthetic feature value."""
     binary_columns = {
@@ -598,7 +597,7 @@ def make_games_modeling_df(
     if len(teams) < 2:
         raise ValueError("At least two teams are required.")
 
-    rng: Generator = np.random.default_rng(seed)
+    rng: np.random.Generator = np.random.default_rng(seed)
     rows: list[dict[str, Any]] = []
 
     identity_columns = {
@@ -770,7 +769,7 @@ def make_games_from_modeling_df(
     if tied.any():
         raise ValueError("Synthetic game fixtures must not contain tied scores.")
 
-    rng: Generator = np.random.default_rng(seed)
+    rng: np.random.Generator = np.random.default_rng(seed)
 
     games["STADIUM"] = games["HOME_TEAM"].astype(str) + " Stadium"
     games["ROOF"] = "outdoors"
@@ -859,7 +858,7 @@ def make_props_modeling_df(
         DataFrame with player_id, position, target stats, rolling
         features, and game context.
     """
-    rng: Generator = np.random.default_rng(seed)
+    rng: np.random.Generator = np.random.default_rng(seed)
     positions: list[str] = ["QB", "RB", "WR", "TE"]
     rows: list[dict[str, Any]] = []
 

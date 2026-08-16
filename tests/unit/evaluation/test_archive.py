@@ -10,6 +10,7 @@ dedup key.
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -75,7 +76,7 @@ def test_build_archive_rows_custom_timestamp() -> None:
     assert (rows["predicted_at"] == ts).all()
 
 
-def test_write_archive_rows_creates_file(tmp_path: pytest.FixtureValue) -> None:
+def test_write_archive_rows_creates_file(tmp_path: Path) -> None:
     rows = build_archive_rows(
         _make_predictions(),
         model_name="win_prob",
@@ -91,7 +92,7 @@ def test_write_archive_rows_creates_file(tmp_path: pytest.FixtureValue) -> None:
     assert len(loaded) == 3
 
 
-def test_write_archive_rows_deduplication(tmp_path: pytest.FixtureValue) -> None:
+def test_write_archive_rows_deduplication(tmp_path: Path) -> None:
     """Re-writing the same game_id + model_name + model_type replaces rather than duplicates."""
     rows_v1 = build_archive_rows(
         _make_predictions(n=2),
@@ -123,7 +124,7 @@ def test_write_archive_rows_deduplication(tmp_path: pytest.FixtureValue) -> None
 
 
 def test_write_archive_rows_accumulates_different_model_types(
-    tmp_path: pytest.FixtureValue,
+    tmp_path: Path,
 ) -> None:
     """Different model_type values under the same model_name accumulate independently."""
     rows_elo = build_archive_rows(
@@ -150,7 +151,7 @@ def test_write_archive_rows_accumulates_different_model_types(
 
 
 def test_write_archive_rows_accumulates_different_model_names(
-    tmp_path: pytest.FixtureValue,
+    tmp_path: Path,
 ) -> None:
     """Different model_name values accumulate independently - e.g. win_prob vs total."""
     rows_wp = build_archive_rows(
@@ -175,7 +176,7 @@ def test_write_archive_rows_accumulates_different_model_names(
     assert set(log["model_name"].unique()) == {"win_prob", "total"}
 
 
-def test_load_prediction_log_filters_by_season(tmp_path: pytest.FixtureValue) -> None:
+def test_load_prediction_log_filters_by_season(tmp_path: Path) -> None:
     rows_25 = build_archive_rows(
         _make_predictions(season="2025-2026", game_id_prefix="2025"),
         model_name="win_prob",
@@ -198,7 +199,7 @@ def test_load_prediction_log_filters_by_season(tmp_path: pytest.FixtureValue) ->
     assert len(filtered) == 3
 
 
-def test_load_prediction_log_filters_by_model_name(tmp_path: pytest.FixtureValue) -> None:
+def test_load_prediction_log_filters_by_model_name(tmp_path: Path) -> None:
     """``model_name`` filter narrows to one purpose, returning all algorithms within it."""
     rows_wp_elo = build_archive_rows(
         _make_predictions(n=2),
@@ -231,7 +232,7 @@ def test_load_prediction_log_filters_by_model_name(tmp_path: pytest.FixtureValue
     assert set(filtered["model_type"].unique()) == {"elo", "random_forest"}
 
 
-def test_load_prediction_log_filters_by_model_type(tmp_path: pytest.FixtureValue) -> None:
+def test_load_prediction_log_filters_by_model_type(tmp_path: Path) -> None:
     """``model_type`` filter narrows to one algorithm across all purposes."""
     rows_wp_rf = build_archive_rows(
         _make_predictions(n=2),
@@ -264,7 +265,7 @@ def test_load_prediction_log_filters_by_model_type(tmp_path: pytest.FixtureValue
     assert set(filtered["model_name"].unique()) == {"win_prob", "total"}
 
 
-def test_load_prediction_log_filters_by_both(tmp_path: pytest.FixtureValue) -> None:
+def test_load_prediction_log_filters_by_both(tmp_path: Path) -> None:
     """``model_name`` + ``model_type`` together select exactly one pair."""
     rows_wp_rf = build_archive_rows(
         _make_predictions(n=2),
@@ -293,14 +294,14 @@ def test_load_prediction_log_filters_by_both(tmp_path: pytest.FixtureValue) -> N
     assert (filtered["model_type"] == "random_forest").all()
 
 
-def test_load_prediction_log_empty_if_no_file(tmp_path: pytest.FixtureValue) -> None:
+def test_load_prediction_log_empty_if_no_file(tmp_path: Path) -> None:
     log = load_prediction_log(repo=tmp_path)
     assert log.empty
     assert list(log.columns) == _ARCHIVE_COLUMNS
 
 
 def test_write_archive_rows_rejects_incomplete_schema(
-    tmp_path: pytest.FixtureValue,
+    tmp_path: Path,
 ) -> None:
     rows = build_archive_rows(
         _make_predictions(),

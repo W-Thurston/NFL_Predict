@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from gridiron_edge.core.settings import Settings
+
 
 def _logs() -> pd.DataFrame:
     return pd.DataFrame(
@@ -66,16 +68,21 @@ def _write(tmp: Path, df: pd.DataFrame) -> None:
     df.to_parquet(d / "player_game_logs.parquet", index=False)
 
 
-class _S:
-    def __init__(self, repo: Path) -> None:
-        self.repo_root = repo
-
-
 def test_skill_only_deduped_latest_team(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_players_list
 
     _write(tmp_path, _logs())
-    result = load_players_list(_S(tmp_path))
+    result = load_players_list(
+        Settings(
+            repo_root=tmp_path,
+            owm_api_key=None,
+            odds_api_key=None,
+            data_raw=tmp_path / "data/raw",
+            data_cleaned=tmp_path / "data/cleaned",
+            data_modeling=tmp_path / "data/modeling",
+            data_output=tmp_path / "data/output",
+        )
+    )
     assert result is not None
     rows = result["rows"]
     # OL excluded; P1 + P2 remain
@@ -91,4 +98,17 @@ def test_skill_only_deduped_latest_team(tmp_path: Path) -> None:
 def test_missing_logs_returns_none(tmp_path: Path) -> None:
     from gridiron_edge.api.loaders import load_players_list
 
-    assert load_players_list(_S(tmp_path)) is None
+    assert (
+        load_players_list(
+            Settings(
+                repo_root=tmp_path,
+                owm_api_key=None,
+                odds_api_key=None,
+                data_raw=tmp_path / "data/raw",
+                data_cleaned=tmp_path / "data/cleaned",
+                data_modeling=tmp_path / "data/modeling",
+                data_output=tmp_path / "data/output",
+            )
+        )
+        is None
+    )

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Protocol
 
 import pandas as pd
 from pandas import Series
@@ -35,6 +35,14 @@ _HOME_AWAY_INPUT_COLUMNS: Final[tuple[str, ...]] = (
     "YEAR",
     "WEEK_NUM",
 )
+
+
+class EloDatasetAccessor(Protocol):
+    """Dataset dependency required by the Away/Home Elo feature."""
+
+    def elo_state(self) -> DataFrame:
+        """Return canonical weekly Elo state."""
+        ...
 
 
 def _require_columns(
@@ -96,7 +104,7 @@ class HomeAwayEloFeature:
         self,
         *,
         df: pd.DataFrame,
-        datasets: DatasetAccessor,
+        datasets: DatasetAccessor | EloDatasetAccessor,
     ) -> pd.DataFrame:
         """Attach Away and Home Elo ratings without dropping games.
 
@@ -105,7 +113,7 @@ class HomeAwayEloFeature:
 
         Args:
             df: One-row-per-game frame using canonical Away/Home identity.
-            datasets: Repository-scoped dataset accessor.
+            datasets: Dataset accessor providing canonical weekly Elo state.
 
         Returns:
             A new frame containing ``AWAY_ELO`` and ``HOME_ELO``.

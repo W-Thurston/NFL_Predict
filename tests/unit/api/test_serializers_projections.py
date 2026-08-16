@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pandas as pd
 from pandas import DataFrame
 
@@ -91,6 +93,7 @@ class TestSerializeProjections:
             None,
             n_simulations=None,
         )
+        assert result.response_meta is not None
         fs = result.response_meta.field_status
         assert "items.clinched" in fs
         assert "items.eliminated" in fs
@@ -152,6 +155,7 @@ class TestNSimulations:
             None,
             n_simulations=10000,
         )
+        assert result.response_meta is not None
         fs = result.response_meta.field_status
         assert "n_simulations" not in fs
 
@@ -164,6 +168,7 @@ class TestNSimulations:
             n_simulations=10000,
         )
 
+        assert result.response_meta is not None
         assert "items.elo_delta" not in result.response_meta.field_status
 
     def test_all_null_elo_deltas_mark_no_prior_snapshot(self) -> None:
@@ -178,7 +183,9 @@ class TestNSimulations:
             n_simulations=10000,
         )
 
+        assert result.response_meta is not None
         status = result.response_meta.field_status["items.elo_delta"]
+        assert not isinstance(status, str)
         assert status.status == "blocked"
         assert status.blocker == "no_prior_snapshot"
         assert status.roadmap == "data"
@@ -196,6 +203,7 @@ class TestNSimulations:
             n_simulations=10000,
         )
 
+        assert result.response_meta is not None
         assert "items.elo_delta" not in result.response_meta.field_status
         by_team: dict[str, TeamProjectionRow] = {item.abbr: item for item in result.items}
         assert by_team["SEA"].elo_delta == 12.0
@@ -411,7 +419,9 @@ class TestSerializeProjectionGrid:
 
         assert all(week.state == "unavailable" for row in result.items for week in row.weeks)
 
+        assert result.response_meta is not None
         status = result.response_meta.field_status["items.weeks"]
+        assert not isinstance(status, str)
         assert status.status == "blocked"
         assert status.blocker == "no_schedule_data"
         assert status.roadmap == "data"
@@ -422,7 +432,9 @@ class TestSerializeProjectionGrid:
         assert result.items == []
         assert result.total == 0
 
+        assert result.response_meta is not None
         status = result.response_meta.field_status["items"]
+        assert not isinstance(status, str)
         assert status.status == "blocked"
         assert status.blocker == "no_projections_data"
 
@@ -432,7 +444,7 @@ class TestSerializeProjectionGrid:
 
         result = serialize_projection_grid(
             self._data(
-                probabilities=probabilities,
+                probabilities=cast(pd.DataFrame, probabilities),
                 schedule=pd.DataFrame(),
                 schedule_available=False,
             )

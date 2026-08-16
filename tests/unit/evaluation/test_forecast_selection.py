@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 import pandas as pd
 import pytest
@@ -557,8 +558,9 @@ class TestResolveForecastCandidates:
         self,
     ) -> None:
         events = _events()
-        reversed_events = events.iloc[::-1].reset_index(
-            drop=True,
+        reversed_events = cast(
+            pd.DataFrame,
+            events.iloc[::-1].reset_index(drop=True),
         )
 
         first = resolve_forecast_candidates(

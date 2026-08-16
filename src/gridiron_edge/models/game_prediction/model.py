@@ -241,7 +241,7 @@ class GamesModel:
     # Set by subclasses.
     model_name: ClassVar[str] = ""
     model_type: ClassVar[str] = ""
-    spec: ClassVar[ModelSpec]
+    spec: ModelSpec
 
     # ------------------------------------------------------------------
     # Trainer / spec accessors

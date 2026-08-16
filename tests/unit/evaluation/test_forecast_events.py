@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 from uuid import UUID
 
 import pandas as pd
@@ -202,7 +203,7 @@ def test_does_not_mutate_source_predictions() -> None:
 
 
 def test_empty_input_returns_canonical_empty_frame() -> None:
-    predictions = _predictions().iloc[0:0]
+    predictions = cast(pd.DataFrame, _predictions().iloc[0:0].copy())
 
     events = build_forecast_events(
         predictions,

@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy import ndarray
-from numpy.random import Generator
 import pandas as pd
 from pandas import Series
 import pytest
@@ -220,7 +219,7 @@ def synthetic_training_data() -> tuple[pd.DataFrame, pd.Series]:
     regressor learns a non-trivial signal. Size chosen so each fold
     has enough samples to fit ElasticNet meaningfully.
     """
-    rng: Generator = np.random.default_rng(42)
+    rng: np.random.Generator = np.random.default_rng(42)
     n = 500
     x = pd.DataFrame(
         {
@@ -445,7 +444,7 @@ class TestPredictWithMeta:
         trainer, meta = self._fit_stub(synthetic_training_data)
         x_train, _ = synthetic_training_data
 
-        empty_df = x_train.iloc[0:0]
+        empty_df = cast(pd.DataFrame, x_train.iloc[0:0].copy())
         preds, predicted_df = trainer.predict_with_meta(empty_df, meta)
 
         assert len(preds) == 0

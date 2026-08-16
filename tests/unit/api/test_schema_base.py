@@ -53,7 +53,12 @@ class TestBaseResponseConstruction:
 
     def test_with_meta_via_attribute_name(self) -> None:
         meta = ResponseMeta().with_pending("value")
-        obj = _SampleObject(name="alpha", response_meta=meta)
+        obj = _SampleObject.model_validate(
+            {
+                "name": "alpha",
+                "response_meta": meta,
+            }
+        )
         assert obj.response_meta is meta
 
     def test_with_meta_via_wire_alias(self) -> None:
@@ -77,7 +82,12 @@ class TestBaseResponseSerialization:
 
     def test_uses_wire_alias_meta(self) -> None:
         meta = ResponseMeta().with_blocked("value", *Blocker.INJURY_DATA)
-        obj = _SampleObject(name="alpha", response_meta=meta)
+        obj = _SampleObject.model_validate(
+            {
+                "name": "alpha",
+                "response_meta": meta,
+            }
+        )
         dumped = obj.model_dump(by_alias=True)
         assert "_meta" in dumped
         assert "response_meta" not in dumped
@@ -89,13 +99,20 @@ class TestBaseResponseSerialization:
 
     def test_json_round_trip(self) -> None:
         meta = ResponseMeta().with_pending("value").with_blocked("name", *Blocker.GAMEDAY_METADATA)
-        obj = _SampleObject(name="alpha", value=None, response_meta=meta)
+        obj = _SampleObject.model_validate(
+            {
+                "name": "alpha",
+                "value": None,
+                "response_meta": meta,
+            }
+        )
         json_str = obj.model_dump_json(by_alias=True)
         rebuilt = _SampleObject.model_validate_json(json_str)
         assert rebuilt.name == "alpha"
         assert rebuilt.value is None
         assert rebuilt.response_meta is not None
         assert rebuilt.response_meta.field_status["value"] == "pending"
+        assert rebuilt.response_meta is not None
         blocked = rebuilt.response_meta.field_status["name"]
         assert isinstance(blocked, BlockedStatus)
         assert blocked.blocker == "gameday_metadata"
@@ -104,24 +121,25 @@ class TestBaseResponseSerialization:
 class TestBaseResponseStrict:
     def test_extra_field_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            _SampleObject(
-                name="alpha",
-                value=1,
-                unexpected="x",  # type: ignore[call-arg]
+            _SampleObject.model_validate(
+                {
+                    "name": "alpha",
+                    "value": 1,
+                    "unexpected": "x",
+                }
             )
 
     def test_misspelled_meta_rejected(self) -> None:
         """Surfaces typos like `reponse_meta=...` at construction time."""
         with pytest.raises(ValidationError):
-            _SampleObject(
-                name="alpha",
-                reponse_meta=ResponseMeta(),  # type: ignore[call-arg]
+            _SampleObject.model_validate(
+                {"name": "alpha", "reponse_meta": ResponseMeta.model_validate({})}
             )
 
     def test_frozen_blocks_attribute_assignment(self) -> None:
         obj = _SampleObject(name="alpha")
         with pytest.raises(ValidationError):
-            obj.name = "beta"  # type: ignore[misc]
+            setattr(obj, "name", "beta")  # noqa: B010
 
 
 # ---------------------------------------------------------------------------
@@ -152,10 +170,12 @@ class TestBaseListResponseConstruction:
 class TestBaseListResponseBlocking:
     def test_marks_items_blocked_via_field_status(self) -> None:
         meta = ResponseMeta().with_blocked("items", *Blocker.MULTI_BOOK)
-        resp = BaseListResponse[_SampleItem](
-            items=[],
-            total=0,
-            response_meta=meta,
+        resp = BaseListResponse[_SampleItem].model_validate(
+            {
+                "items": [],
+                "total": 0,
+                "response_meta": meta,
+            }
         )
         assert resp.items == []
         assert resp.total == 0
@@ -167,10 +187,12 @@ class TestBaseListResponseBlocking:
 
     def test_serializes_blocked_list_with_wire_shape(self) -> None:
         meta = ResponseMeta().with_blocked("items", *Blocker.LIVE_STATE)
-        resp = BaseListResponse[_SampleItem](
-            items=[],
-            total=0,
-            response_meta=meta,
+        resp = BaseListResponse[_SampleItem].model_validate(
+            {
+                "items": [],
+                "total": 0,
+                "response_meta": meta,
+            }
         )
         dumped = resp.model_dump(by_alias=True)
         assert dumped["items"] == []
@@ -202,20 +224,15 @@ class TestBaseListResponseGenerics:
 
     def test_rejects_wrong_item_type(self) -> None:
         with pytest.raises(ValidationError):
-            BaseListResponse[_SampleItem](
-                items=[{"label": "x"}],  # missing required `score`
-            )
+            BaseListResponse[_SampleItem].model_validate({"items": [{"label": "x"}]})
 
 
 class TestBaseListResponseStrict:
     def test_extra_field_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            BaseListResponse[_SampleItem](
-                items=[],
-                page=1,  # type: ignore[call-arg]
-            )
+            BaseListResponse[_SampleItem].model_validate({"items": [], "page": 1})
 
     def test_frozen_blocks_items_reassignment(self) -> None:
         resp = BaseListResponse[_SampleItem](items=[])
         with pytest.raises(ValidationError):
-            resp.items = [_SampleItem(label="x", score=1.0)]  # type: ignore[misc]
+            setattr(resp, "items", [_SampleItem(label="x", score=1.0)])  # noqa: B010

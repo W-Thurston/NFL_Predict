@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import numpy as np
@@ -26,7 +25,7 @@ def _make_eval_df(n: int = 200) -> pd.DataFrame:
     Uses (model_name, model_type) columns per WS2's composite key convention,
     matching what build_evaluation_df actually returns.
     """
-    rng: Generator = np.random.default_rng(42)
+    rng: np.random.Generator = np.random.default_rng(42)
     probs = rng.uniform(0.2, 0.8, n)
     outcomes = (rng.random(n) < probs).astype(int)
     return pd.DataFrame(

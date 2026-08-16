@@ -184,8 +184,8 @@ def fetch_weather(*, season_year: str, owm_api_key: str, repo: Path | None = Non
     weather_path = dataset_path(resolved_repo, "weather_enriched")
     if weather_path.exists():
         existing: DataFrame = pd.read_csv(weather_path, usecols=["GAME_ID"])
-        already_fetched: set[str] = set(existing["GAME_ID"].astype(str))
-        target_game_ids: set[str] = set(temp_df["GAME_ID"].astype(str))
+        already_fetched = {str(value) for value in existing["GAME_ID"].tolist()}
+        target_game_ids = {str(value) for value in temp_df["GAME_ID"].tolist()}
         if target_game_ids.issubset(already_fetched):
             logger.info(
                 "Weather already exists for all %d games in %s week %d - skipping API calls.",

@@ -189,14 +189,8 @@ class TestResolveCurrentWeek:
 class TestLoadGamesForWeek:
     """Cover selected-product weekly game loading."""
 
-    def _fake_settings(self, tmp_path: Path):
-        from dataclasses import dataclass
-
-        @dataclass
-        class FakeSettings:
-            repo_root: Path
-
-        return FakeSettings(repo_root=tmp_path)
+    def _fake_settings(self, tmp_path: Path) -> Settings:
+        return _make_settings(tmp_path)
 
     def test_returns_schedule_complete_selected_product(
         self,
@@ -267,14 +261,8 @@ class TestLoadGamesForWeek:
 class TestLoadGame:
     """Cover selected-product individual game loading."""
 
-    def _fake_settings(self, tmp_path: Path):
-        from dataclasses import dataclass
-
-        @dataclass
-        class FakeSettings:
-            repo_root: Path
-
-        return FakeSettings(repo_root=tmp_path)
+    def _fake_settings(self, tmp_path: Path) -> Settings:
+        return _make_settings(tmp_path)
 
     def test_returns_scheduled_game_when_prediction_is_missing(
         self,
@@ -345,14 +333,8 @@ class TestLoadGame:
 class TestLoadEdgesForWeek:
     """Cover the API loader boundary around the weekly edge service."""
 
-    def _fake_settings(self, tmp_path: Path):
-        from dataclasses import dataclass
-
-        @dataclass
-        class FakeSettings:
-            repo_root: Path
-
-        return FakeSettings(repo_root=tmp_path)
+    def _fake_settings(self, tmp_path: Path) -> Settings:
+        return _make_settings(tmp_path)
 
     def test_forwards_scope_sizing_and_repository(
         self,
@@ -498,14 +480,8 @@ class TestParseSeasonInt:
 class TestLoadPropsForWeek:
     """Cover weekly prop loading."""
 
-    def _fake_settings(self, tmp_path: Path):
-        from dataclasses import dataclass
-
-        @dataclass
-        class FakeSettings:
-            repo_root: Path
-
-        return FakeSettings(repo_root=tmp_path)
+    def _fake_settings(self, tmp_path: Path) -> Settings:
+        return _make_settings(tmp_path)
 
     def _write_manifest(
         self,
@@ -750,14 +726,8 @@ class TestLoadPropsForWeek:
 class TestLoadProp:
     """Cover individual prop loading."""
 
-    def _fake_settings(self, tmp_path: Path):
-        from dataclasses import dataclass
-
-        @dataclass
-        class FakeSettings:
-            repo_root: Path
-
-        return FakeSettings(repo_root=tmp_path)
+    def _fake_settings(self, tmp_path: Path) -> Settings:
+        return _make_settings(tmp_path)
 
     def _write_manifest(self, tmp_path: Path, model_type: str) -> None:
         import json

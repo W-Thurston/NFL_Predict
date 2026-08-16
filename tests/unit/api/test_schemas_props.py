@@ -34,12 +34,12 @@ class TestProjectionBlock:
 
     def test_rejects_extra_fields(self) -> None:
         with pytest.raises(ValidationError):
-            ProjectionBlock(predicted_mean=265.0, mystery=1)  # type: ignore[call-arg]
+            ProjectionBlock.model_validate({"predicted_mean": 265.0, "mystery": 1})
 
     def test_frozen(self) -> None:
         block = ProjectionBlock(predicted_mean=265.0)
         with pytest.raises(ValidationError):
-            block.predicted_mean = 300.0  # type: ignore[misc]
+            setattr(block, "predicted_mean", 300.0)  # noqa: B010
 
 
 class TestLineBlock:
@@ -61,7 +61,7 @@ class TestLineBlock:
     def test_frozen(self) -> None:
         block = LineBlock(line=273.5)
         with pytest.raises(ValidationError):
-            block.line = 280.0  # type: ignore[misc]
+            setattr(block, "line", 280.0)  # noqa: B010
 
 
 class TestPropSummary:
@@ -112,7 +112,7 @@ class TestPropSummary:
 
     def test_rejects_missing_required(self) -> None:
         with pytest.raises(ValidationError):
-            PropSummary(prop_id="x")  # type: ignore[call-arg]
+            PropSummary.model_validate({"prop_id": "x"})
 
 
 class TestPropList:
@@ -217,14 +217,16 @@ class TestPropDetail:
 
     def test_rejects_extra_fields(self) -> None:
         with pytest.raises(ValidationError):
-            PropDetail(
-                prop_id="x",
-                game_id="y",
-                player_id="p",
-                player_name="X",
-                position="QB",
-                team="KC",
-                stat_type="qb_pass_yards",
-                model_key="qb_pass_yards_elasticnet",
-                mystery="oops",  # type: ignore[call-arg]
+            PropDetail.model_validate(
+                {
+                    "prop_id": "x",
+                    "game_id": "y",
+                    "player_id": "p",
+                    "player_name": "X",
+                    "position": "QB",
+                    "team": "KC",
+                    "stat_type": "qb_pass_yards",
+                    "model_key": "qb_pass_yards_elasticnet",
+                    "mystery": "oops",
+                }
             )

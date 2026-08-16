@@ -30,8 +30,12 @@ class TestNewsItem:
     def test_is_frozen(self) -> None:
         item = NewsItem()
         with pytest.raises(ValidationError):
-            item.team = "BUF"
+            setattr(item, "team", "BUF")  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            NewsItem(unexpected="x")
+            NewsItem.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )

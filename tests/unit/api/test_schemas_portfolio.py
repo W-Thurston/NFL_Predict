@@ -33,11 +33,15 @@ class TestPortfolioSummary:
     def test_is_frozen(self) -> None:
         s = PortfolioSummary()
         with pytest.raises(ValidationError):
-            s.bankroll = 100.0
+            setattr(s, "bankroll", 100.0)  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            PortfolioSummary(unexpected="x")
+            PortfolioSummary.model_validate(
+                {
+                    "unexpected": "x",
+                }
+            )
 
 
 class TestBetRow:
@@ -51,7 +55,7 @@ class TestBetRow:
     def test_is_frozen(self) -> None:
         row = BetRow()
         with pytest.raises(ValidationError):
-            row.stake = 200.0
+            setattr(row, "stake", 200.0)  # noqa: B010
 
 
 class TestBankrollCurve:

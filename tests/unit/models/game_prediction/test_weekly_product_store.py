@@ -117,7 +117,7 @@ def test_product_round_trips_without_schema_loss(tmp_path: Path) -> None:
     assert loaded["product_schema_version"].tolist() == [WEEKLY_PRODUCT_SCHEMA_VERSION] * len(
         source
     )
-    assert loaded["product_generated_at"].dt.tz is not None
+    assert pd.DatetimeIndex(loaded["product_generated_at"]).tz is not None
     assert loaded["product_generated_at"].iloc[0] == pd.Timestamp(identity.generated_at)
     assert pd.isna(loaded.loc[1, "away_win_prob"])
 

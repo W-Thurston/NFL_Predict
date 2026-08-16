@@ -24,11 +24,17 @@ class TestCurrentWeek:
     def test_is_frozen(self) -> None:
         cw = CurrentWeek(season=2025, week=10)
         with pytest.raises(ValidationError):
-            cw.season = 2026
+            setattr(cw, "season", 2026)  # noqa: B010
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            CurrentWeek(season=2025, week=10, unexpected="x")
+            CurrentWeek.model_validate(
+                {
+                    "season": 2025,
+                    "week": 10,
+                    "unexpected": "x",
+                }
+            )
 
     def test_wire_shape(self) -> None:
         cw = CurrentWeek(season=2025, week=10, source="schedule")

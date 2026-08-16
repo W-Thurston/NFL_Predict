@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from gridiron_edge.evaluation.forecast_contracts import ForecastRole
 from gridiron_edge.evaluation.forecast_events import build_forecast_events
@@ -97,17 +98,19 @@ def _validate_coverage(
     """Require exactly one returned prediction for every scheduled game."""
     if "GAME_ID" not in predictions.columns:
         raise ValueError(f"{family} predictions are missing GAME_ID.")
-    actual = predictions["GAME_ID"]
+    actual = cast(Series, predictions["GAME_ID"])
     if actual.isna().any():
         raise ValueError(f"{family} predictions contain null GAME_ID values.")
-    actual_ids = actual.astype(str)
-    duplicated = actual_ids.duplicated(keep=False)
-    if duplicated.any():
-        values = sorted(actual_ids.loc[duplicated].unique())
-        raise ValueError(f"{family} predictions contain duplicate Game IDs: " + ", ".join(values))
+
+    actual_ids = [str(value) for value in actual.tolist()]
+    duplicate_ids = sorted(game_id for game_id, count in Counter(actual_ids).items() if count > 1)
+    if duplicate_ids:
+        raise ValueError(
+            f"{family} predictions contain duplicate Game IDs: " + ", ".join(duplicate_ids)
+        )
 
     expected_set = set(expected_ids)
-    actual_set = set(actual_ids.tolist())
+    actual_set = set(actual_ids)
     missing = sorted(expected_set - actual_set)
     unexpected = sorted(actual_set - expected_set)
     if len(predictions) != len(expected_ids) or missing or unexpected:
@@ -242,7 +245,7 @@ def execute_weekly_prediction_policy(
         raise ValueError("Prediction policy selected no available Win or Total model.")
 
     canonical_schedule = _build_elo_schedule(scoped.copy())
-    expected_ids = scoped["game_id"].astype(str).tolist()
+    expected_ids = [str(value) for value in scoped["game_id"].tolist()]
     win_predictions = _execute_decision(policy.win, canonical_schedule, repo=repo)
     total_predictions = _execute_decision(policy.total, canonical_schedule, repo=repo)
 

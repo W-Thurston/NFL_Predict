@@ -5,11 +5,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import pandas as pd
 from pandas import DataFrame
 import pytest
 
+from gridiron_edge.datasets.accessor import DatasetAccessor
 from gridiron_edge.features.pipeline import (
     CANONICAL_FEATURES,
     canonical_feature_columns,
@@ -184,7 +186,7 @@ def test_complete_sequence_preserves_canonical_rows_and_schema(
     result = run_features(
         df=target,
         feature_names=CANONICAL_FEATURES,
-        datasets=object(),
+        datasets=DatasetAccessor(repo=Path(".")),
     )
 
     pd.testing.assert_frame_equal(target, expected)

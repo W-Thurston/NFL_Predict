@@ -44,7 +44,12 @@ def test_line_offer_preserves_exact_quote_identity() -> None:
 def test_line_offer_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         # pyrefly: ignore [unexpected-keyword]
-        LineOffer(**offer().model_dump(), unexpected="x")
+        LineOffer.model_validate(
+            {
+                **offer().model_dump(),
+                "unexpected": "x",
+            }
+        )
 
 
 def test_line_shopping_list_composes_games_and_offers() -> None:

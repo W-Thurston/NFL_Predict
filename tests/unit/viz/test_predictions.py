@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pandas as pd
 import pytest
 
@@ -101,7 +103,14 @@ def test_optional_float_handles_absent_null_and_supplied_values() -> None:
 
 def test_html_renders_without_moneyline_columns(tmp_path) -> None:
     display = build_weekly_product_display_frame(
-        _product().iloc[[0]].drop(columns=["away_moneyline", "home_moneyline"])
+        cast(
+            pd.DataFrame,
+            _product()
+            .iloc[[0]]
+            .drop(
+                columns=["away_moneyline", "home_moneyline"],
+            ),
+        )
     )
     original = display.copy(deep=True)
 
@@ -122,7 +131,7 @@ def test_html_renders_without_moneyline_columns(tmp_path) -> None:
 
 
 def test_html_preserves_supplied_moneylines_for_underdog_highlight(tmp_path) -> None:
-    display = build_weekly_product_display_frame(_product().iloc[[0]])
+    display = build_weekly_product_display_frame(cast(pd.DataFrame, _product().iloc[[0]]))
 
     output = render_predictions_html(
         display,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -126,10 +127,9 @@ def test_market_and_side_mapping_preserves_provider_values() -> None:
 
 def test_uses_market_update_and_bookmaker_fallback() -> None:
     payload = _payload()
-    bookmaker = payload[0]["bookmakers"][0]
-    assert isinstance(bookmaker, dict)
-    markets = bookmaker["markets"]
-    assert isinstance(markets, list)
+    bookmakers = cast(list[dict[str, object]], payload[0]["bookmakers"])
+    bookmaker = bookmakers[0]
+    markets = cast(list[dict[str, object]], bookmaker["markets"])
     markets[0].pop("last_update")
     result = _parse(payload)
     moneyline = result.loc[
@@ -173,10 +173,9 @@ def test_normalizes_team_whitespace_and_case_for_matching() -> None:
 
 def test_ignores_unsupported_market_without_collapsing_supported_rows() -> None:
     payload = _payload()
-    bookmaker = payload[0]["bookmakers"][0]
-    assert isinstance(bookmaker, dict)
-    markets = bookmaker["markets"]
-    assert isinstance(markets, list)
+    bookmakers = cast(list[dict[str, object]], payload[0]["bookmakers"])
+    bookmaker = bookmakers[0]
+    markets = cast(list[dict[str, object]], bookmaker["markets"])
     markets.append(_market("outrights", [{"name": "KC", "price": 500}]))
     result = _parse(payload)
     assert len(result) == 12

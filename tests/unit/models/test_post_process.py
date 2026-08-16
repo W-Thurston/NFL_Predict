@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 import math
 from pathlib import Path
 from typing import Any
@@ -300,7 +299,7 @@ class TestCalibrateSigma:
     def test_recovers_known_sigma(self) -> None:
         """Synthetic data generated with known sigma is recovered."""
         true_sigma = 15.0
-        rng: Generator = np.random.default_rng(42)
+        rng: np.random.Generator = np.random.default_rng(42)
         n = 500
 
         # Generate random home win probabilities (away from extremes)
@@ -321,7 +320,7 @@ class TestCalibrateSigma:
     def test_recovers_exact_sigma_no_noise(self) -> None:
         """With zero noise, calibration recovers sigma exactly."""
         true_sigma = 12.5
-        rng: Generator = np.random.default_rng(99)
+        rng: np.random.Generator = np.random.default_rng(99)
         n = 200
 
         home_probs: Series = pd.Series(rng.uniform(0.25, 0.75, size=n))
@@ -495,7 +494,7 @@ class TestFitRecalibration:
 
     def _make_seasons_data(self) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Create synthetic underconfident model data across 5 seasons."""
-        rng: Generator = np.random.default_rng(42)
+        rng: np.random.Generator = np.random.default_rng(42)
         n_per_season = 100
         season_labels: list[str] = [
             "2019-2020",
@@ -545,8 +544,8 @@ class TestFitRecalibration:
 
     def test_insufficient_seasons_raises(self) -> None:
         """Too few unique seasons for the requested split raises ValueError."""
-        probs: Series[float] = pd.Series([0.5, 0.6])
-        outcomes: Series[int] = pd.Series([0, 1])
+        probs = pd.Series([0.5, 0.6], dtype=float)
+        outcomes = pd.Series([0, 1], dtype=int)
         seasons: Series[str] = pd.Series(["2023-2024", "2024-2025"])
 
         with pytest.raises(ValueError, match="Need at least 3"):
@@ -756,7 +755,7 @@ class TestComputeMarginStd:
 
     def test_recovers_known_std(self) -> None:
         """Residual std matches the noise std used to generate data."""
-        rng: Generator = np.random.default_rng(42)
+        rng: np.random.Generator = np.random.default_rng(42)
         n = 500
         sigma = 14.0
         noise_std = 10.0
@@ -771,7 +770,7 @@ class TestComputeMarginStd:
 
     def test_zero_residuals(self) -> None:
         """Perfect predictions produce near-zero std."""
-        rng: Generator = np.random.default_rng(99)
+        rng: np.random.Generator = np.random.default_rng(99)
         sigma = 14.0
         probs: Series = pd.Series(rng.uniform(0.25, 0.75, size=200))
         actual_margins: Series = pd.Series(

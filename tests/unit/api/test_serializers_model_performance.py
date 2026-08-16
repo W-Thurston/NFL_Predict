@@ -42,6 +42,7 @@ class TestEmptyInputs:
             filters=_filters(),
         )
         assert result.betting_performance.n_model_bets == 0
+        assert result.response_meta is not None
         assert "betting_performance.roi_pct" in result.response_meta.field_status
 
 

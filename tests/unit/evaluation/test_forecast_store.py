@@ -184,7 +184,7 @@ def test_write_and_load_round_trip(
     assert len(loaded) == 1
     assert list(loaded.columns) == FORECAST_EVENT_COLUMNS
     assert loaded["event_id"].iloc[0] == "event-1"
-    assert loaded["generated_at"].dt.tz is not None
+    assert pd.DatetimeIndex(loaded["generated_at"]).tz is not None
 
 
 def test_multiple_live_events_for_same_game_and_model_coexist(

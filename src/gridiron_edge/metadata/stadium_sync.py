@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Hashable
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 _STADIUM_COLUMNS: Final[tuple[str, ...]] = (
     "HOME_TEAM",
@@ -38,6 +38,11 @@ _SPECIAL_HOME_TEAMS: Final[frozenset[str]] = frozenset({"Alternate", "Internatio
 _REVIEW_STATUSES: Final[frozenset[str]] = frozenset(
     {"proposed", "approved", "rejected", "unresolved"}
 )
+
+
+def _string_values(series: Series) -> list:
+    """Return non-null series values as strings."""
+    return [str(value) for value in series.dropna().tolist()]
 
 
 def _require_columns(frame: DataFrame, required: tuple[str, ...], *, label: str) -> None:
@@ -203,8 +208,7 @@ def prepare_stadium_updates(
     scoped = schedule.loc[schedule["season"].astype(str) == season].copy()
     normal_teams = _normal_teams(stadiums)
     required_teams = sorted(
-        set(scoped["away_team"].dropna().astype(str))
-        | set(scoped["home_team"].dropna().astype(str))
+        set(_string_values(scoped["away_team"])) | set(_string_values(scoped["home_team"]))
     )
     unknown = sorted(set(required_teams) - set(normal_teams))
     if unknown:
@@ -221,14 +225,19 @@ def prepare_stadium_updates(
             raise ValueError("Stadium aliases contain duplicate source identities.")
         alias_map = dict(
             zip(
-                aliases["SOURCE_STADIUM"].astype(str),
-                aliases["CANONICAL_STADIUM"].astype(str),
+                _string_values(aliases["SOURCE_STADIUM"]),
+                _string_values(aliases["CANONICAL_STADIUM"]),
                 strict=True,
             )
         )
 
     existing_target = set(
-        stadiums.loc[stadiums["YEAR"].astype(str) == season, "HOME_TEAM"].dropna().astype(str)
+        _string_values(
+            stadiums.loc[
+                stadiums["YEAR"].astype(str) == season,
+                "HOME_TEAM",
+            ]
+        )
     )
     work = stadiums.copy()
     work["_START_YEAR"] = work["YEAR"].map(_season_start)
@@ -244,7 +253,7 @@ def prepare_stadium_updates(
         .tail(1)
         .set_index("HOME_TEAM")
     )
-    known_sites = set(stadiums["STADIUM"].astype(str))
+    known_sites = set(_string_values(stadiums["STADIUM"]))
     rows: list[dict[str, object]] = []
 
     for team in required_teams:
@@ -390,15 +399,21 @@ def _validate_approved_updates(
     nfl_teams: frozenset[str],
 ) -> DataFrame:
     _require_columns(updates, _UPDATE_COLUMNS, label="Stadium updates")
-    invalid_statuses = sorted(set(updates["REVIEW_STATUS"].astype(str)) - _REVIEW_STATUSES)
+    invalid_statuses = sorted(set(_string_values(updates["REVIEW_STATUS"])) - _REVIEW_STATUSES)
     if invalid_statuses:
         raise ValueError("Unknown review statuses: " + ", ".join(invalid_statuses))
-    approved = updates.loc[updates["REVIEW_STATUS"].astype(str) == "approved"].copy()
+    approved = cast(
+        DataFrame,
+        updates.loc[
+            updates["REVIEW_STATUS"].astype(str) == "approved",
+            :,
+        ],
+    ).copy()
     if approved.empty:
         return approved
 
     allowed = set(nfl_teams) | set(_SPECIAL_HOME_TEAMS)
-    unknown = sorted(set(approved["HOME_TEAM"].astype(str)) - allowed)
+    unknown = sorted(set(_string_values(approved["HOME_TEAM"])) - allowed)
     if unknown:
         raise ValueError(
             "Approved stadium HOME_TEAM values must be NFL teams, Alternate, or International: "
@@ -416,14 +431,26 @@ def _validate_approved_updates(
     ]
     if approved[required_values].isna().any().any():
         raise ValueError("Approved stadium updates require complete metadata.")
-    latitudes = pd.to_numeric(approved["LATITUDE"], errors="coerce")
-    longitudes = pd.to_numeric(approved["LONGITUDE"], errors="coerce")
+    latitudes = cast(
+        Series,
+        pd.to_numeric(approved["LATITUDE"], errors="coerce"),
+    )
+    longitudes = cast(
+        Series,
+        pd.to_numeric(approved["LONGITUDE"], errors="coerce"),
+    )
     if latitudes.isna().any() or not latitudes.between(-90, 90).all():
         raise ValueError("Approved stadium latitude must be between -90 and 90.")
     if longitudes.isna().any() or not longitudes.between(-180, 180).all():
         raise ValueError("Approved stadium longitude must be between -180 and 180.")
     normal = ~approved["HOME_TEAM"].astype(str).isin(_SPECIAL_HOME_TEAMS)
-    if approved.loc[normal].duplicated(["HOME_TEAM", "YEAR"]).any():
+    normal_approved = cast(
+        DataFrame,
+        approved.loc[normal, :],
+    )
+    if normal_approved.duplicated(
+        subset=["HOME_TEAM", "YEAR"],
+    ).any():
         raise ValueError("Approved updates contain duplicate franchise-season origins.")
 
     return _remove_already_applied_updates(

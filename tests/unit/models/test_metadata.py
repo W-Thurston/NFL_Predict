@@ -13,6 +13,8 @@ Covers:
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from gridiron_edge.models.artifact import BaseModelMetadata
@@ -56,8 +58,9 @@ class TestBaseModelMetadata:
         assert meta.notes == ""
 
     def test_kw_only_enforced(self) -> None:
+        constructor: Any = BaseModelMetadata
         with pytest.raises(TypeError):
-            BaseModelMetadata(  # type: ignore[misc]
+            constructor(
                 "win_prob",
                 "random_forest",
                 "classification",

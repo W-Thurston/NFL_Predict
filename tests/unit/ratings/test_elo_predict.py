@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from pandas import DataFrame
@@ -146,7 +147,7 @@ def test_missing_home_elo_preserves_schedule_row() -> None:
 def test_missing_both_elos_is_explicit() -> None:
     result = predict_schedule_with_elo(
         _schedule(),
-        _elo_state().iloc[0:0].copy(),
+        cast(DataFrame, _elo_state().iloc[0:0].copy()),
         year="2026-2027",
         week=1,
     )
@@ -183,7 +184,10 @@ def test_only_requested_week_is_returned() -> None:
 
 
 def test_schedule_order_is_preserved() -> None:
-    schedule = _schedule().iloc[[1, 0, 2]].reset_index(drop=True)
+    schedule = cast(
+        DataFrame,
+        _schedule().iloc[[1, 0, 2]].reset_index(drop=True),
+    )
 
     result = predict_schedule_with_elo(
         schedule,

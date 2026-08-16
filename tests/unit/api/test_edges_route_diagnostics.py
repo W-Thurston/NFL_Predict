@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +14,7 @@ import pytest
 from gridiron_edge.api.app import create_app
 from gridiron_edge.api.deps import settings_dependency
 from gridiron_edge.api.routes import edges as edges_route
+from gridiron_edge.core.settings import Settings
 from gridiron_edge.market.edge_diagnostics import (
     EdgeDiagnosticBlocker,
     EdgeDiagnostics,
@@ -23,15 +23,22 @@ from gridiron_edge.market.edge_diagnostics import (
 from gridiron_edge.market.recommendations import EdgeResult
 
 
-@dataclass
-class _FakeSettings:
-    repo_root: Path
+def _settings(repo: Path) -> Settings:
+    return Settings(
+        repo_root=repo,
+        owm_api_key=None,
+        odds_api_key=None,
+        data_raw=repo / "data/raw",
+        data_cleaned=repo / "data/cleaned",
+        data_modeling=repo / "data/modeling",
+        data_output=repo / "data/output",
+    )
 
 
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
     app = create_app()
-    app.dependency_overrides[settings_dependency] = lambda: _FakeSettings(repo_root=tmp_path)
+    app.dependency_overrides[settings_dependency] = lambda: _settings(tmp_path)
     return TestClient(app)
 
 
@@ -187,7 +194,7 @@ def test_explicit_scope_does_not_load_current_scope(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _FakeSettings(repo_root=tmp_path)
+    settings = _settings(tmp_path)
 
     def fail_if_called(_settings):
         raise AssertionError("Explicit season and week must not resolve current scope.")
@@ -220,7 +227,7 @@ def test_missing_scope_values_use_current_scope(
     week: int | None,
     expected: tuple[str, int],
 ) -> None:
-    settings = _FakeSettings(repo_root=tmp_path)
+    settings = _settings(tmp_path)
 
     monkeypatch.setattr(
         edges_route,

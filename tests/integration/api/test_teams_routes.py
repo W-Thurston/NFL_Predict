@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from fastapi.testclient import TestClient
 import pandas as pd
@@ -89,7 +90,7 @@ class TestPreseasonEloScope:
         client: TestClient,
         tmp_path: Path,
     ) -> None:
-        empty_games = _make_games_df().iloc[0:0].copy()
+        empty_games = cast(pd.DataFrame, _make_games_df().iloc[0:0].copy())
         (
             MiniRepoBuilder(tmp_path)
             .with_games(empty_games)
@@ -116,7 +117,7 @@ class TestPreseasonEloScope:
         client: TestClient,
         tmp_path: Path,
     ) -> None:
-        empty_games = _make_games_df().iloc[0:0].copy()
+        empty_games = cast(pd.DataFrame, _make_games_df().iloc[0:0].copy())
         (
             MiniRepoBuilder(tmp_path)
             .with_games(empty_games)
@@ -139,7 +140,7 @@ class TestPreseasonEloScope:
         client: TestClient,
         tmp_path: Path,
     ) -> None:
-        empty_games = _make_games_df().iloc[0:0].copy()
+        empty_games = cast(pd.DataFrame, _make_games_df().iloc[0:0].copy())
         (
             MiniRepoBuilder(tmp_path)
             .with_games(empty_games)

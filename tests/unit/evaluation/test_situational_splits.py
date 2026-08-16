@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 import pytest
@@ -437,12 +438,15 @@ class TestComputePlayerSituationalSplits:
             compute_player_situational_splits,
         )
 
-        logs = _make_player_game_logs().iloc[[0]].copy()
+        logs = cast(
+            pd.DataFrame,
+            _make_player_game_logs().iloc[[0]].copy(),
+        )
         logs["team"] = "UNKNOWN"
 
         result = compute_player_situational_splits(
             logs,
-            _make_games().iloc[[0]].copy(),
+            cast(pd.DataFrame, _make_games().iloc[[0]].copy()),
             LONG_TO_SHORT,
             "qb_pass_yards",
         )
