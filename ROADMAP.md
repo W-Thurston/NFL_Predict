@@ -175,6 +175,163 @@ Program sequence:
   recommendation requirement. A positive-EV candidate remains necessary but
   insufficient for recommendation.
 
+### Remaining Recommendation Program
+
+The remaining program is divided into bounded units so evidence acquisition,
+historical evaluation, policy calibration, persisted decision state, product
+integration, and production proof do not collapse into one implementation
+boundary.
+
+#### Market Unit 19: Restore the Repository-Wide Pyrefly Boundary
+
+Restore `uvx pyrefly check .` as a truthful zero-error repository quality gate.
+
+Required work:
+
+- define the intended type-check scope for production source, tests, deployment
+  assets, administrative tools, and exploratory notebooks;
+- correct repository and test import roots before treating unresolved fixture
+  imports as source defects;
+- separate configuration failures from production-source, test, fixture,
+  negative-validation, Pandas-inference, and notebook findings;
+- resolve production-source findings before test-only debt;
+- establish explicit conventions for deliberately invalid test inputs, frozen
+  object mutation tests, protocol fakes, and typed fixture construction;
+- repair exploratory notebooks or explicitly exclude them through a documented
+  ownership decision;
+- update hooks, verification commands, and operational documentation to use the
+  complete repository target;
+- require `uvx pyrefly check .` to report zero errors at acceptance.
+
+Focused type checks remain required during this restoration work. Existing
+errors must not become a blanket suppression baseline.
+
+#### Market Unit 20: Persist Immutable Pregame Candidate Issuance
+
+Persist the exact positive-EV candidate evidence available before kickoff so
+later evaluation does not reconstruct historical decisions from newer state.
+
+Required work:
+
+- preserve provider, provider-event, sportsbook, game, market, side, line,
+  American price, fetch timestamp, sportsbook update timestamp, and kickoff;
+- preserve the selected weekly product, exact forecast events, model identity,
+  model probability, and calculated expected value;
+- record the evaluated timestamp and explicit candidate, not-candidate, and
+  unavailable states;
+- reject post-kickoff issuance;
+- provide deterministic identity, immutable persistence, replay idempotence, and
+  conflicting-replay rejection;
+- keep candidate issuance separate from qualification, staking, exposure, and
+  recommendation policy.
+
+#### Market Unit 21: Implement Validated Market Closeout and CLV
+
+Close issued candidates and recorded wagers against the correct latest eligible
+pregame evidence.
+
+Required work:
+
+- require the same provider, provider event, sportsbook, game, market, and side;
+- preserve exact line identity where the market contract requires it;
+- use only the latest eligible non-live quote observed before kickoff;
+- preserve missing, ambiguous, conflicting, live, post-kickoff, and unavailable
+  closeout states;
+- calculate Moneyline price CLV only when valid closing-price evidence exists;
+- calculate Spread and Total point CLV only when valid closing-line evidence
+  exists;
+- never treat the first or last stored quote as an implicit opening or closing
+  definition.
+
+#### Market Unit 22: Build Empirical Market-Family Evaluation
+
+Evaluate issued candidates independently for Moneyline, Spread, and Total.
+
+Required work:
+
+- report candidate counts, evidence coverage, and closeout availability;
+- evaluate model reliability, realized outcomes, expected-value cohorts, CLV
+  cohorts, and realized return;
+- evaluate quote age, historical observation depth, sportsbook, and market-side
+  cohorts;
+- retain market-family-specific results;
+- report sample sizes and insufficient-evidence states explicitly;
+- do not present intuitive thresholds or underpowered cohorts as validated
+  policy.
+
+#### Market Unit 23: Lock Versioned Recommendation Policy
+
+Derive and persist the policy that may promote an exact candidate into a
+qualified opportunity or recommendation.
+
+Required work:
+
+- derive thresholds from Unit 22 evidence independently by market family;
+- define quote-freshness and evidence-sufficiency rules;
+- define fractional-Kelly sizing and bankroll-basis requirements;
+- define duplicate, conflicting, per-game, portfolio-concentration, and
+  correlation exposure rules;
+- define mandatory, failed, and unavailable checks;
+- persist immutable policy versions with provenance;
+- keep policy evaluation deterministic and independent from API or frontend
+  request paths.
+
+#### Market Unit 24: Persist Recommended-Bet Results
+
+Persist one immutable qualification and recommendation result for every
+evaluated exact offer.
+
+Required work:
+
+- preserve exact offer and candidate identity;
+- preserve selected-product, forecast-event, and policy provenance;
+- record the evaluated timestamp and every mandatory check;
+- distinguish qualified, recommended, failed, and unavailable states;
+- preserve suggested stake, bankroll basis, Kelly fraction, and exposure
+  evidence when available;
+- provide deterministic identity, replay idempotence, and conflict rejection;
+- do not place a sportsbook wager.
+
+#### Market Unit 25: Integrate Recommendation Products
+
+Serialize and present persisted recommendation results without request-time
+qualification or frontend decision calculation.
+
+Required work:
+
+- add persisted-result loading and API serialization;
+- integrate qualification and recommendation state into Line Shopping,
+  Available Edges, Game Detail, Bet Slip, and the recorded-bet workflow;
+- present the policy version, supporting checks, failed checks, unavailable
+  reasons, suggested stake, and provenance;
+- keep recording a wager an explicit user action;
+- preserve the distinction between a candidate, qualified opportunity,
+  recommendation, Bet Slip draft, and recorded wager.
+
+#### Market Unit 26: Prove the Full Production Recommendation Chain
+
+Complete a real-week end-to-end proof independently for Moneyline, Spread, and
+Total.
+
+Required proof:
+
+- explicitly selected weekly product and exact forecast provenance;
+- repeated timestamped pregame quote observations;
+- immutable candidate issuance;
+- versioned qualification and recommendation policy;
+- persisted recommended or explicitly unavailable result;
+- backend serialization and frontend presentation;
+- optional explicit recorded-bet action with duplicate protection and bankroll
+  transaction semantics;
+- completed outcome and validated same-provider, same-sportsbook closeout;
+- Moneyline price CLV or Spread and Total point CLV;
+- realized performance and reproducible chronological audit evidence.
+
+Each market family requires separate empirical acceptance. Success for one
+family must not be generalized to another. The system does not place sportsbook
+wagers.
+
+
 10. **Recommendation product integration [Planned].** Add the qualified and
   recommended states to the backend contract, Line Shopping, Available Edges,
   Bet Slip, and recorded-bet workflow only after the qualification policy is

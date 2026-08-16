@@ -1428,20 +1428,20 @@ Market Unit 17 is complete.
 
 ---
 
-#### Market Unit 18: Codify the Quote Collection Worker Deployment [Completed]
+### Market Unit 18: Codify the Quote Collection Worker Deployment [Completed]
 
-##### Completed
+#### Completed
 
 2026-08-16
 
-##### Goal
+#### Goal
 
 Make the validated Raspberry Pi quote-collection worker reproducible,
 repository-owned, verifiable, transactional, and recoverable without changing
 collection-plan, selection, due-time, quota, claim, receipt, provider-ingest,
 historical interpretation, or recommendation semantics.
 
-##### Files Added/Removed/Changed
+#### Files Added/Removed/Changed
 
 Added:
 
@@ -1465,7 +1465,7 @@ Removed:
 
 - None.
 
-##### Tests
+#### Tests
 
 - `uv run ruff check src/gridiron_edge/deployment tests/unit/deployment --fix`
   passed.
@@ -1488,7 +1488,7 @@ Removed:
 - The worker reported `throttled=0x0`, 46.2 C, root storage on the 2 TB SSD,
   and no configured current transport or storage error markers.
 
-##### Acceptance
+#### Acceptance
 
 The quote-collection worker deployment is repository-owned, reproducible,
 transactional, independently verifiable, and validated on the target Raspberry
@@ -1506,3 +1506,76 @@ successfully, and creates no execution or quote artifacts. No collection
 policy, due-time, quota, claim, receipt, provider-ingest, historical
 interpretation, API, frontend, model, qualification, or recommendation behavior
 was introduced.
+
+---
+
+### Market Unit 19: Restore the Repository-Wide Pyrefly Boundary [Active]
+
+#### Goal
+
+Restore `uvx pyrefly check .` as a truthful, documented, and enforced
+zero-error repository quality gate without hiding genuine production defects
+behind a blanket suppression baseline.
+
+#### Design Decisions
+
+- Treat `uvx pyrefly check .` as the canonical repository-wide type-check
+  command.
+- Preserve focused Pyrefly checks for bounded implementation work.
+- Establish the intended repository-wide scope before changing source solely to
+  satisfy diagnostics.
+- Inspect the current Pyrefly configuration, inferred import roots, repository
+  layout, and diagnostic categories before implementing fixes.
+- Separate configuration and scope findings from production-source, shared
+  fixture, test annotation, deliberate invalid-input, Pandas inference, and
+  exploratory-notebook findings.
+- Correct repository and test import roots before treating unresolved
+  `tests.fixtures` imports as code defects.
+- Prioritize production-source errors ahead of test-only and exploratory
+  content.
+- Do not weaken concrete production types merely to accommodate loosely typed
+  test doubles.
+- Use explicit typed fakes, protocols, casts, or narrowly documented ignores
+  only when they represent the real static contract.
+- Preserve deliberate negative tests while making their static intent explicit.
+- Decide exploratory-notebook ownership explicitly: repair notebooks included
+  in the enforced gate or exclude them through documented configuration.
+- Do not mass-suppress the existing diagnostic set.
+- Update hooks, verification commands, `HANDOFF.md`, and other current
+  documentation only after the enforced boundary is locked.
+- Keep candidate issuance, closeout, CLV, recommendation policy, and product
+  work outside this unit.
+
+#### Tests
+
+- Capture the initial `uvx pyrefly check .` result and classify every diagnostic
+  by owning boundary.
+- Validate the configured repository and test import roots.
+- Run focused Pyrefly checks after each bounded correction.
+- Run affected unit, integration, and end-to-end tests after production or
+  shared-fixture changes.
+- Run Ruff across the repository.
+- Run the complete selected Python test suite.
+- Run `uvx pyrefly check .` and require zero errors.
+- Verify no blanket suppression baseline or broad exclusion hides production
+  source.
+- Verify hooks and documented quality commands use the complete repository
+  target.
+
+#### Acceptance
+
+`uvx pyrefly check .` reports zero errors across the explicitly documented
+repository scope. Production source, tests, fixtures, administrative tools, and
+exploratory content are either type-correct within that scope or excluded only
+through a deliberate documented ownership decision.
+
+Repository and test import roots resolve correctly. Deliberate negative tests
+retain their behavioral intent without weakening production contracts. No
+blanket suppression baseline hides existing errors.
+
+Ruff, the applicable Python test suites, and the complete repository-wide
+Pyrefly gate pass. Current quality-gate documentation and hooks invoke the
+correct complete command.
+
+No market candidate, closeout, CLV, recommendation-policy, API, frontend,
+model, or operational worker behavior is changed.
