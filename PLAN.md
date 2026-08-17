@@ -1909,3 +1909,133 @@ exposure, portfolio, outcome grading, ROI policy, ledger mutation, closeout
 persistence, CLI, API, frontend, or operational-worker behavior was introduced.
 
 ---
+
+### Market Unit 22: Build Empirical Market-Family Evaluation [Completed]
+
+#### Completed
+
+2026-08-17
+
+#### Goal
+
+Evaluate immutable issued candidates independently for Moneyline, Spread, and
+Total using matured outcome evidence, validated strictly pre-kickoff closeout
+evidence, and exact settled-wager matches.
+
+The evaluation boundary reports empirical candidate behavior, market-family
+coverage, closeout and CLV evidence, and realized return without introducing
+attribution, qualification thresholds, recommendation policy, staking policy,
+or ledger mutation.
+
+Realized-return evidence remains observational. It is derived only from exact
+matches to settled wagers and preserves explicit available, unavailable, and
+conflict states so missing evidence cannot be interpreted as zero return.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- Market-family evaluation contracts, implementation, and test coverage.
+
+Changed:
+
+- `PLAN.md`
+- Market-family report construction and realized-return evidence integration.
+- Market-family evaluation unit, integration, and architecture tests.
+
+Removed:
+
+- `integrate_market_family_return_evidence_v2.py`
+- Temporary Market Unit 22 implementation and repair helpers.
+
+#### Tests
+
+- Moneyline, Spread, and Total candidates were evaluated independently.
+- Immutable candidate issuance was consumed directly without reopening current
+  market products or recalculating original candidate evidence.
+- Only candidates with matured outcome evidence contributed to empirical
+  outcome cohorts.
+- Candidates without matured outcomes remained explicitly outside empirical
+  outcome calculations.
+- Market-family reports preserved independent coverage for Moneyline, Spread,
+  and Total.
+- Validated closeout and CLV evidence was reported without weakening exact
+  provider-aware market identity.
+- Missing closeout evidence remained explicitly unavailable.
+- Conflicting closeout evidence remained explicitly conflicting.
+- Unavailable or conflicting closeout evidence did not contribute fabricated
+  CLV values.
+- Realized-return evidence was derived only from exact settled-wager matches.
+- Family-specific realized-return coverage distinguished available,
+  unavailable, and conflict states.
+- Settled-wager matches preserved exact wager and immutable candidate identity.
+- Empirical cohort mean return was populated from exact settled-wager matches.
+- Empirical cohort aggregate return was populated from exact settled-wager
+  matches.
+- Cohorts without settled-wager evidence retained null mean and aggregate return
+  metrics.
+- Missing realized-return evidence was not represented as zero return.
+- Conflicting realized-return evidence did not contribute to empirical return
+  metrics.
+- Market-family return evidence remained separate from outcome, closeout, and
+  CLV coverage.
+- Market families without settled-wager evidence remained reportable.
+- Report construction remained deterministic.
+- Evaluation inputs were not mutated.
+- No outcome, closeout, CLV, or realized-return evidence was attributed to a
+  particular model, feature, decision rule, or issuance cause.
+- No empirical result was converted into a candidate qualification threshold.
+- No empirical result was converted into recommendation policy.
+- No empirical result changed wager eligibility, staking, bankroll, exposure,
+  portfolio, or ledger behavior.
+- Existing market issuance, exact-reference matching, closeout, CLV, wager
+  settlement, and reporting tests remained green.
+- AST validation passed.
+- Syntax validation passed.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check` passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- The full test suite passed.
+- No temporary Market Unit 22 helper files remain in the repository.
+
+#### Acceptance
+
+A caller can evaluate immutable issued candidates independently for Moneyline,
+Spread, and Total without reopening current products, reconstructing source
+identity, or recalculating the evidence that existed when each candidate was
+issued.
+
+Only candidates with matured outcome evidence contribute to empirical outcome
+cohorts. Candidates without matured outcomes remain explicitly identifiable and
+cannot silently affect empirical rates or aggregates.
+
+Closeout and CLV evidence is consumed through the validated market closeout
+boundary. Exact provider, provider-event, sportsbook, canonical game, market,
+and side identity remains required. Unavailable and conflicting closeout
+evidence remains explicit and cannot be interpreted as valid or zero-valued CLV.
+
+Realized return is derived only from exact matches between immutable issued
+candidates and settled wager evidence. Market-family reports distinguish
+available, unavailable, and conflicting return coverage independently for
+Moneyline, Spread, and Total.
+
+When exact settled-wager evidence exists, empirical cohorts report mean return
+and aggregate return from those exact matches. When no settled-wager evidence
+exists, return metrics remain null. Missing, unavailable, or conflicting
+evidence is never converted to zero return.
+
+Outcome, closeout, CLV, and realized-return coverage remain distinct so the
+presence of one evidence type does not imply the presence or validity of
+another.
+
+The evaluation is descriptive only. It does not attribute observed performance
+to a model, feature, decision rule, or issuance cause. It does not establish
+minimum sample sizes, evidence thresholds, candidate qualification rules,
+recommendation policy, or approval criteria.
+
+No candidate issuance, quote history, recorded wager, settlement evidence, or
+input DataFrame is mutated.
+
+No staking, bankroll, exposure, portfolio construction, ledger mutation,
+candidate qualification, recommendation emission, recommendation persistence,
+CLI, API, frontend, or operational-worker behavior was introduced.
