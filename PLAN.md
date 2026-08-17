@@ -1666,3 +1666,125 @@ No market candidate, closeout, CLV, recommendation-policy, API, frontend,
 model-output, or operational worker behavior was introduced.
 
 ---
+
+### Market Unit 20: Persist Immutable Pregame Candidate Issuance [Completed]
+
+#### Completed
+
+2026-08-16
+
+#### Goal
+
+Persist the exact candidate evidence evaluated before kickoff so later
+qualification, recommendation, and outcome evaluation consume an immutable
+historical decision artifact rather than reconstructing candidate state from
+newer forecasts, products, market quotes, or policy.
+
+The issuance boundary preserves the selected weekly product, referenced
+forecast events, exact sportsbook quote, model probability, calculated expected
+value, evaluation timestamp, and explicit issuance state.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- `src/gridiron_edge/market/candidate_issuance.py`
+- `src/gridiron_edge/market/candidate_issuance_store.py`
+- `tests/unit/market/test_candidate_issuance.py`
+- `tests/unit/market/test_candidate_issuance_evaluation.py`
+- `tests/unit/market/test_candidate_issuance_store.py`
+
+Changed:
+
+- `PLAN.md`
+- `src/gridiron_edge/market/__init__.py`
+
+Removed:
+
+- None.
+
+#### Tests
+
+- Deterministic SHA-256 issuance identity was verified for identical product,
+  weekly scope, and evaluation context.
+- Changing the explicit evaluation timestamp was verified to produce a distinct
+  issuance identity.
+- Non-UTC evaluation timestamps were rejected.
+- Complete quote evidence was preserved, including provider, provider-event,
+  sportsbook, canonical game, market, side, line, American price, fetch
+  timestamp, sportsbook update timestamp, kickoff, and live state.
+- Selected weekly-product identity, product-run identity, product generation
+  timestamp, exact referenced forecast event, forecast run, role, generation
+  timestamp, model name, and model type were preserved.
+- Model probability, calculated expected value, explicit evaluation timestamp,
+  state, and reason were preserved.
+- Strictly positive expected value produced `candidate` with
+  `positive_expected_value`.
+- Negative and break-even expected value produced `not_candidate` with
+  `expected_value_not_positive`.
+- Missing kickoff, live quote evidence, quotes fetched at or after kickoff,
+  missing selected forecasts, unavailable model evidence, and unavailable
+  uncertainty remained explicit `unavailable` results.
+- Issuance exactly at kickoff and after kickoff was rejected.
+- Moneyline and spread issuance referenced the selected Win forecast event.
+  Total issuance referenced the selected Total forecast event.
+- Product and quote weekly-scope mismatch was rejected.
+- Duplicate quote-observation identities were rejected.
+- Reordered quote input produced identical deterministic issuance output.
+- Product, forecast-event, and quote inputs were not mutated.
+- Immutable JSON persistence round-tripped without evidence loss.
+- Exact replay was idempotent and did not rewrite the artifact.
+- Conflicting replay under the same deterministic issuance identity was
+  rejected.
+- Unsupported schema versions, malformed artifact keys, unexpected row keys,
+  embedded identity conflicts, filename conflicts, nondeterministic row order,
+  duplicate stored row identities, and unsafe issuance IDs were rejected.
+- Focused Ruff checks passed.
+- Focused Pyrefly checks passed with zero errors.
+- All 29 candidate-issuance tests passed.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check` passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- No temporary Unit 20 update helpers remain in the repository.
+
+#### Acceptance
+
+A caller can evaluate every supplied exact sportsbook quote against one
+explicitly selected immutable weekly product and its exact referenced forecast
+events before kickoff. The result records each observation as `candidate`,
+`not_candidate`, or `unavailable` with a deterministic evidence-only reason.
+
+Each issuance row preserves provider, provider-event, sportsbook, canonical
+game, market, side, line, American price, quote fetch timestamp, sportsbook
+update timestamp, kickoff, live state, exact forecast-event identity, forecast
+run, forecast role, forecast generation timestamp, model identity, model
+probability, and calculated expected value. The issuance artifact also
+preserves product identity, product-run identity, product generation timestamp,
+weekly scope, and the explicit evaluation timestamp.
+
+The deterministic issuance identity is derived from the schema version,
+selected product identity, product-run identity, season, week, and evaluation
+timestamp. Result rows and calculated values remain immutable artifact content,
+so identical replay is idempotent while different content under the same
+issuance identity is rejected.
+
+Issuance at or after any known kickoff is rejected. Live observations and
+observations fetched at or after kickoff cannot become candidates. The existing
+quote-history definition of pregame eligibility remains authoritative:
+`is_live` is false and `fetched_at` is strictly before kickoff.
+
+Artifacts are persisted as deterministic JSON under the candidate-issuance
+output root using exclusive creation without replacement. Existing artifacts,
+embedded identities, serialized rows, and deterministic ordering are validated
+when read.
+
+Later qualification and evaluation work can consume the persisted artifact
+without reopening current weekly-product selection, resolving newer forecast
+events, querying newer quotes, recalculating model probability, or recalculating
+expected value.
+
+No candidate qualification, recommendation policy, staking, bankroll,
+exposure, portfolio, settlement, closeout, CLV, CLI, API, frontend, or
+operational-worker behavior was introduced.
+
+---

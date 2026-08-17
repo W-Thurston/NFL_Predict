@@ -7,6 +7,22 @@ No data dependencies - every function is a leaf.
 from .bet_reference_matching import BetReferenceMatch as BetReferenceMatch
 from .bet_reference_matching import BetReferenceMatchStatus as BetReferenceMatchStatus
 from .bet_reference_matching import match_bet_references as match_bet_references
+from .candidate_issuance import (
+    CANDIDATE_ISSUANCE_SCHEMA_VERSION as CANDIDATE_ISSUANCE_SCHEMA_VERSION,
+)
+from .candidate_issuance import CandidateIssuance as CandidateIssuance
+from .candidate_issuance import CandidateIssuanceReason as CandidateIssuanceReason
+from .candidate_issuance import CandidateIssuanceRow as CandidateIssuanceRow
+from .candidate_issuance import CandidateIssuanceState as CandidateIssuanceState
+from .candidate_issuance import candidate_issuance_id as candidate_issuance_id
+from .candidate_issuance import issue_pregame_candidates as issue_pregame_candidates
+from .candidate_issuance_store import candidate_issuance_path as candidate_issuance_path
+from .candidate_issuance_store import candidate_issuance_root as candidate_issuance_root
+from .candidate_issuance_store import read_candidate_issuance as read_candidate_issuance
+from .candidate_issuance_store import (
+    validate_candidate_issuance as validate_candidate_issuance,
+)
+from .candidate_issuance_store import write_candidate_issuance as write_candidate_issuance
 from .clv import closing_line_value as closing_line_value
 from .clv import spread_clv as spread_clv
 from .clv import summarize_clv as summarize_clv
