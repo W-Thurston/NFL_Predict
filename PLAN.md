@@ -1788,3 +1788,124 @@ exposure, portfolio, settlement, closeout, CLV, CLI, API, frontend, or
 operational-worker behavior was introduced.
 
 ---
+
+### Market Unit 21: Implement Validated Market Closeout and CLV [Completed]
+
+#### Completed
+
+2026-08-16
+
+#### Goal
+
+Close immutable candidate issuance and recorded-wager reference evidence against
+the correct latest eligible pregame quote observation without reconstructing
+source identity, weakening exact-offer provenance, or treating storage order as
+an implicit closing definition.
+
+The closeout boundary requires exact provider-aware market identity, preserves
+explicit unavailable and conflict states, and calculates CLV only when complete
+validated closing-price or closing-line evidence exists.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- `src/gridiron_edge/market/market_closeout.py`
+- `tests/unit/market/test_market_closeout.py`
+
+Changed:
+
+- `PLAN.md`
+- `src/gridiron_edge/market/__init__.py`
+
+Removed:
+
+- None.
+
+#### Tests
+
+- Exact provider, provider-event, sportsbook, canonical game, market, and side
+  matching was verified.
+- Provider, provider-event, sportsbook, game, market, and side mismatches were
+  rejected as missing exact closeout identity.
+- Reference and selected closeout line identities were preserved independently
+  so valid point movement could be calculated.
+- The maximum eligible fetch timestamp was selected independently of input and
+  storage order.
+- Only non-live observations fetched strictly before kickoff were eligible.
+- Live observations, observations at kickoff, and post-kickoff observations
+  could not displace valid pregame evidence.
+- Missing kickoff and conflicting kickoff evidence remained explicit.
+- Live-only, post-kickoff-only, and mixed unavailable history remained explicit.
+- Duplicate observations at the maximum eligible fetch remained ambiguous.
+- Conflicting observations at the maximum eligible fetch remained explicit
+  conflicts.
+- Missing exact closeout history remained explicit.
+- Moneyline price CLV was calculated only when valid reference and closeout
+  American prices existed.
+- Moneyline price CLV used raw American-price implied probabilities and remained
+  distinct from no-vig fair-probability analysis.
+- Spread point CLV preserved the established Home and Away side orientation.
+- Total point CLV preserved the established Over and Under side orientation.
+- Missing reference price, closeout price, reference line, and closeout line
+  produced explicit unavailable states with null CLV.
+- Unavailable CLV was never represented as zero.
+- Candidate issuance rows were closed directly from their immutable reference
+  evidence without reopening current products, resolving forecast events, or
+  recalculating original model probability or expected value.
+- Candidate rows with invalid or live reference evidence could not produce CLV.
+- Recorded wagers were passed through exact immutable reference matching before
+  closeout.
+- Manual, missing, ambiguous, and conflicting recorded-wager references mapped
+  to explicit closeout states.
+- Recorded-wager closeout preserved the original provider, provider-event,
+  sportsbook, game, market, side, fetch time, sportsbook update time, kickoff,
+  price, and line evidence.
+- Candidate and recorded-wager results were deterministically ordered.
+- Candidate issuance, wager, and quote inputs were not mutated.
+- Result and reference contracts were immutable.
+- Source inspection verified the closeout implementation does not use
+  `iloc[-1]`, `tail(1)`, first-stored, last-stored, or opening-line semantics.
+- Existing CLV and historical-boundary tests remained green.
+- Focused Ruff checks passed.
+- The configured repository-wide Pyrefly check passed with zero errors.
+- Focused market closeout, CLV, historical-boundary, and reference-matching
+  tests passed.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check` passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- No temporary Unit 21 update helpers remain in the repository.
+
+#### Acceptance
+
+A caller can close one immutable candidate issuance or recorded-wager reference
+against canonical quote history using exact provider, provider-event,
+sportsbook, game, market, and side identity.
+
+Recorded wagers must first match their immutable reference observation,
+including fetch timestamp, sportsbook update timestamp, kickoff, American
+price, and line. Manual, missing, ambiguous, or conflicting references cannot
+proceed to CLV calculation.
+
+Closeout selects the observation at the maximum eligible fetch timestamp only
+after requiring one unambiguous kickoff and filtering to non-live observations
+strictly before kickoff. Input order and raw storage order cannot change the
+result. The first or last stored observation is never interpreted as an opening
+or closing definition.
+
+Moneyline closeout calculates raw implied-probability price CLV only when valid
+reference and closeout American prices exist. Spread and Total closeout
+calculate side-oriented point CLV only when valid reference and closeout lines
+exist. Reference and selected closeout terms remain preserved independently.
+Missing calculations remain null with explicit unavailable states.
+
+Candidate issuance is consumed directly as immutable historical evidence.
+Recorded wagers reuse exact reference matching before closeout. Neither path
+mutates the betting ledger, settlement fields, candidate issuance, quote
+history, or input DataFrames.
+
+No candidate qualification, recommendation policy, staking, bankroll,
+exposure, portfolio, outcome grading, ROI policy, ledger mutation, closeout
+persistence, CLI, API, frontend, or operational-worker behavior was introduced.
+
+---
