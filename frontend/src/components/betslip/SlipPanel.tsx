@@ -1,6 +1,12 @@
 import { useState } from "react";
+import { useRecordPortfolioBet } from "../../api/hooks";
 import { useAppState } from "../../context/AppStateContext";
 import { useBetSlip } from "../../context/BetSlipContext";
+import type { GameBetLeg } from "../../utils/betLegs";
+import {
+  buildRecordBetRequest,
+  type RecordBetRequest,
+} from "./recordWager";
 import type { BetSlipSizingResult } from "../../hooks/useBetSlipSizing";
 import {
   formatOdds,
@@ -12,6 +18,24 @@ import {
 } from "../../utils/betSlipSummary";
 import { BetLegCard } from "./BetLegCard";
 
+
+function recordingConfirmation(leg: GameBetLeg, request: RecordBetRequest): string {
+  const persisted = leg.persistedRecommendation;
+  const reference = persisted == null
+    ? "Persisted reference: Candidate, no attached policy result."
+    : [
+        `Persisted reference: ${persisted.result_state}.`,
+        `Reference sportsbook: ${persisted.offer_provenance.sportsbook ?? "Consensus"}.`,
+        `Reference odds: ${persisted.offer_provenance.american_price ?? "Unavailable"}.`,
+        `Persisted suggested stake: ${persisted.suggested_stake ?? "Unavailable"}.`,
+      ].join(" ");
+  return [
+    reference,
+    `Draft being recorded: ${request.book} ${request.odds} for $${request.stake.toFixed(2)}.`,
+    "This records the wager in Gridiron Edge.",
+    "It does not place a sportsbook wager.",
+  ].join("\n\n");
+}
 
 export function SlipPanel({
   sizing,
@@ -28,6 +52,9 @@ export function SlipPanel({
   } = useBetSlip();
 
   const { state } = useAppState();
+  const recordBet = useRecordPortfolioBet();
+  const [recordingLegId, setRecordingLegId] = useState<string | null>(null);
+  const [recordingMessage, setRecordingMessage] = useState<string | null>(null);
 
   const [
     parlayStake,
@@ -39,6 +66,26 @@ export function SlipPanel({
     mode,
     parlayStake,
   });
+
+  const recordGameLeg = async (leg: GameBetLeg) => {
+    const request = buildRecordBetRequest(leg);
+    if (request == null) return;
+    if (!window.confirm(recordingConfirmation(leg, request))) return;
+
+    setRecordingLegId(leg.id);
+    setRecordingMessage(null);
+    try {
+      const response = await recordBet.mutateAsync(request);
+      remove(leg.id);
+      setRecordingMessage(response.message);
+    } catch (error) {
+      setRecordingMessage(
+        error instanceof Error ? error.message : "Wager could not be recorded.",
+      );
+    } finally {
+      setRecordingLegId(null);
+    }
+  };
 
   return (
     <div className="hm-card" style={{ padding: 24 }}>
@@ -203,9 +250,29 @@ export function SlipPanel({
                 onRemove={() =>
                   remove(leg.id)
                 }
+                onRecordWager={
+                  leg.kind === "game"
+                    ? () => recordGameLeg(leg)
+                    : undefined
+                }
+                isRecording={recordingLegId === leg.id}
+                recordingDisabled={
+                  leg.kind !== "game"
+                  || buildRecordBetRequest(leg) == null
+                }
               />
             ))}
           </div>
+
+          {recordingMessage && (
+            <div
+              role="status"
+              className="mono"
+              style={{ marginBottom: 12, fontSize: 10, color: "var(--ink-2)" }}
+            >
+              {recordingMessage}
+            </div>
+          )}
 
           {/* Aggregate summary */}
           <AggregateSummary

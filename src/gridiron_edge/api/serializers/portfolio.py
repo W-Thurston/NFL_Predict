@@ -21,6 +21,7 @@ from gridiron_edge.api.schemas.portfolio import (
     CurveBucket,
     PortfolioSplits,
     PortfolioSummary,
+    RecordBetResponse,
     SplitRow,
     TransactionRow,
 )
@@ -149,6 +150,10 @@ def serialize_bets(bets: pd.DataFrame) -> _BetsList:
             clv=_none_if_nan(row.get("clv")),
             model_name=_none_if_nan(row.get("model_name")),
             model_type=_none_if_nan(row.get("model_type")),
+            recommendation_policy_id=_none_if_nan(row.get("recommendation_policy_id")),
+            candidate_reference_id=_none_if_nan(row.get("candidate_reference_id")),
+            recommendation_evaluation_id=_none_if_nan(row.get("recommendation_evaluation_id")),
+            recommended_bet_result_id=_none_if_nan(row.get("recommended_bet_result_id")),
         )
         for _, row in bets.iterrows()
     ]
@@ -236,3 +241,18 @@ def serialize_splits(splits_df: pd.DataFrame, dimension: str) -> PortfolioSplits
         for _, row in splits_df.iterrows()
     ]
     return PortfolioSplits(items=rows, total=len(rows), dimension=dimension)
+
+
+def serialize_recorded_bet(
+    bets: pd.DataFrame,
+    *,
+    bankroll_transaction_id: str,
+) -> RecordBetResponse:
+    """Serialize one newly recorded wager without deriving provenance."""
+    serialized = serialize_bets(bets)
+    if serialized.total != 1 or len(serialized.items) != 1:
+        raise ValueError("Recorded wager could not be loaded uniquely.")
+    return RecordBetResponse(
+        bet=serialized.items[0],
+        bankroll_transaction_id=bankroll_transaction_id,
+    )

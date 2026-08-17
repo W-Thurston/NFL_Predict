@@ -230,6 +230,17 @@
             ],
             "title": "Book"
           },
+          "candidate_reference_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Reference Id"
+          },
           "closing_line": {
             "anyOf": [
               {
@@ -339,6 +350,39 @@
               }
             ],
             "title": "Pnl"
+          },
+          "recommendation_evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Evaluation Id"
+          },
+          "recommendation_policy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Policy Id"
+          },
+          "recommended_bet_result_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Bet Result Id"
           },
           "side": {
             "anyOf": [
@@ -1081,18 +1125,6 @@
             ],
             "description": "Optional metadata describing unpopulated fields (per D14)."
           },
-          "bankroll": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Bankroll basis used to calculate kelly_stake. None means dollar sizing was not requested.",
-            "title": "Bankroll"
-          },
           "diagnostics": {
             "$ref": "#/components/schemas/EdgeDiagnosticsResponse",
             "description": "Complete diagnostics returned by the unified edge service."
@@ -1104,18 +1136,6 @@
             },
             "title": "Items",
             "type": "array"
-          },
-          "kelly_multiplier": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Fraction of full Kelly applied when calculating kelly_stake.",
-            "title": "Kelly Multiplier"
           },
           "min_ev": {
             "anyOf": [
@@ -1377,27 +1397,10 @@
             "title": "Home Team",
             "type": "string"
           },
-          "kelly_frac": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Kelly Frac"
-          },
-          "kelly_stake": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Kelly Stake"
+          "is_live": {
+            "default": false,
+            "title": "Is Live",
+            "type": "boolean"
           },
           "market_fetched_at": {
             "anyOf": [
@@ -1477,6 +1480,16 @@
               }
             ],
             "title": "Provider Event Id"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationPresentation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "season": {
             "anyOf": [
@@ -2555,6 +2568,16 @@
               }
             ],
             "title": "Provider Event Id"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationPresentation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "side": {
             "enum": [
@@ -3674,6 +3697,18 @@
         },
         "title": "PlayersListResponse",
         "type": "object"
+      },
+      "PolicyCheckStatus": {
+        "description": "Result of one stable recommendation-policy check.",
+        "enum": [
+          "passed",
+          "failed",
+          "unavailable",
+          "conflicting_evidence",
+          "not_applicable"
+        ],
+        "title": "PolicyCheckStatus",
+        "type": "string"
       },
       "PortfolioSplits": {
         "additionalProperties": false,
@@ -5032,6 +5067,735 @@
           "week"
         ],
         "title": "RecentResult",
+        "type": "object"
+      },
+      "RecommendationBankrollBasisResponse": {
+        "additionalProperties": false,
+        "description": "Persisted bankroll basis used by the original policy evaluation.",
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "observed_at",
+          "source_kind",
+          "source_id"
+        ],
+        "title": "RecommendationBankrollBasisResponse",
+        "type": "object"
+      },
+      "RecommendationCheckResponse": {
+        "additionalProperties": false,
+        "description": "One persisted policy check without request-time reinterpretation.",
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "mandatory": {
+            "title": "Mandatory",
+            "type": "boolean"
+          },
+          "observed_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Value"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "required_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Value"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PolicyCheckStatus"
+          }
+        },
+        "required": [
+          "check_id",
+          "mandatory",
+          "status",
+          "reason"
+        ],
+        "title": "RecommendationCheckResponse",
+        "type": "object"
+      },
+      "RecommendationDecisionState": {
+        "description": "Final non-mutating candidate decision state.",
+        "enum": [
+          "unqualified",
+          "insufficient_evidence",
+          "qualified_opportunity",
+          "recommendation_eligible"
+        ],
+        "title": "RecommendationDecisionState",
+        "type": "string"
+      },
+      "RecommendationForecastProvenanceResponse": {
+        "additionalProperties": false,
+        "description": "Selected-product and forecast evidence associated with one result.",
+        "properties": {
+          "expected_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Value"
+          },
+          "forecast_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Event Id"
+          },
+          "forecast_generated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Generated At"
+          },
+          "forecast_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Role"
+          },
+          "forecast_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Run Id"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "model_probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Probability"
+          },
+          "model_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Type"
+          },
+          "product_generated_at": {
+            "format": "date-time",
+            "title": "Product Generated At",
+            "type": "string"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "product_run_id": {
+            "title": "Product Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "product_run_id",
+          "product_generated_at"
+        ],
+        "title": "RecommendationForecastProvenanceResponse",
+        "type": "object"
+      },
+      "RecommendationOfferProvenanceResponse": {
+        "additionalProperties": false,
+        "description": "Exact immutable offer evidence associated with one result.",
+        "properties": {
+          "american_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "American Price"
+          },
+          "candidate_reference_id": {
+            "title": "Candidate Reference Id",
+            "type": "string"
+          },
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "game_id": {
+            "title": "Game Id",
+            "type": "string"
+          },
+          "is_live": {
+            "title": "Is Live",
+            "type": "boolean"
+          },
+          "issuance_id": {
+            "title": "Issuance Id",
+            "type": "string"
+          },
+          "kickoff": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kickoff"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Event Id"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          },
+          "sportsbook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sportsbook"
+          },
+          "sportsbook_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sportsbook Updated At"
+          }
+        },
+        "required": [
+          "issuance_id",
+          "candidate_reference_id",
+          "game_id",
+          "market",
+          "side",
+          "provider",
+          "fetched_at",
+          "is_live"
+        ],
+        "title": "RecommendationOfferProvenanceResponse",
+        "type": "object"
+      },
+      "RecommendationPolicyProvenanceResponse": {
+        "additionalProperties": false,
+        "description": "Exact persisted policy provenance associated with one result.",
+        "properties": {
+          "derivation_method": {
+            "title": "Derivation Method",
+            "type": "string"
+          },
+          "governance_fingerprint": {
+            "title": "Governance Fingerprint",
+            "type": "string"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "string"
+          },
+          "policy_schema_version": {
+            "title": "Policy Schema Version",
+            "type": "integer"
+          },
+          "source_evidence_fingerprint": {
+            "title": "Source Evidence Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy_id",
+          "policy_schema_version",
+          "source_evidence_fingerprint",
+          "governance_fingerprint",
+          "derivation_method"
+        ],
+        "title": "RecommendationPolicyProvenanceResponse",
+        "type": "object"
+      },
+      "RecommendationPresentation": {
+        "additionalProperties": false,
+        "description": "Mechanical read-only presentation of one persisted Unit 24 result.",
+        "properties": {
+          "bankroll_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationBankrollBasisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationCheckResponse"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "decision_quote_age_seconds": {
+            "title": "Decision Quote Age Seconds",
+            "type": "number"
+          },
+          "decision_state": {
+            "$ref": "#/components/schemas/RecommendationDecisionState"
+          },
+          "evaluated_at": {
+            "format": "date-time",
+            "title": "Evaluated At",
+            "type": "string"
+          },
+          "evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Id"
+          },
+          "failed_checks": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationCheckResponse"
+            },
+            "title": "Failed Checks",
+            "type": "array"
+          },
+          "forecast_provenance": {
+            "$ref": "#/components/schemas/RecommendationForecastProvenanceResponse"
+          },
+          "issuance_quote_age_seconds": {
+            "title": "Issuance Quote Age Seconds",
+            "type": "number"
+          },
+          "offer_provenance": {
+            "$ref": "#/components/schemas/RecommendationOfferProvenanceResponse"
+          },
+          "policy_provenance": {
+            "$ref": "#/components/schemas/RecommendationPolicyProvenanceResponse"
+          },
+          "portfolio_observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Observed At"
+          },
+          "portfolio_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Snapshot Id"
+          },
+          "recommendation_eligible": {
+            "title": "Recommendation Eligible",
+            "type": "boolean"
+          },
+          "result_id": {
+            "title": "Result Id",
+            "type": "string"
+          },
+          "result_state": {
+            "$ref": "#/components/schemas/RecommendedBetResultState"
+          },
+          "sizing": {
+            "$ref": "#/components/schemas/RecommendationSizingResponse"
+          },
+          "suggested_stake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Stake"
+          },
+          "supporting_checks": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationCheckResponse"
+            },
+            "title": "Supporting Checks",
+            "type": "array"
+          },
+          "unavailable_checks": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationCheckResponse"
+            },
+            "title": "Unavailable Checks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "result_id",
+          "result_state",
+          "decision_state",
+          "recommendation_eligible",
+          "evaluated_at",
+          "issuance_quote_age_seconds",
+          "decision_quote_age_seconds",
+          "checks",
+          "supporting_checks",
+          "failed_checks",
+          "unavailable_checks",
+          "sizing",
+          "offer_provenance",
+          "forecast_provenance",
+          "policy_provenance"
+        ],
+        "title": "RecommendationPresentation",
+        "type": "object"
+      },
+      "RecommendationSizingResponse": {
+        "additionalProperties": false,
+        "description": "Persisted Kelly and stake evidence from the original decision.",
+        "properties": {
+          "actionable_stake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actionable Stake"
+          },
+          "constrained_stake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constrained Stake"
+          },
+          "fractional_kelly_fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fractional Kelly Fraction"
+          },
+          "full_kelly_fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Kelly Fraction"
+          },
+          "raw_stake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Stake"
+          },
+          "rounded_stake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounded Stake"
+          }
+        },
+        "title": "RecommendationSizingResponse",
+        "type": "object"
+      },
+      "RecommendedBetResultState": {
+        "description": "Persistable lifecycle summary of one exact policy decision.",
+        "enum": [
+          "qualified",
+          "recommended",
+          "failed",
+          "unavailable",
+          "conflicting"
+        ],
+        "title": "RecommendedBetResultState",
+        "type": "string"
+      },
+      "RecordBetRequest": {
+        "additionalProperties": false,
+        "description": "Recorded wager terms plus an optional complete Unit 24 identity chain.",
+        "properties": {
+          "book": {
+            "minLength": 1,
+            "title": "Book",
+            "type": "string"
+          },
+          "candidate_reference_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Reference Id"
+          },
+          "game_id": {
+            "minLength": 1,
+            "title": "Game Id",
+            "type": "string"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "market_type": {
+            "enum": [
+              "moneyline",
+              "spread",
+              "total"
+            ],
+            "title": "Market Type",
+            "type": "string"
+          },
+          "odds": {
+            "title": "Odds",
+            "type": "integer"
+          },
+          "recommendation_evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Evaluation Id"
+          },
+          "recommendation_policy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Policy Id"
+          },
+          "recommended_bet_result_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Bet Result Id"
+          },
+          "side": {
+            "minLength": 1,
+            "title": "Side",
+            "type": "string"
+          },
+          "stake": {
+            "exclusiveMinimum": 0.0,
+            "title": "Stake",
+            "type": "number"
+          }
+        },
+        "required": [
+          "game_id",
+          "market_type",
+          "side",
+          "odds",
+          "stake",
+          "book"
+        ],
+        "title": "RecordBetRequest",
+        "type": "object"
+      },
+      "RecordBetResponse": {
+        "additionalProperties": false,
+        "description": "One successfully recorded wager and its bankroll transaction.",
+        "properties": {
+          "bankroll_transaction_id": {
+            "title": "Bankroll Transaction Id",
+            "type": "string"
+          },
+          "bet": {
+            "$ref": "#/components/schemas/BetRow"
+          },
+          "message": {
+            "default": "Wager recorded in Gridiron Edge. No sportsbook wager was placed.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bet",
+          "bankroll_transaction_id"
+        ],
+        "title": "RecordBetResponse",
         "type": "object"
       },
       "ResponseMeta": {
@@ -6704,39 +7468,6 @@
               "title": "Min Ev",
               "type": "number"
             }
-          },
-          {
-            "description": "Bankroll for Kelly stake sizing. When omitted, kelly_stake is unavailable while kelly_frac remains populated.",
-            "in": "query",
-            "name": "bankroll",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "minimum": 0.0,
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Bankroll for Kelly stake sizing. When omitted, kelly_stake is unavailable while kelly_frac remains populated.",
-              "title": "Bankroll"
-            }
-          },
-          {
-            "description": "Fraction of full Kelly, constrained to [0, 1] (e.g. 0.25 = quarter-Kelly).",
-            "in": "query",
-            "name": "kelly_multiplier",
-            "required": false,
-            "schema": {
-              "default": 0.25,
-              "description": "Fraction of full Kelly, constrained to [0, 1] (e.g. 0.25 = quarter-Kelly).",
-              "maximum": 1.0,
-              "minimum": 0.0,
-              "title": "Kelly Multiplier",
-              "type": "number"
-            }
           }
         ],
         "responses": {
@@ -7538,6 +8269,46 @@
           }
         },
         "summary": "Get Portfolio Bets",
+        "tags": [
+          "portfolio"
+        ]
+      },
+      "post": {
+        "description": "Record a wager locally; this does not place a sportsbook wager.",
+        "operationId": "record_portfolio_bet_portfolio_bets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordBetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Portfolio Bet",
         "tags": [
           "portfolio"
         ]

@@ -29,6 +29,7 @@ function edge(
 ): EdgeApiRow {
   return {
     american_odds: -110,
+    is_live: false,
     away_team: "KC",
     cover_prob: null,
     edge_strength: "strong",
@@ -36,8 +37,6 @@ function edge(
     game_id:
       "2026_01_KC_LAC",
     home_team: "LAC",
-    kelly_frac: 0.08,
-    kelly_stake: 20,
     market_type: "moneyline",
     market_value: 0.45,
     model_key:
@@ -87,14 +86,11 @@ function pricedGameLeg({
 } = {}): BetLeg {
   const leg = createGameBetLeg({
     edge: edge({
-      american_odds:
-        americanOdds,
+      american_odds: americanOdds,
+      is_live: false,
     }),
     source: "betslip-edges",
     addedAt: ADDED_AT,
-    referenceBankroll: 2500,
-    referenceKellyMultiplier:
-      0.1,
   });
 
   return {

@@ -26,6 +26,13 @@ from gridiron_edge.core.settings import Settings
 
 if TYPE_CHECKING:
     from gridiron_edge.market.recommendations import EdgeResult
+    from gridiron_edge.market.recommended_bet_result import RecommendedBetResult
+
+
+if TYPE_CHECKING:
+    from gridiron_edge.betting.recording import (
+        RecommendationRecordingEvidence,
+    )
 
 
 def load_bets_df(settings: Settings, *, status: str | None = None) -> pd.DataFrame:
@@ -828,8 +835,6 @@ def load_edges_for_week(
     season: str,
     week: int,
     min_ev: float = 0.0,
-    bankroll: float | None = None,
-    kelly_multiplier: float = 0.25,
 ) -> EdgeResult:
     """Load the unified persisted weekly edge result for one scope."""
     from gridiron_edge.market.recommendations import EdgeResult
@@ -841,8 +846,8 @@ def load_edges_for_week(
         season=season,
         week=week,
         min_ev=min_ev,
-        bankroll=bankroll,
-        kelly_multiplier=kelly_multiplier,
+        bankroll=None,
+        kelly_multiplier=0.25,
         repo=settings.repo_root,
     )
     return EdgeResult(
@@ -1203,3 +1208,165 @@ def load_defense_allowed(
         stat_type=stat_type,
     )
     return (position, cohorts)
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedRecommendedBetResult:
+    """One persisted result paired with its immutable evaluation identity."""
+
+    evaluation_id: str
+    result: RecommendedBetResult
+
+
+RecommendedBetOfferKey = tuple[
+    str,
+    str | None,
+    str | None,
+    str,
+    str,
+    str,
+    datetime,
+    datetime | None,
+    datetime | None,
+    bool,
+    int | None,
+    float | None,
+]
+
+
+def recommended_bet_offer_key(
+    result: RecommendedBetResult,
+) -> RecommendedBetOfferKey:
+    """Return the complete exact-offer key preserved by one result."""
+    return (
+        result.provider,
+        result.provider_event_id,
+        result.sportsbook,
+        result.game_id,
+        result.market,
+        result.side,
+        result.fetched_at,
+        result.sportsbook_updated_at,
+        result.kickoff,
+        result.is_live,
+        result.american_price,
+        result.line,
+    )
+
+
+def load_recommended_bet_results_for_week(
+    settings: Settings,
+    *,
+    season: str,
+    week: int,
+) -> tuple[LoadedRecommendedBetResult, ...]:
+    """Load latest unambiguous persisted results for one explicit week.
+
+    Selection uses persisted ``evaluated_at`` values only. Equal-time,
+    different-result evidence for one exact offer is rejected as conflicting.
+    """
+    from gridiron_edge.market.recommended_bet_result_store import (
+        read_recommended_bet_evaluation,
+        recommended_bet_result_root,
+    )
+
+    root = recommended_bet_result_root(settings.repo_root)
+    if not root.is_dir():
+        return ()
+
+    selected: dict[RecommendedBetOfferKey, LoadedRecommendedBetResult] = {}
+    manifest_paths = sorted(root.glob("schema=*/evaluations/*.json"))
+    for path in manifest_paths:
+        evaluation = read_recommended_bet_evaluation(path)
+        for result in evaluation.results:
+            if result.season != season or result.week != week:
+                continue
+            candidate = LoadedRecommendedBetResult(evaluation.evaluation_id, result)
+            key = recommended_bet_offer_key(result)
+            existing = selected.get(key)
+            if existing is None or result.evaluated_at > existing.result.evaluated_at:
+                selected[key] = candidate
+            elif (
+                result.evaluated_at == existing.result.evaluated_at
+                and result.result_id != existing.result.result_id
+            ):
+                raise ValueError(
+                    "Conflicting persisted recommendation results share the latest "
+                    "evaluation time for one exact offer."
+                )
+
+    return tuple(selected[key] for key in sorted(selected, key=_recommended_bet_offer_sort_key))
+
+
+def _recommended_bet_offer_sort_key(
+    key: RecommendedBetOfferKey,
+) -> tuple[str, ...]:
+    return tuple("" if value is None else str(value) for value in key)
+
+
+def resolve_recommended_bet_recording_evidence(
+    settings: Settings,
+    *,
+    result_id: str,
+    evaluation_id: str,
+    candidate_reference_id: str,
+    policy_id: str,
+) -> RecommendationRecordingEvidence:
+    """Resolve one complete Unit 24 identity chain into trusted evidence."""
+    from gridiron_edge.betting.recording import RecommendationRecordingEvidence
+    from gridiron_edge.market.recommended_bet_result_store import (
+        read_recommended_bet_evaluation,
+        recommended_bet_result_root,
+    )
+
+    root = recommended_bet_result_root(settings.repo_root)
+    matches: list[LoadedRecommendedBetResult] = []
+    if root.is_dir():
+        for path in sorted(root.glob("schema=*/evaluations/*.json")):
+            evaluation = read_recommended_bet_evaluation(path)
+            if evaluation.evaluation_id != evaluation_id:
+                continue
+            matches.extend(
+                LoadedRecommendedBetResult(evaluation.evaluation_id, result)
+                for result in evaluation.results
+                if result.result_id == result_id
+            )
+    if len(matches) != 1:
+        raise ValueError("Persisted recommendation result identity was not found uniquely.")
+
+    loaded = matches[0]
+    result = loaded.result
+    if result.candidate_reference_id != candidate_reference_id:
+        raise ValueError("candidate_reference_id does not match persisted evidence.")
+    if result.policy_id != policy_id:
+        raise ValueError("recommendation_policy_id does not match persisted evidence.")
+
+    return RecommendationRecordingEvidence(
+        result_id=result.result_id,
+        evaluation_id=loaded.evaluation_id,
+        candidate_reference_id=result.candidate_reference_id,
+        policy_id=result.policy_id,
+        game_id=result.game_id,
+        market_type=result.market,
+        side=result.side,
+        provider=result.provider,
+        provider_event_id=result.provider_event_id,
+        sportsbook=result.sportsbook,
+        fetched_at=result.fetched_at,
+        sportsbook_updated_at=result.sportsbook_updated_at,
+        commence_time=result.kickoff,
+        american_odds=result.american_price,
+        line=result.line,
+        model_name=result.model_name,
+        model_type=result.model_type,
+        model_probability=result.model_probability,
+        expected_value=result.expected_value,
+    )
+
+
+def load_recorded_bet_df(settings: Settings, *, bet_id: str) -> DataFrame:
+    """Load exactly one recorded ledger row by generated bet identity."""
+    bets = load_bets_df(settings)
+    if bets.empty or "bet_id" not in bets.columns:
+        return DataFrame()
+    return bets.loc[bets["bet_id"].astype(str) == bet_id].copy()

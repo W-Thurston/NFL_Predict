@@ -12,6 +12,10 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
+from gridiron_edge.api.loaders import (
+    LoadedRecommendedBetResult,
+    RecommendedBetOfferKey,
+)
 from gridiron_edge.api.meta import ResponseMeta
 from gridiron_edge.api.schemas.lines import (
     GuidanceStatus,
@@ -21,6 +25,9 @@ from gridiron_edge.api.schemas.lines import (
     LineShoppingList,
     MarketName,
     MarketSide,
+)
+from gridiron_edge.api.serializers.recommendations import (
+    serialize_recommendation_result,
 )
 
 
@@ -72,19 +79,44 @@ def _optional_bool(value: object) -> bool | None:
     return bool(value)
 
 
-def _serialize_offer(row: Mapping[Hashable, object]) -> LineOffer:
+def _serialize_offer(
+    row: Mapping[Hashable, object],
+    *,
+    game_id: str,
+    recommendations: Mapping[RecommendedBetOfferKey, LoadedRecommendedBetResult],
+) -> LineOffer:
+    fetched_at = _required_datetime(row["fetched_at"])
+    sportsbook_updated_at = _datetime_or_none(row.get("sportsbook_updated_at"))
+    kickoff = _datetime_or_none(row.get("commence_time"))
+    line = None if _is_missing_scalar(row.get("line")) else _number(row["line"], label="line")
+    american_odds = int(_number(row["odds"], label="odds"))
+    key: RecommendedBetOfferKey = (
+        str(row["provider"]),
+        _text_or_none(row.get("provider_event_id")),
+        str(row["sportsbook"]),
+        game_id,
+        str(row["market"]),
+        str(row["side"]),
+        fetched_at,
+        sportsbook_updated_at,
+        kickoff,
+        bool(row["is_live"]),
+        american_odds,
+        line,
+    )
+    loaded = recommendations.get(key)
     return LineOffer(
         provider=str(row["provider"]),
         provider_event_id=_text_or_none(row.get("provider_event_id")),
         sportsbook=str(row["sportsbook"]),
-        sportsbook_updated_at=_datetime_or_none(row.get("sportsbook_updated_at")),
-        market_fetched_at=_required_datetime(row["fetched_at"]),
-        commence_time=_datetime_or_none(row.get("commence_time")),
+        sportsbook_updated_at=sportsbook_updated_at,
+        market_fetched_at=fetched_at,
+        commence_time=kickoff,
         is_live=bool(row["is_live"]),
         market=cast(MarketName, str(row["market"])),
         side=cast(MarketSide, str(row["side"])),
-        line=(None if _is_missing_scalar(row.get("line")) else _number(row["line"], label="line")),
-        american_odds=int(_number(row["odds"], label="odds")),
+        line=line,
+        american_odds=american_odds,
         is_best_line=bool(row["is_best_line"]),
         is_best_price=bool(row["is_best_price"]),
         model_status=cast(
@@ -98,6 +130,11 @@ def _serialize_offer(row: Mapping[Hashable, object]) -> LineOffer:
         is_best_model_approved_offer=bool(row.get("is_best_model_approved_offer", False)),
         product_id=_text_or_none(row.get("product_id")),
         product_run_id=_text_or_none(row.get("product_run_id")),
+        recommendation=(
+            None
+            if loaded is None
+            else serialize_recommendation_result(loaded.result, evaluation_id=loaded.evaluation_id)
+        ),
     )
 
 
@@ -155,8 +192,26 @@ def serialize_line_shopping_list(
     sportsbooks: tuple[str, ...] | None = None,
     guidance: DataFrame | None = None,
     response_meta: ResponseMeta | None = None,
+    recommendations: tuple[LoadedRecommendedBetResult, ...] = (),
 ) -> LineShoppingList:
     """Group classified offers by game without fabricating missing books."""
+    recommendation_lookup = {
+        (
+            item.result.provider,
+            item.result.provider_event_id,
+            item.result.sportsbook,
+            item.result.game_id,
+            item.result.market,
+            item.result.side,
+            item.result.fetched_at,
+            item.result.sportsbook_updated_at,
+            item.result.kickoff,
+            item.result.is_live,
+            item.result.american_price,
+            item.result.line,
+        ): item
+        for item in recommendations
+    }
     games: list[LineShoppingGame] = []
     for game_id, group in rows.groupby("game_id", sort=True):
         first = group.iloc[0]
@@ -164,7 +219,14 @@ def serialize_line_shopping_list(
         commence_time = (
             _datetime_or_none(commence_values.iloc[0]) if not commence_values.empty else None
         )
-        offers = [_serialize_offer(record) for record in group.to_dict(orient="records")]
+        offers = [
+            _serialize_offer(
+                record,
+                game_id=str(game_id),
+                recommendations=recommendation_lookup,
+            )
+            for record in group.to_dict(orient="records")
+        ]
         game_guidance = _serialize_guidance(
             guidance,
             game_id=str(game_id),

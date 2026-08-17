@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from gridiron_edge.api.deps import SettingsDep
 from gridiron_edge.api.loaders import (
@@ -12,6 +12,8 @@ from gridiron_edge.api.loaders import (
     load_bankroll_txns_df,
     load_bets_df,
     load_current_bankroll,
+    load_recorded_bet_df,
+    resolve_recommended_bet_recording_evidence,
 )
 from gridiron_edge.api.schemas._base import BaseListResponse
 from gridiron_edge.api.schemas.portfolio import (
@@ -19,12 +21,15 @@ from gridiron_edge.api.schemas.portfolio import (
     BetRow,
     PortfolioSplits,
     PortfolioSummary,
+    RecordBetRequest,
+    RecordBetResponse,
     TransactionRow,
 )
 from gridiron_edge.api.serializers.portfolio import (
     serialize_bankroll_curve,
     serialize_bets,
     serialize_portfolio_summary,
+    serialize_recorded_bet,
     serialize_splits,
     serialize_transactions,
 )
@@ -58,6 +63,50 @@ def get_portfolio_bets(
     """Return the list of bets, optionally filtered by status."""
     bets = load_bets_df(settings, status=status)
     return serialize_bets(bets)
+
+
+@router.post("/bets", response_model=RecordBetResponse, status_code=201)
+def record_portfolio_bet(
+    settings: SettingsDep,
+    request: RecordBetRequest,
+) -> RecordBetResponse:
+    """Record a wager locally; this does not place a sportsbook wager."""
+    from gridiron_edge.betting.recording import RecordWagerCommand, record_wager
+
+    recommendation = None
+    if request.recommended_bet_result_id is not None:
+        try:
+            recommendation = resolve_recommended_bet_recording_evidence(
+                settings,
+                result_id=request.recommended_bet_result_id,
+                evaluation_id=request.recommendation_evaluation_id or "",
+                candidate_reference_id=request.candidate_reference_id or "",
+                policy_id=request.recommendation_policy_id or "",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        recorded = record_wager(
+            RecordWagerCommand(
+                game_id=request.game_id,
+                market_type=request.market_type,
+                side=request.side,
+                line=request.line,
+                odds=request.odds,
+                stake=request.stake,
+                book=request.book,
+                recommendation=recommendation,
+            ),
+            repo=settings.repo_root,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return serialize_recorded_bet(
+        load_recorded_bet_df(settings, bet_id=recorded.bet_id),
+        bankroll_transaction_id=recorded.bankroll_transaction_id,
+    )
 
 
 @router.get("/curve", response_model=BankrollCurve)

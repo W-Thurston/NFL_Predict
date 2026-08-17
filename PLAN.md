@@ -2378,3 +2378,342 @@ wager recording, sportsbook integration, automatic wagering, ledger mutation,
 bankroll mutation, API route, frontend component, CLI command, notification, or
 operational-worker behavior was introduced. The system does not place a
 sportsbook wager.
+
+---
+
+### Market Unit 25: Present and Record Recommended Wagers [Completed]
+
+#### Completed
+
+2026-08-17
+
+#### Goal
+
+Present persisted qualification and recommendation results across the product
+without inferring recommendation state from analytical expected value, edge
+strength, confidence, bankroll, Kelly sizing, or mutable frontend settings.
+
+Preserve persisted recommendation evidence, immutable edge analytics, editable
+Bet Slip draft terms, and transient local what-if calculations as separate
+contracts. Allow a user to explicitly record a completed game-wager draft in
+Gridiron Edge while preserving both the recorded terms and the original
+recommendation and reference-offer evidence.
+
+Recording must update the betting ledger and tracked bankroll through one
+rollback-safe domain operation. It records a wager locally and does not place a
+sportsbook wager.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- `src/gridiron_edge/betting/recording.py`
+- `tests/unit/betting/test_recording.py`
+- `tests/integration/api/test_portfolio_routes.py`
+- `frontend/src/components/recommendations/recommendationPresentation.ts`
+- `frontend/src/components/recommendations/recommendationPresentation.test.ts`
+- `frontend/src/components/recommendations/RecommendationStatus.tsx`
+- `frontend/src/components/recommendations/RecommendationStatus.test.tsx`
+- `frontend/src/components/recommendations/RecommendationDetails.tsx`
+- `frontend/src/components/betslip/recordWager.ts`
+- `frontend/src/components/betslip/recordWager.test.ts`
+
+Changed:
+
+- `PLAN.md`
+- `api-schema.json`
+- `src/gridiron_edge/api/loaders.py`
+- `src/gridiron_edge/api/routes/portfolio.py`
+- `src/gridiron_edge/api/schemas/portfolio.py`
+- `src/gridiron_edge/api/serializers/portfolio.py`
+- `src/gridiron_edge/betting/ledger.py`
+- `src/gridiron_edge/cli/betting.py`
+- `tests/unit/api/test_schemas_portfolio.py`
+- `tests/unit/api/test_serializers_portfolio.py`
+- `tests/unit/betting/test_ledger.py`
+- `tests/unit/cli/test_betting.py`
+- `frontend/package.json`
+- `frontend/pnpm-lock.yaml`
+- `frontend/tsconfig.app.json`
+- `frontend/src/api/hooks.ts`
+- `frontend/src/api/schema.ts`
+- `frontend/src/components/betslip/BetLegCard.tsx`
+- `frontend/src/components/betslip/BetLegCard.test.tsx`
+- `frontend/src/components/betslip/EdgesTable.tsx`
+- `frontend/src/components/betslip/EdgesTable.test.tsx`
+- `frontend/src/components/betslip/SlipPanel.tsx`
+- `frontend/src/components/betslip/SlipPanel.test.tsx`
+- `frontend/src/components/dashboard/FeaturedMatchupsGrid.tsx`
+- `frontend/src/components/dashboard/FeaturedMatchupsGrid.test.tsx`
+- `frontend/src/components/dashboard/ModelEdgesTable.tsx`
+- `frontend/src/components/dashboard/ModelEdgesTable.test.tsx`
+- `frontend/src/context/BetSlipContext.tsx`
+- `frontend/src/context/BetSlipContext.test.tsx`
+- `frontend/src/screens/GameDetail.tsx`
+- `frontend/src/screens/GameDetail.test.tsx`
+- `frontend/src/screens/LineShopping.tsx`
+- `frontend/src/screens/LineShopping.test.tsx`
+- `frontend/src/utils/betLegs.ts`
+- `frontend/src/utils/betLegs.test.ts`
+- `frontend/src/utils/betSlipSummary.test.ts`
+- `frontend/src/utils/sportsbookPreferences.test.ts`
+
+Renamed:
+
+- `tests/unit/api/serializers/test_recommendations.py` to
+  `tests/unit/api/serializers/test_recommendation_serializers.py`
+
+Removed:
+
+- Temporary Market Unit 25 implementation and correction helpers.
+- Bet Slip v3 production storage, parser, and immutable snapshot contracts.
+- Request-time bankroll and Kelly sizing parameters from the `/edges` frontend
+  contract.
+- Retired immutable Bet Slip snapshot fields for Kelly fraction, Kelly stake,
+  bankroll, and Kelly multiplier.
+
+#### Tests
+
+- Persisted recommendation presentation mapped qualified, recommended, failed,
+  unavailable, and conflicting lifecycle states directly from persisted result
+  state.
+- Offers without an attached persisted result were presented as Candidate.
+- Analytical expected value, edge strength, confidence, bankroll, local Kelly
+  multiplier, and frontend settings did not manufacture a recommendation
+  state.
+- Persisted suggested stake was presented directly from the persisted
+  recommendation result without frontend recalculation.
+- Supporting, failed, unavailable, and conflicting policy checks remained
+  distinct.
+- Policy identity, policy schema version, evaluation time, exact offer
+  provenance, forecast provenance, model identity, and selected-product
+  identity remained available through shared presentation components.
+- Line Shopping presented persisted policy state for each exact sportsbook
+  offer while preserving existing model guidance, price, best-line, best-price,
+  and preferred-offer behavior.
+- Available Edges presented analytical strength and persisted policy state as
+  separate columns.
+- Positive analytical edges without persisted recommendation evidence remained
+  Candidate rather than Recommended.
+- Sportsbook offer grouping, alternative expansion, exact price and line
+  preservation, filtering, and Bet Slip staging remained unchanged.
+- Game Detail renamed the model callout to Top Analytical Edge and presented
+  persisted policy state independently from side, sportsbook, odds, and
+  expected value.
+- Persisted suggested stake was displayed only when a persisted recommendation
+  supplied it.
+- The generated frontend schema included the recommendation presentation,
+  policy-check, sizing, bankroll-basis, exact-offer, forecast, and policy
+  provenance contracts.
+- TypeScript was pinned to the generator-compatible 5.9 line after
+  `openapi-typescript` failed with the TypeScript 7 compiler API.
+- The checked-in OpenAPI artifact matched the live FastAPI application schema.
+- Bet Slip version 4 replaced the version 3 development contract outright.
+- Active Bet Slip storage used `hm-betslip-v4` and
+  `hm-betslip-mode-v4`.
+- Runtime parsing used `parseBetLegV4` and `parseBetLegsV4`.
+- Version 1, version 2, and version 3 Bet Slip entries were rejected rather
+  than migrated.
+- Canonical game and prop wager identities remained deterministic.
+- Bet Slip version 4 separated `persistedRecommendation`, `edgeAnalytics`, and
+  editable `draft` evidence.
+- Game legs copied attached persisted recommendation evidence without
+  re-evaluation.
+- Candidate game legs remained valid with null persisted recommendation
+  evidence.
+- Prop legs remained valid with null persisted recommendation evidence.
+- Edge analytics preserved model identity, reference price, model probability,
+  model value, market value, expected value, edge strength, provider,
+  provider-event identity, sportsbook, quote timestamps, kickoff, and live
+  state.
+- Edge analytics did not persist reference Kelly fraction, reference Kelly
+  stake, reference bankroll, or reference Kelly multiplier.
+- Negative assertions explicitly verified that retired immutable sizing fields
+  were absent from the version 4 analytical snapshot.
+- Local tracked and what-if bankroll values remained transient inputs to draft
+  analysis.
+- Local Kelly multiplier remained a transient input to draft analysis.
+- Current price, current expected value, full Kelly, multiplier-adjusted stake,
+  proposed stake, payout, and profit remained draft-analysis values.
+- Zero bankroll and zero Kelly multiplier remained valid local analysis inputs.
+- Missing bankroll or Kelly multiplier continued to block only dollar sizing.
+- Editing current odds, proposed stake, sportsbook, and note did not alter
+  persisted recommendation or immutable analytical evidence.
+- Bet Slip summaries preserved singles and parlay price, stake, payout, profit,
+  incomplete-state, and correlation-caveat behavior.
+- The betting ledger added canonical Unit 24 result, evaluation, candidate, and
+  policy identity columns.
+- Manual wagers persisted all Unit 24 recommendation identity columns as null.
+- Recommendation-backed wagers persisted all four Unit 24 identities.
+- Partial recommendation identity chains were rejected before persistence.
+- Empty recommendation identity strings were rejected.
+- Exact reference-offer provenance continued to require an explicit provider
+  and observation timestamp.
+- Reference provider, provider-event identity, sportsbook, fetch time,
+  sportsbook update time, kickoff, American odds, and line round-tripped
+  unchanged.
+- Recorded odds, line, sportsbook, and stake remained separate from persisted
+  reference-offer terms.
+- Recorded terms were allowed to differ from the original recommendation
+  reference terms.
+- Model name and model type continued to form one complete optional identity.
+- `record_wager()` validated wager identity, market and side compatibility,
+  price, stake, sportsbook, and line before writing either artifact.
+- Moneyline recording rejected a non-null line.
+- Spread and Total recording required a finite line.
+- Ledger and bankroll transaction artifacts were created together.
+- The bankroll transaction referenced the generated ledger bet identity.
+- Existing ledger and bankroll history were preserved when a new wager was
+  recorded.
+- A bankroll write failure removed a newly created ledger when neither artifact
+  previously existed.
+- A failed second write restored the original ledger and bankroll artifacts.
+- Existing artifacts were restored through temporary-file replacement.
+- Successful recording returned both the bet identity and bankroll transaction
+  identity.
+- Repeated recording commands created distinct bet identities because no
+  idempotency-key contract was introduced.
+- The betting CLI used the shared rollback-safe recording domain owner instead
+  of independently writing the ledger and bankroll transaction log.
+- CLI output used Wager recorded language.
+- `POST /portfolio/bets` accepted recorded game-wager terms and an optional
+  complete Unit 24 identity chain.
+- API request models were frozen and rejected unknown fields.
+- Partial Unit 24 identity chains were rejected by request validation.
+- Unknown or non-unique recommendation result identity was rejected.
+- Candidate and policy identity mismatches were rejected.
+- Persisted recommendation game, market, and side mismatches were rejected by
+  the recording domain.
+- The API derived provider, exact offer, model, probability, expected value,
+  and policy evidence from persisted Unit 24 artifacts rather than accepting
+  those values from the browser.
+- Manual API recording did not fabricate recommendation provenance.
+- API recording returned HTTP 201 with the recorded BetRow and bankroll
+  transaction identity.
+- The returned bankroll transaction referenced the returned bet identity.
+- The API response explicitly stated that no sportsbook wager was placed.
+- Portfolio BetRow serialization exposed result, evaluation, candidate, and
+  policy identities mechanically from the ledger.
+- The typed frontend mutation submitted requests through
+  `POST /portfolio/bets`.
+- Successful frontend recording invalidated Portfolio summary, bets,
+  transactions, and curve queries.
+- A game draft could not be recorded without current American odds, a positive
+  proposed stake, and a nonempty sportsbook.
+- Candidate and manual drafts submitted null recommendation identities.
+- Recommendation-backed drafts submitted only result, evaluation, candidate,
+  and policy identities from persisted recommendation evidence.
+- The frontend did not submit provider, model, expected value, checks, policy
+  details, or reference-offer evidence.
+- Edited draft odds, stake, and sportsbook were submitted as recorded terms
+  rather than being replaced by persisted reference terms.
+- The recording confirmation distinguished persisted reference evidence from
+  the draft terms being recorded.
+- The confirmation stated that the action records a wager in Gridiron Edge and
+  does not place a sportsbook wager.
+- Cancelled recording preserved the staged draft.
+- Failed recording preserved the staged draft and displayed its error.
+- Successful recording removed only the recorded draft and preserved other
+  staged wagers.
+- Successful recording displayed the API no-placement message.
+- Prop drafts did not expose the game-wager recording action.
+- Recommendation serializer tests retained mechanical lifecycle and sizing
+  coverage after being renamed to avoid a duplicate pytest module basename.
+- Python bytecode removal confirmed that the duplicate
+  `test_recommendations.py` basename was a deterministic import collision rather
+  than stale cache.
+- Focused Ruff checks passed throughout implementation.
+- The configured repository-wide Pyrefly check passed with zero errors.
+- Focused market, betting, API schema, API serializer, API integration, CLI,
+  Bet Slip, recommendation presentation, and frontend request-mapping tests
+  passed.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check` passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- `pnpm --dir frontend run lint` passed.
+- `pnpm --dir frontend run build` passed.
+- `pnpm --dir frontend test:run` passed with 402 tests.
+- The checked-in OpenAPI artifact matched the live FastAPI application
+  contract.
+- No temporary Market Unit 25 helper files remain in the repository.
+
+#### Acceptance
+
+Line Shopping, Available Edges, and Game Detail present persisted recommendation
+state through one shared lifecycle mapping. Qualified, recommended, failed,
+unavailable, and conflicting labels come only from persisted result evidence.
+An exact offer without attached persisted evidence is a Candidate. Expected
+value, edge strength, confidence, bankroll, Kelly sizing, or other analytical
+evidence cannot manufacture recommendation state.
+
+Persisted policy evidence remains mechanically auditable. Policy identity and
+schema version, evaluation identity and time, exact offer provenance, selected
+product and forecast provenance, model identity, ordered checks, sizing
+evidence, bankroll basis, portfolio evidence, and persisted suggested stake are
+presented without rerunning qualification or recomputing sizing.
+
+Analytical value remains separate from policy state. Line Shopping continues to
+show model guidance, line quality, price quality, and preferred positive-value
+offers. Available Edges continues to show expected value and analytical edge
+strength. Game Detail continues to select its top analytical edge. None of
+these analytical views relabels an offer as Recommended without persisted
+recommendation evidence.
+
+Bet Slip version 4 is the only active draft contract. Previous development
+versions are not read or migrated. Each staged wager preserves persisted
+recommendation evidence separately from immutable edge analytics and editable
+draft terms. Local bankroll and Kelly inputs remain transient what-if inputs
+rather than immutable recommendation or analytical provenance.
+
+Changing current odds, proposed stake, sportsbook, note, tracked bankroll,
+what-if bankroll, or Kelly multiplier does not change persisted lifecycle
+state, persisted suggested stake, policy identity, checks, exact reference
+offer, model evidence, or original expected value.
+
+A user can explicitly record a complete Moneyline, Spread, or Total game-wager
+draft. The action requires current American odds, a positive proposed stake,
+and a sportsbook. Props remain staged analytical drafts and are not submitted
+to the game-wager recording endpoint.
+
+Before recording, the interface separates persisted reference evidence from the
+editable draft terms that will be recorded. The confirmation and resulting API
+message state that Gridiron Edge records the wager locally and does not place a
+sportsbook wager.
+
+Recommendation-backed recording sends only the persisted result, evaluation,
+candidate, and policy identity chain. The backend resolves exact offer, model,
+expected value, and policy provenance from strict persisted Unit 24 artifacts.
+The browser cannot supply or replace trusted provider, model, expected value,
+check, policy, or reference-offer evidence.
+
+Recorded terms remain independently auditable from recommendation reference
+terms. A user may record a different current sportsbook, American price, line,
+or stake without overwriting the original exact offer or persisted suggested
+stake.
+
+The recorded-wager domain validates the complete operation before persistence.
+Ledger and bankroll transaction writes share one rollback-safe orchestration
+boundary. If either write fails, existing ledger and bankroll artifacts are
+restored. A failed operation does not leave an orphaned open wager or an
+unreferenced bankroll transaction.
+
+The ledger preserves the generated bet identity, recorded wager terms, exact
+reference-offer evidence, complete Unit 24 recommendation identities, model
+evidence, status, settlement evidence, and closeout fields in one strict
+canonical schema.
+
+A manual or Candidate wager may validly contain no Unit 24 recommendation
+identity. Recommendation-backed wagers require a complete result, evaluation,
+candidate, and policy identity chain. Partial or empty chains are rejected.
+
+A successful API request returns the recorded BetRow, bankroll transaction
+identity, and explicit no-placement message. The frontend removes only the
+successfully recorded draft and refreshes Portfolio data. Cancellation,
+validation failure, provenance mismatch, or persistence failure preserves the
+staged draft.
+
+The betting CLI and Portfolio API use the same rollback-safe recording domain
+owner. Neither route performs independent ledger and bankroll writes. No
+sportsbook integration, sportsbook authentication, automatic wagering, wager
+placement, or background recording behavior was introduced. The system records
+wagers in Gridiron Edge and does not place sportsbook wagers.

@@ -3,7 +3,7 @@
 
 Wires together ``betting/ledger.py``, ``betting/bankroll.py``, and
 ``betting/performance.py``.  The CLI orchestrates the decoupled modules:
-bet placement calls both ``log_bet`` and ``record_bet_placed``; settlement
+wager recording uses one rollback-safe domain operation; settlement
 calls both ``settle_bet`` and ``record_bet_settled``.
 
 Registered as ``gridiron bet`` in ``cli/main.py``.
@@ -50,33 +50,35 @@ def log_cmd(
     confidence_tier: str | None = typer.Option(None, help="Confidence tier"),
 ) -> None:
     """Record a new bet."""
-    from gridiron_edge.betting.bankroll import current_balance, record_bet_placed
-    from gridiron_edge.betting.ledger import log_bet
+    from gridiron_edge.betting.bankroll import current_balance
+    from gridiron_edge.betting.recording import RecordWagerCommand, record_wager
 
     try:
-        bet_id: str = log_bet(
-            game_id=game_id,
-            market_type=market,
-            side=side,
-            odds=odds,
-            stake=stake,
-            book=book,
-            line=line,
-            model_name=model_name,
-            model_type=model_type,
-            model_prob=model_prob,
-            model_ev=model_ev,
-            edge_strength=edge_strength,
-            confidence_tier=confidence_tier,
+        recorded = record_wager(
+            RecordWagerCommand(
+                game_id=game_id,
+                market_type=market,
+                side=side,
+                odds=odds,
+                stake=stake,
+                book=book,
+                line=line,
+                model_name=model_name,
+                model_type=model_type,
+                model_probability=model_prob,
+                expected_value=model_ev,
+                edge_strength=edge_strength,
+                confidence_tier=confidence_tier,
+            ),
+            repo=Path.cwd(),
         )
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    record_bet_placed(stake, bet_id=bet_id)
-
+    bet_id = recorded.bet_id
     balance: float = current_balance()
-    typer.echo(f"Bet logged: {bet_id}")
+    typer.echo(f"Wager recorded: {bet_id}")
     typer.echo(f"  {market} {side} {game_id} @ {odds:+d}  stake=${stake:.2f}  book={book}")
     typer.echo(f"  Balance: ${balance:.2f}")
 

@@ -6,8 +6,8 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import {
-  parseBetLegsV3,
-  parseBetLegV3,
+  parseBetLegsV4,
+  parseBetLegV4,
   type BetDraftInputs,
   type BetLeg,
 } from "../utils/betLegs";
@@ -38,8 +38,8 @@ const BetSlipContext = createContext<
   BetSlipContextValue | undefined
 >(undefined);
 
-const LEGS_STORAGE_KEY = "hm-betslip-v3";
-const MODE_STORAGE_KEY = "hm-betslip-mode-v3";
+const LEGS_STORAGE_KEY = "hm-betslip-v4";
+const MODE_STORAGE_KEY = "hm-betslip-mode-v4";
 
 function loadInitialLegs(): BetLeg[] {
   try {
@@ -51,7 +51,7 @@ function loadInitialLegs(): BetLeg[] {
       return [];
     }
 
-    return parseBetLegsV3(
+    return parseBetLegsV4(
       JSON.parse(stored) as unknown,
     );
   } catch {
@@ -111,7 +111,7 @@ export function BetSlipProvider({
   }, [mode]);
 
   const add = (leg: BetLeg) => {
-    const parsed = parseBetLegV3(leg);
+    const parsed = parseBetLegV4(leg);
 
     if (!parsed) {
       return;
@@ -150,7 +150,7 @@ export function BetSlipProvider({
         };
 
         return (
-          parseBetLegV3(candidate) ??
+          parseBetLegV4(candidate) ??
           leg
         );
       }),

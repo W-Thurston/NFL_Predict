@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from gridiron_edge.api.loaders import LoadedRecommendedBetResult
 from gridiron_edge.api.schemas.edges import EdgeList, EdgeRow
 from gridiron_edge.api.serializers.edges import (
     _none_if_nan,
@@ -50,8 +52,7 @@ def _valid_row() -> dict:
         "cover_prob": float("nan"),
         "ev": 0.045,
         "edge_strength": "moderate",
-        "kelly_frac": 0.023,
-        "kelly_stake": 5.75,
+        "is_live": False,
     }
 
 
@@ -157,8 +158,6 @@ class TestSerializeEdgesList:
         response: EdgeList = serialize_edges_list(
             _result(),
             min_ev=0.0,
-            bankroll=2500.0,
-            kelly_multiplier=0.1,
         )
         assert response.total == 1
         assert response.season == "2026-2027"
@@ -171,11 +170,47 @@ class TestSerializeEdgesList:
         response = serialize_edges_list(
             _result(),
             min_ev=None,
-            bankroll=None,
-            kelly_multiplier=None,
         )
         assert response.season == "2026-2027"
         assert response.week == 1
         assert response.min_ev is None
-        assert response.bankroll is None
-        assert response.kelly_multiplier is None
+
+
+def test_attaches_only_exact_persisted_recommendation() -> None:
+    from tests.fixtures.recommended_bet_results import evaluation
+
+    value = evaluation()
+    result = value.results[0]
+    matching = replace(
+        result,
+        season="2026-2027",
+        week=1,
+        side="away",
+        provider_event_id="event-1",
+        sportsbook="draftkings",
+        fetched_at=datetime(2026, 9, 5, 12, tzinfo=UTC),
+        sportsbook_updated_at=datetime(2026, 9, 5, 11, 59, tzinfo=UTC),
+        kickoff=datetime(2026, 9, 6, 0, 20, tzinfo=UTC),
+        american_price=-110,
+        line=None,
+    )
+    loaded = LoadedRecommendedBetResult(value.evaluation_id, matching)
+    response = serialize_edges_list(_result(), min_ev=0.0, recommendations=(loaded,))
+    attached = response.items[0].recommendation
+    assert attached is not None
+    assert attached.result_id == matching.result_id
+    assert attached.evaluation_id == value.evaluation_id
+    assert attached.suggested_stake == matching.sizing.actionable_stake
+
+
+def test_exact_identity_mismatch_leaves_edge_unmatched() -> None:
+    from tests.fixtures.recommended_bet_results import evaluation
+
+    value = evaluation()
+    changed = replace(value.results[0], american_price=-109)
+    response = serialize_edges_list(
+        _result(),
+        min_ev=0.0,
+        recommendations=(LoadedRecommendedBetResult(value.evaluation_id, changed),),
+    )
+    assert response.items[0].recommendation is None

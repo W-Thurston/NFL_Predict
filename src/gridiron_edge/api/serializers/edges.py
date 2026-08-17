@@ -6,12 +6,19 @@ from typing import Any, cast
 
 import pandas as pd
 
+from gridiron_edge.api.loaders import (
+    LoadedRecommendedBetResult,
+    RecommendedBetOfferKey,
+)
 from gridiron_edge.api.meta import ResponseMeta
 from gridiron_edge.api.schemas.edges import (
     EdgeDiagnosticsResponse,
     EdgeList,
     EdgeProvenanceResponse,
     EdgeRow,
+)
+from gridiron_edge.api.serializers.recommendations import (
+    serialize_recommendation_result,
 )
 from gridiron_edge.market.edge import EdgeStrength
 from gridiron_edge.market.recommendations import EdgeResult
@@ -26,8 +33,29 @@ def _none_if_nan(v: Any) -> Any:  # noqa: ANN401
     return v
 
 
-def _row_to_edge(row: dict) -> EdgeRow:
-    """Convert one service recommendation row to its API schema."""
+def _row_to_edge(
+    row: dict,
+    *,
+    recommendations: dict[RecommendedBetOfferKey, LoadedRecommendedBetResult] | None = None,
+) -> EdgeRow:
+    """Convert one analytical edge and attach only an exact persisted result."""
+    market = str(row["market_type"])
+    line = None if market == "moneyline" else _none_if_nan(row.get("market_value"))
+    key: RecommendedBetOfferKey = (
+        _none_if_nan(row.get("provider")),
+        _none_if_nan(row.get("provider_event_id")),
+        _none_if_nan(row.get("sportsbook")),
+        str(row["game_id"]),
+        market,
+        str(row["side"]),
+        _none_if_nan(row.get("market_fetched_at")),
+        _none_if_nan(row.get("sportsbook_updated_at")),
+        _none_if_nan(row.get("commence_time")),
+        bool(row.get("is_live", False)),
+        int(row["american_odds"]),
+        line,
+    )
+    loaded = None if recommendations is None else recommendations.get(key)
     return EdgeRow(
         provider=_none_if_nan(row.get("provider")),
         provider_event_id=_none_if_nan(row.get("provider_event_id")),
@@ -35,6 +63,7 @@ def _row_to_edge(row: dict) -> EdgeRow:
         market_fetched_at=_none_if_nan(row.get("market_fetched_at")),
         sportsbook_updated_at=_none_if_nan(row.get("sportsbook_updated_at")),
         commence_time=_none_if_nan(row.get("commence_time")),
+        is_live=bool(row.get("is_live", False)),
         game_id=str(row["game_id"]),
         game_date=_none_if_nan(row.get("game_date")),
         season=_none_if_nan(row.get("season")),
@@ -43,7 +72,7 @@ def _row_to_edge(row: dict) -> EdgeRow:
         home_team=str(row["home_team"]),
         model_key=str(row["model_key"]),
         confidence_tier=_none_if_nan(row.get("confidence_tier")),
-        market_type=str(row["market_type"]),
+        market_type=market,
         side=str(row["side"]),
         model_value=_none_if_nan(row.get("model_value")),
         market_value=_none_if_nan(row.get("market_value")),
@@ -52,8 +81,11 @@ def _row_to_edge(row: dict) -> EdgeRow:
         cover_prob=_none_if_nan(row.get("cover_prob")),
         ev=float(row["ev"]),
         edge_strength=cast(EdgeStrength, str(row["edge_strength"])),
-        kelly_frac=_none_if_nan(row.get("kelly_frac")),
-        kelly_stake=_none_if_nan(row.get("kelly_stake")),
+        recommendation=(
+            None
+            if loaded is None
+            else serialize_recommendation_result(loaded.result, evaluation_id=loaded.evaluation_id)
+        ),
     )
 
 
@@ -98,12 +130,30 @@ def serialize_edges_list(
     result: EdgeResult,
     *,
     min_ev: float | None,
-    bankroll: float | None,
-    kelly_multiplier: float | None,
+    recommendations: tuple[LoadedRecommendedBetResult, ...] = (),
     response_meta: ResponseMeta | None = None,
 ) -> EdgeList:
     """Serialize one complete unified weekly edge result."""
-    items = [_row_to_edge(row.to_dict()) for _, row in result.rows.iterrows()]
+    lookup = {
+        (
+            item.result.provider,
+            item.result.provider_event_id,
+            item.result.sportsbook,
+            item.result.game_id,
+            item.result.market,
+            item.result.side,
+            item.result.fetched_at,
+            item.result.sportsbook_updated_at,
+            item.result.kickoff,
+            item.result.is_live,
+            item.result.american_price,
+            item.result.line,
+        ): item
+        for item in recommendations
+    }
+    items = [
+        _row_to_edge(row.to_dict(), recommendations=lookup) for _, row in result.rows.iterrows()
+    ]
     diagnostics = _serialize_diagnostics(result)
     return EdgeList(
         items=items,
@@ -111,8 +161,6 @@ def serialize_edges_list(
         season=diagnostics.season,
         week=diagnostics.week,
         min_ev=min_ev,
-        bankroll=bankroll,
-        kelly_multiplier=kelly_multiplier,
         diagnostics=diagnostics,
         response_meta=response_meta,  # pyrefly: ignore [unexpected-keyword]
     )

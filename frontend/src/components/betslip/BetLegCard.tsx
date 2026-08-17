@@ -12,6 +12,8 @@ import {
 } from "../../utils/props";
 import { PendingChip } from "../field-status/PendingChip";
 import { TeamMark } from "../primitives/TeamMark";
+import { RecommendationDetails } from "../recommendations/RecommendationDetails";
+import { RecommendationStatus } from "../recommendations/RecommendationStatus";
 
 type OddsFormat =
   | "american"
@@ -35,6 +37,9 @@ type BetLegCardProps = {
     value: string | null,
   ) => void;
   onRemove: () => void;
+  onRecordWager?: () => void;
+  isRecording?: boolean;
+  recordingDisabled?: boolean;
 };
 
 export function BetLegCard({
@@ -47,6 +52,9 @@ export function BetLegCard({
   onUpdateSportsbook,
   onUpdateNote,
   onRemove,
+  onRecordWager,
+  isRecording = false,
+  recordingDisabled = false,
 }: BetLegCardProps) {
   const fieldIdPrefix = useId();
   const accessibleLegLabel =
@@ -75,6 +83,22 @@ export function BetLegCard({
       />
 
       <WagerDescription leg={leg} />
+
+      <section
+        aria-label={`Persisted policy result for ${accessibleLegLabel}`}
+        style={{ marginBottom: 12, display: "grid", gap: 6 }}
+      >
+        <RecommendationStatus
+          recommendation={leg.persistedRecommendation}
+          compact
+        />
+        {leg.persistedRecommendation && (
+          <RecommendationDetails
+            recommendation={leg.persistedRecommendation}
+            summary="Persisted policy evidence"
+          />
+        )}
+      </section>
 
       <PriceSection
         leg={leg}
@@ -122,6 +146,42 @@ export function BetLegCard({
         }
         onUpdateNote={onUpdateNote}
       />
+
+      {leg.kind === "game" ? (
+        onRecordWager && (
+          <button
+            type="button"
+            onClick={onRecordWager}
+            disabled={recordingDisabled || isRecording}
+            aria-label={`Record ${accessibleLegLabel} in Gridiron Edge`}
+            style={{
+              width: "100%",
+              marginTop: 12,
+              padding: "8px 12px",
+              border: "none",
+              borderRadius: 4,
+              background: recordingDisabled || isRecording
+                ? "var(--bg-3)"
+                : "var(--pos)",
+              color: recordingDisabled || isRecording
+                ? "var(--ink-4)"
+                : "var(--bg)",
+              cursor: recordingDisabled || isRecording
+                ? "not-allowed"
+                : "pointer",
+              fontFamily: "var(--f-sans)",
+              fontWeight: 600,
+            }}
+          >
+            {isRecording ? "Recording..." : "Record wager"}
+          </button>
+        )
+      ) : (
+        <div className="mono dim2" style={{ marginTop: 10, fontSize: 9 }}>
+          Recording is currently available for Moneyline, Spread, and Total
+          game wagers.
+        </div>
+      )}
     </article>
   );
 }
@@ -254,7 +314,7 @@ function WagerDescription({
         }}
       >
         Model:{" "}
-        {leg.recommendation.modelKey}
+        {leg.edgeAnalytics?.modelKey ?? "Unavailable"}
       </div>
     </div>
   );
@@ -278,8 +338,8 @@ function PriceSection({
   ) => void;
 }) {
   const referenceOdds =
-    leg.recommendation
-      .referenceAmericanOdds;
+    leg.edgeAnalytics
+      ?.referenceAmericanOdds ?? null;
 
   const currentOdds =
     leg.draft.currentAmericanOdds;
@@ -357,8 +417,8 @@ function ModelSection({
   kellyMultiplier: number;
 }) {
   const probability =
-    leg.recommendation
-      .referenceModelProbability;
+    leg.edgeAnalytics
+      ?.referenceModelProbability ?? null;
 
   return (
     <section
@@ -387,8 +447,8 @@ function ModelSection({
       <Metric
         label="Edge strength"
         value={
-          leg.recommendation
-            .referenceEdgeStrength
+          leg.edgeAnalytics
+            ?.referenceEdgeStrength ?? null
         }
         capitalize
       />
@@ -396,12 +456,12 @@ function ModelSection({
       <Metric
         label="Reference EV"
         value={formatPercent(
-          leg.recommendation
-            .referenceExpectedValue,
+          leg.edgeAnalytics
+            ?.referenceExpectedValue ?? null,
         )}
         tone={evTone(
-          leg.recommendation
-            .referenceExpectedValue,
+          leg.edgeAnalytics
+            ?.referenceExpectedValue ?? null,
         )}
       />
 

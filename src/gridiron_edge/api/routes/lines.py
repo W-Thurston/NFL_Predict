@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query
 from gridiron_edge.api.deps import SettingsDep
 from gridiron_edge.api.loaders import (
     load_games_for_week,
+    load_recommended_bet_results_for_week,
     resolve_current_season_week,
 )
 from gridiron_edge.api.meta import ResponseMeta, Unavailable
@@ -41,6 +42,9 @@ def list_lines(
         current_season, current_week = "", 0
     resolved_season = season or current_season
     resolved_week = week or current_week
+    recommendations = load_recommended_bet_results_for_week(
+        settings, season=resolved_season, week=resolved_week
+    )
 
     snapshot = load_current_odds(repo=settings.repo_root)
     if snapshot is None:
@@ -54,6 +58,7 @@ def list_lines(
             week=resolved_week,
             market=market,
             response_meta=meta,
+            recommendations=recommendations,
         )
 
     scoped = snapshot.loc[
@@ -88,4 +93,5 @@ def list_lines(
         market=market,
         sportsbooks=sportsbooks,
         guidance=guidance,
+        recommendations=recommendations,
     )

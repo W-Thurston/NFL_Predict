@@ -209,20 +209,15 @@ class TestListEdgesRoute:
         direct_result = build_weekly_edge_result(
             season=SEASON,
             week=WEEK,
-            bankroll=2500.0,
-            kelly_multiplier=0.10,
+            bankroll=None,
+            kelly_multiplier=0.25,
             min_ev=0.0,
             repo=tmp_path,
         )
 
         response = client.get(
             "/edges",
-            params={
-                "season": SEASON,
-                "week": WEEK,
-                "bankroll": 2500.0,
-                "kelly_multiplier": 0.10,
-            },
+            params={"season": SEASON, "week": WEEK},
         )
 
         assert response.status_code == 200
@@ -230,8 +225,6 @@ class TestListEdgesRoute:
         assert body["season"] == SEASON
         assert body["week"] == WEEK
         assert body["min_ev"] == 0.0
-        assert body["bankroll"] == 2500.0
-        assert body["kelly_multiplier"] == 0.10
         assert body["total"] > 0
         assert body["items"]
 
@@ -249,7 +242,8 @@ class TestListEdgesRoute:
         assert first["market_fetched_at"] == "2026-09-05T12:00:00Z"
         assert first["sportsbook_updated_at"] is None
         assert first["commence_time"] is None
-        assert first["kelly_stake"] is not None
+        assert first["recommendation"] is None
+        assert first["is_live"] is False
 
         expected_diagnostics = EdgeDiagnosticsResponse.model_validate(
             direct_result.diagnostics.to_dict()
@@ -274,33 +268,22 @@ class TestListEdgesRoute:
         assert provenance["market_sportsbooks"] == []
         assert provenance["market_fetched_at"] == ["2026-09-05T12:00:00Z"]
 
-    def test_omitted_bankroll_keeps_dollar_stake_unavailable(
+    def test_request_time_sizing_fields_are_retired(
         self,
         client: TestClient,
         tmp_path: Path,
     ) -> None:
         _persist_selected_product(tmp_path)
         _persist_markets(tmp_path)
-
-        response = client.get(
-            "/edges",
-            params={"season": SEASON, "week": WEEK},
-        )
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["bankroll"] is None
-        assert body["items"]
-        for item in body["items"]:
-            assert item["kelly_frac"] is not None
-            assert item["kelly_stake"] is None
+        body = client.get("/edges", params={"season": SEASON, "week": WEEK}).json()
+        assert "bankroll" not in body
+        assert "kelly_multiplier" not in body
+        assert all("kelly_frac" not in item for item in body["items"])
+        assert all("kelly_stake" not in item for item in body["items"])
 
     @pytest.mark.parametrize(
         "invalid_params",
         [
-            {"bankroll": -1.0},
-            {"kelly_multiplier": -0.01},
-            {"kelly_multiplier": 1.01},
             {"min_ev": -0.01},
         ],
     )

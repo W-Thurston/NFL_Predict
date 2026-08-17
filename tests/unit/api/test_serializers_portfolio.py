@@ -11,6 +11,7 @@ from gridiron_edge.api.serializers.portfolio import (
     serialize_bankroll_curve,
     serialize_bets,
     serialize_portfolio_summary,
+    serialize_recorded_bet,
     serialize_splits,
     serialize_transactions,
 )
@@ -100,6 +101,10 @@ class TestSerializeBets:
                 "clv": [None],
                 "model_name": ["win_prob"],
                 "model_type": ["random_forest"],
+                "recommended_bet_result_id": ["result-1"],
+                "recommendation_evaluation_id": ["evaluation-1"],
+                "candidate_reference_id": ["candidate-1"],
+                "recommendation_policy_id": ["policy-1"],
             },
         )
         result = serialize_bets(bets)
@@ -155,3 +160,21 @@ class TestSerializeSplits:
         assert result.total == 2
         assert result.items[0].dimension_value == "spread"
         assert result.items[0].roi == 0.05
+
+
+def test_serialize_recorded_bet() -> None:
+    bets = pd.DataFrame(
+        {
+            "bet_id": ["b1"],
+            "game_id": ["2026_01_KC_LAC"],
+            "odds": [175],
+            "stake": [25.0],
+            "recommended_bet_result_id": ["result-1"],
+        }
+    )
+    response = serialize_recorded_bet(
+        bets,
+        bankroll_transaction_id="txn-1",
+    )
+    assert response.bet.recommended_bet_result_id == "result-1"
+    assert response.bankroll_transaction_id == "txn-1"

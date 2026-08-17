@@ -11,6 +11,8 @@ import {
   normalizeSportsbookKey,
   sportsbookDisplayName,
 } from "../utils/sportsbookPreferences";
+import { RecommendationDetails } from "../components/recommendations/RecommendationDetails";
+import { RecommendationStatus } from "../components/recommendations/RecommendationStatus";
 
 type Market = "spread" | "total" | "moneyline";
 type LineOffer = components["schemas"]["LineOffer"];
@@ -380,19 +382,28 @@ function OfferCell({
   }
   const title = offerTitle(game, offer);
   return (
-    <ExplainTooltip
-      accessibleLabel={`Explain ${title}`}
-      title={title}
-      sections={offerExplanationSections(game, offer)}
-      className={classNames.join(" ")}
-    >
-      <span className="line-shopping-offer-values">
-        {offer.market === "moneyline" ? null : <span>{formatLine(offer)}</span>}
-        <strong className={valueHighlights && display.bestPrice && offer.is_best_price ? "line-shopping-best-price" : undefined}>
-          {formatAmericanOdds(offer.american_odds)}
-        </strong>
-      </span>
-    </ExplainTooltip>
+    <div style={{ display: "grid", gap: 5 }}>
+      <ExplainTooltip
+        accessibleLabel={`Explain ${title}`}
+        title={title}
+        sections={offerExplanationSections(game, offer)}
+        className={classNames.join(" ")}
+      >
+        <span className="line-shopping-offer-values">
+          {offer.market === "moneyline" ? null : <span>{formatLine(offer)}</span>}
+          <strong className={valueHighlights && display.bestPrice && offer.is_best_price ? "line-shopping-best-price" : undefined}>
+            {formatAmericanOdds(offer.american_odds)}
+          </strong>
+        </span>
+      </ExplainTooltip>
+      <RecommendationStatus recommendation={offer.recommendation} compact />
+      {offer.recommendation && (
+        <RecommendationDetails
+          recommendation={offer.recommendation}
+          summary="Policy evidence"
+        />
+      )}
+    </div>
   );
 }
 

@@ -13,6 +13,8 @@ from gridiron_edge.api.schemas.portfolio import (
     CurveBucket,
     PortfolioSplits,
     PortfolioSummary,
+    RecordBetRequest,
+    RecordBetResponse,
     SplitRow,
     TransactionRow,
 )
@@ -89,3 +91,35 @@ class TestPortfolioSplits:
         )
         assert splits.dimension == "market_type"
         assert splits.items[0].dimension_value == "spread"
+
+
+class TestRecordBetRequest:
+    def test_manual_request(self) -> None:
+        request = RecordBetRequest(
+            game_id="2026_01_KC_LAC",
+            market_type="moneyline",
+            side="away",
+            odds=175,
+            stake=25.0,
+            book="fanduel",
+        )
+        assert request.recommended_bet_result_id is None
+
+    def test_rejects_partial_recommendation_chain(self) -> None:
+        with pytest.raises(ValidationError):
+            RecordBetRequest(
+                game_id="2026_01_KC_LAC",
+                market_type="moneyline",
+                side="away",
+                odds=175,
+                stake=25.0,
+                book="fanduel",
+                recommended_bet_result_id="result-1",
+            )
+
+    def test_response_message_disclaims_placement(self) -> None:
+        response = RecordBetResponse(
+            bet=BetRow(bet_id="bet-1"),
+            bankroll_transaction_id="txn-1",
+        )
+        assert "No sportsbook wager was placed" in response.message

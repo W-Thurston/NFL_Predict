@@ -18,6 +18,8 @@ import { TeamHero } from "../components/primitives/TeamHero";
 import { TeamMark } from "../components/primitives/TeamMark";
 import { WhyLink } from "../components/primitives/WhyLink";
 import { useBetSlip } from "../context/BetSlipContext";
+import { RecommendationDetails } from "../components/recommendations/RecommendationDetails";
+import { RecommendationStatus } from "../components/recommendations/RecommendationStatus";
 import { useAppState } from "../context/AppStateContext";
 import {
   filterEdgesBySportsbook,
@@ -177,7 +179,7 @@ export function GameDetail() {
  * Full-width game header. Renders TeamHero components for both teams
  * framing a center block with kick datetime, venue, and weather.
  *
- * Model lean callout (recommendation + EV + WhyLink + slip button)
+ * Top analytical edge callout (recommendation + EV + WhyLink + slip button)
  * ships in Substep 2b.
  */
 function GameHeader({
@@ -542,7 +544,7 @@ function formatMargin(
  * 1. Fetch all edges via useEdges
  * 2. Filter to this game_id client-side
  * 3. Take top by EV
- * 4. Render recommendation + metadata
+ * 4. Render analytical context and persisted policy state
  *
  * Empty states use the authoritative weekly edge diagnostics.
  * Loading and transport errors remain non-blocking for the game header.
@@ -591,7 +593,7 @@ function ModelLeanCallout({
             color: "var(--ink-4)",
           }}
         >
-          Model Lean
+          Top Analytical Edge
         </div>
         {data?.diagnostics && items.length === 0 ? (
           <EdgeResultStatus diagnostics={data.diagnostics} compact />
@@ -646,11 +648,6 @@ function ModelLeanCallout({
         source: "game-detail-lean",
         addedAt:
           new Date().toISOString(),
-        referenceBankroll:
-          data?.bankroll ?? null,
-        referenceKellyMultiplier:
-          data?.kelly_multiplier ??
-          null,
       }),
     );
   };
@@ -674,7 +671,7 @@ function ModelLeanCallout({
           color: "var(--ink-4)",
         }}
       >
-        Model Lean
+        Top Analytical Edge
       </span>
       <span
         style={{
@@ -711,6 +708,18 @@ function ModelLeanCallout({
           subject={{ kind: "rec", gameId: topEdge.game_id }}
         />
       </div>
+      <RecommendationStatus recommendation={topEdge.recommendation} compact />
+      {topEdge.recommendation?.suggested_stake != null && (
+        <span className="mono" style={{ fontSize: 10, color: "var(--ink-2)" }}>
+          Persisted suggested stake ${topEdge.recommendation.suggested_stake.toFixed(2)}
+        </span>
+      )}
+      {topEdge.recommendation && (
+        <RecommendationDetails
+          recommendation={topEdge.recommendation}
+          summary="Policy evidence"
+        />
+      )}
       <button
         onClick={handleAddSlip}
         type="button"
@@ -966,7 +975,7 @@ function LinesAndFairValueCard({
                 fontWeight: 500,
               }}
             >
-              Recommendation
+              Policy State
             </td>
             <td style={{ padding: "12px 16px" }}>
               <RecCell edge={spreadEdge} diagnostics={edgesData?.diagnostics} />
@@ -1027,7 +1036,8 @@ function RecCell({
   }
 
   return (
-    <div>
+    <div style={{ display: "grid", gap: 5 }}>
+      <RecommendationStatus recommendation={edge.recommendation} compact />
       <div
         style={{
           color: "var(--pos)",

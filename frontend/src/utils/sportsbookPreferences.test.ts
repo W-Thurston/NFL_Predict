@@ -27,6 +27,7 @@ function edge(
     market_type: "moneyline",
     side: "home",
     american_odds: -110,
+    is_live: false,
     ev: 0.08,
     edge_strength: "strong",
     ...overrides,
@@ -89,12 +90,14 @@ describe("sportsbook preferences", () => {
       ...edge("fanduel"),
       ev: 0.1,
       american_odds: -140,
+      is_live: false,
       provider_event_id: "event-b",
     };
     const draftkings = {
       ...edge("draftkings"),
       ev: 0.1,
       american_odds: -150,
+      is_live: false,
       provider_event_id: "event-a",
     };
     expect(selectBestEdge([fanduel, draftkings])?.sportsbook).toBe("draftkings");
@@ -157,6 +160,7 @@ describe("sportsbook preferences", () => {
         market_type: "spread",
         market_value: -3.5,
         american_odds: -110,
+        is_live: false,
         ev: 0.08,
         provider_event_id: "event-dk",
       }),
@@ -164,6 +168,7 @@ describe("sportsbook preferences", () => {
         market_type: "spread",
         market_value: -4,
         american_odds: 105,
+        is_live: false,
         ev: 0.1,
         provider_event_id: "event-fd",
       }),
@@ -174,12 +179,14 @@ describe("sportsbook preferences", () => {
         sportsbook: "fanduel",
         market_value: -4,
         american_odds: 105,
+        is_live: false,
         provider_event_id: "event-fd",
       }),
       expect.objectContaining({
         sportsbook: "draftkings",
         market_value: -3.5,
         american_odds: -110,
+        is_live: false,
         provider_event_id: "event-dk",
       }),
     ]);

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pandas as pd
 
+from gridiron_edge.api.loaders import LoadedRecommendedBetResult
 from gridiron_edge.api.serializers.lines import serialize_line_shopping_list
 from gridiron_edge.market.line_shopping import (
     evaluate_line_shopping_guidance,
@@ -123,3 +126,62 @@ def test_sorts_games_by_kickoff_then_team_identity() -> None:
         "2026_01_ARI_LAC",
         "2026_01_BAL_IND",
     ]
+
+
+def _matching_recommendation() -> LoadedRecommendedBetResult:
+    from tests.fixtures.recommended_bet_results import evaluation
+
+    value = evaluation()
+    result = value.results[0]
+    matching = replace(
+        result,
+        game_id="2026_01_NE_SEA",
+        season="2026-2027",
+        week=1,
+        market="spread",
+        side="away",
+        provider_event_id="event-1",
+        sportsbook="draftkings",
+        fetched_at=pd.Timestamp("2026-08-05T22:05:33Z").to_pydatetime(),
+        sportsbook_updated_at=pd.Timestamp("2026-08-05T22:05:03Z").to_pydatetime(),
+        kickoff=pd.Timestamp("2026-09-10T00:15:00Z").to_pydatetime(),
+        american_price=-110,
+        line=3.5,
+    )
+    return LoadedRecommendedBetResult(value.evaluation_id, matching)
+
+
+def test_attaches_only_exact_persisted_recommendation() -> None:
+    evaluated = evaluate_line_shopping_guidance(product(), quotes())
+    loaded = _matching_recommendation()
+    result = serialize_line_shopping_list(
+        evaluated.offers,
+        season="2026-2027",
+        week=1,
+        market="spread",
+        guidance=evaluated.guidance,
+        recommendations=(loaded,),
+    )
+    by_book = {offer.sportsbook: offer for offer in result.items[0].offers}
+    attached = by_book["draftkings"].recommendation
+    assert attached is not None
+    assert attached.result_id == loaded.result.result_id
+    assert attached.evaluation_id == loaded.evaluation_id
+    assert attached.suggested_stake == loaded.result.sizing.actionable_stake
+    assert by_book["betrivers"].recommendation is None
+
+
+def test_exact_identity_mismatch_leaves_offer_unmatched() -> None:
+    evaluated = evaluate_line_shopping_guidance(product(), quotes())
+    loaded = _matching_recommendation()
+    changed = LoadedRecommendedBetResult(
+        loaded.evaluation_id, replace(loaded.result, american_price=-109)
+    )
+    result = serialize_line_shopping_list(
+        evaluated.offers,
+        season="2026-2027",
+        week=1,
+        market="spread",
+        recommendations=(changed,),
+    )
+    assert all(offer.recommendation is None for offer in result.items[0].offers)

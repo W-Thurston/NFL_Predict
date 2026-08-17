@@ -106,3 +106,7 @@ def test_line_offer_and_outcome_guidance_preserve_model_contract() -> None:
     assert row.is_model_approved is True
     assert row.expected_value == pytest.approx(0.069)
     assert guidance.playable_line == pytest.approx(2.3)
+
+
+def test_line_offer_allows_read_only_persisted_recommendation() -> None:
+    assert offer().recommendation is None

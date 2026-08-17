@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { components } from "./schema";
 import { apiClient } from "./client";
 
 /**
@@ -246,6 +247,33 @@ export function usePortfolioSummary() {
   });
 }
 
+type RecordBetRequest = components["schemas"]["RecordBetRequest"];
+
+/**
+ * Records one wager in Gridiron Edge without placing a sportsbook wager.
+ */
+export function useRecordPortfolioBet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (request: RecordBetRequest) => {
+      const { data, error } = await apiClient.POST("/portfolio/bets", {
+        body: request,
+      });
+      if (error) throw new Error(JSON.stringify(error));
+      return data;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["portfolio-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["portfolio-bets"] }),
+        queryClient.invalidateQueries({ queryKey: ["portfolio-transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["portfolio-curve"] }),
+      ]);
+    },
+  });
+}
+
 /**
  * Fetches open + recent bets from the ledger.
  */
@@ -313,8 +341,6 @@ export type EdgesQueryParams = {
   season?: string;
   week?: number;
   min_ev?: number;
-  bankroll?: number;
-  kelly_multiplier?: number;
 };
 
 export function useEdges(

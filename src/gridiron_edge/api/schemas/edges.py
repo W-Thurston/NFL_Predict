@@ -9,6 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from gridiron_edge.api.schemas._base import BaseListResponse
+from gridiron_edge.api.schemas.recommendations import RecommendationPresentation
 from gridiron_edge.market.edge import EdgeStrength
 from gridiron_edge.market.edge_diagnostics import (
     EdgeDiagnosticBlocker,
@@ -86,6 +87,7 @@ class EdgeRow(BaseModel):
     market_fetched_at: datetime | None = None
     sportsbook_updated_at: datetime | None = None
     commence_time: datetime | None = None
+    is_live: bool = False
 
     # Game context
     game_id: str
@@ -137,8 +139,7 @@ class EdgeRow(BaseModel):
     edge_strength: EdgeStrength = Field(
         description="'strong', 'moderate', 'lean', or 'no_edge'.",
     )
-    kelly_frac: float | None = None
-    kelly_stake: float | None = None
+    recommendation: RecommendationPresentation | None = None
 
 
 class EdgeList(BaseListResponse[EdgeRow]):
@@ -149,18 +150,6 @@ class EdgeList(BaseListResponse[EdgeRow]):
     min_ev: float | None = Field(
         default=None,
         description="Minimum EV threshold applied to the report.",
-    )
-    bankroll: float | None = Field(
-        default=None,
-        description=(
-            "Bankroll basis used to calculate kelly_stake. "
-            "None means dollar sizing was not requested."
-        ),
-    )
-
-    kelly_multiplier: float | None = Field(
-        default=None,
-        description=("Fraction of full Kelly applied when calculating kelly_stake."),
     )
     diagnostics: EdgeDiagnosticsResponse = Field(
         description="Complete diagnostics returned by the unified edge service.",

@@ -27,14 +27,15 @@ type EdgeApiRow =
 type PropApi =
   components["schemas"]["PropSummary"];
 
-const LEGS_KEY = "hm-betslip-v3";
-const MODE_KEY = "hm-betslip-mode-v3";
+const LEGS_KEY = "hm-betslip-v4";
+const MODE_KEY = "hm-betslip-mode-v4";
 const ADDED_AT =
   "2026-07-29T16:00:00.000Z";
 
 function edge(): EdgeApiRow {
   return {
     american_odds: -110,
+    is_live: false,
     away_team: "KC",
     confidence_tier: "High",
     cover_prob: null,
@@ -42,8 +43,6 @@ function edge(): EdgeApiRow {
     ev: 0.08,
     game_id: "2026_01_KC_LAC",
     home_team: "LAC",
-    kelly_frac: 0.08,
-    kelly_stake: 20,
     market_type: "moneyline",
     market_value: 0.45,
     model_key: "random_forest_win_prob",
@@ -83,8 +82,6 @@ function gameLeg() {
     edge: edge(),
     source: "betslip-edges",
     addedAt: ADDED_AT,
-    referenceBankroll: 2500,
-    referenceKellyMultiplier: 0.1,
   });
 }
 
@@ -146,14 +143,14 @@ function Harness() {
       </div>
 
       <div data-testid="reference-odds">
-        {legs[0]?.recommendation
-          .referenceAmericanOdds ??
+        {legs[0]?.edgeAnalytics
+          ?.referenceAmericanOdds ??
           "null"}
       </div>
 
       <div data-testid="reference-ev">
-        {legs[0]?.recommendation
-          .referenceExpectedValue ??
+        {legs[0]?.edgeAnalytics
+          ?.referenceExpectedValue ??
           "null"}
       </div>
 
@@ -339,7 +336,7 @@ describe("BetSlipContext", () => {
     ).toHaveTextContent("single");
   });
 
-  it("loads valid v3 legs", () => {
+  it("loads valid v4 legs", () => {
     localStorage.setItem(
       LEGS_KEY,
       JSON.stringify([
@@ -773,14 +770,14 @@ describe("BetSlipContext", () => {
     });
 
     expect(
-      stored[0].recommendation,
+      stored[0].edgeAnalytics,
     ).toMatchObject({
       referenceAmericanOdds: -110,
       referenceExpectedValue: 0.08,
     });
   });
 
-  it("persists v2 legs and mode", async () => {
+  it("persists v4 legs and mode", async () => {
     const user = userEvent.setup();
     renderProvider();
 

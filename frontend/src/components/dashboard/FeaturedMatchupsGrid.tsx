@@ -117,14 +117,6 @@ export function FeaturedMatchupsGrid() {
             key={game.game_id}
             game={game}
             edge={edge}
-            referenceBankroll={
-              edgesResult.data?.bankroll ??
-              null
-            }
-            referenceKellyMultiplier={
-              edgesResult.data
-                ?.kelly_multiplier ?? null
-            }
           />
         ))}
       </div>
@@ -135,15 +127,11 @@ export function FeaturedMatchupsGrid() {
 type FeaturedCardProps = {
   game: components["schemas"]["GameSummary"];
   edge: EdgeApiRow;
-  referenceBankroll: number | null;
-  referenceKellyMultiplier: number | null;
 };
 
 function FeaturedCard({
   game,
   edge,
-  referenceBankroll,
-  referenceKellyMultiplier,
 }: FeaturedCardProps) {
   const { navigate } = useNav();
   const { legs, add } = useBetSlip();
@@ -191,8 +179,6 @@ function FeaturedCard({
           "dashboard-featured",
         addedAt:
           new Date().toISOString(),
-        referenceBankroll,
-        referenceKellyMultiplier,
       }),
     );
   };

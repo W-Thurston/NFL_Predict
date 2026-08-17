@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from gridiron_edge.api.schemas._base import BaseListResponse
+from gridiron_edge.api.schemas.recommendations import RecommendationPresentation
 
 MarketName = Literal["moneyline", "spread", "total"]
 MarketSide = Literal["away", "home", "over", "under"]
@@ -59,6 +60,7 @@ class LineOffer(BaseModel):
     is_best_model_approved_offer: bool = False
     product_id: str | None = None
     product_run_id: str | None = None
+    recommendation: RecommendationPresentation | None = None
 
 
 class LineShoppingGame(BaseModel):

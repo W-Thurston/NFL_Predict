@@ -12,6 +12,8 @@ import {
 } from "../../utils/sportsbookPreferences";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
 import { ErrorCard } from "../../components/error/ErrorCard";
+import { RecommendationDetails } from "../recommendations/RecommendationDetails";
+import { RecommendationStatus } from "../recommendations/RecommendationStatus";
 
 export function EdgesTable({
   bankroll,
@@ -20,20 +22,15 @@ export function EdgesTable({
   bankroll: number | null;
   kellyMultiplier: number;
 }) {
+  void bankroll;
+  void kellyMultiplier;
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     () => new Set(),
   );
-  const edgeParams =
-    bankroll == null
-      ? {
-          kelly_multiplier:
-            kellyMultiplier,
-        }
-      : {
-          bankroll,
-          kelly_multiplier:
-            kellyMultiplier,
-        };
+  // Persisted recommendation sizing comes from each exact EdgeRow.
+  // The component bankroll and multiplier remain Bet Slip draft-analysis
+  // inputs and are never sent to /edges.
+  const edgeParams = {};
 
   const {
     data,
@@ -215,6 +212,12 @@ export function EdgesTable({
 
               <th
                 scope="col"
+                style={{ padding: "8px 12px 8px 0" }}
+              >
+                Policy State
+              </th>
+              <th
+                scope="col"
                 aria-label="Bet Slip action"
                 style={{
                   padding: "8px 0",
@@ -338,6 +341,20 @@ export function EdgesTable({
                     <td style={{ padding: "10px 12px 10px 0" }}>
                       <EdgeStrengthPill strength={edge.edge_strength} />
                     </td>
+                    <td style={{ padding: "10px 12px 10px 0" }}>
+                      <div style={{ display: "grid", gap: 5 }}>
+                        <RecommendationStatus
+                          recommendation={edge.recommendation}
+                          compact
+                        />
+                        {edge.recommendation && (
+                          <RecommendationDetails
+                            recommendation={edge.recommendation}
+                            summary="Policy evidence"
+                          />
+                        )}
+                      </div>
+                    </td>
                     <td style={{ padding: "10px 0" }}>
                       <AddButton
                         disabled={alreadyAdded}
@@ -348,9 +365,6 @@ export function EdgesTable({
                               edge,
                               source: "betslip-edges",
                               addedAt: new Date().toISOString(),
-                              referenceBankroll: data.bankroll ?? null,
-                              referenceKellyMultiplier:
-                                data.kelly_multiplier ?? null,
                             }),
                           )
                         }

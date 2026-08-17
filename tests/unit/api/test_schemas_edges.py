@@ -46,8 +46,7 @@ def _valid_edge_row() -> dict:
         "cover_prob": None,
         "ev": 0.045,
         "edge_strength": "moderate",
-        "kelly_frac": 0.023,
-        "kelly_stake": 5.75,
+        "is_live": False,
     }
 
 
@@ -67,7 +66,7 @@ class TestEdgeRow:
         assert row.game_id == "2026_01_KC_LAC"
         assert row.point_edge is None
         assert row.cover_prob is None
-        assert row.kelly_stake is None
+        assert row.recommendation is None
         assert row.american_odds == 125
 
     def test_full_moneyline_row(self) -> None:
@@ -310,8 +309,6 @@ class TestEdgeList:
         assert response.week is None
         assert response.min_ev is None
         assert response.response_meta is None
-        assert response.bankroll is None
-        assert response.kelly_multiplier is None
         assert response.diagnostics == _edge_list_diagnostics()
 
     def test_with_edges(self) -> None:
@@ -334,15 +331,11 @@ class TestEdgeList:
             season="2026-2027",
             week=1,
             min_ev=0.02,
-            bankroll=2500.0,
-            kelly_multiplier=0.1,
             diagnostics=_edge_list_diagnostics(),
         )
         assert len(response.items) == 2
         assert response.season == "2026-2027"
         assert response.min_ev == 0.02
-        assert response.bankroll == 2500.0
-        assert response.kelly_multiplier == 0.1
 
     def test_min_ev_zero_preserved(self) -> None:
         response = EdgeList(

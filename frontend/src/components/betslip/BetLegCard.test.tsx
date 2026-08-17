@@ -34,6 +34,7 @@ function edge(
 ): EdgeApiRow {
   return {
     american_odds: -110,
+    is_live: false,
     away_team: "KC",
     cover_prob: null,
     edge_strength: "strong",
@@ -41,8 +42,6 @@ function edge(
     game_id:
       "2026_01_KC_LAC",
     home_team: "LAC",
-    kelly_frac: 0.08,
-    kelly_stake: 20,
     market_type: "moneyline",
     market_value: 0.45,
     model_key:
@@ -94,9 +93,6 @@ function renderCard({
     edge: edge(),
     source: "betslip-edges",
     addedAt: ADDED_AT,
-    referenceBankroll: 2500,
-    referenceKellyMultiplier:
-      0.1,
   }),
   bankroll = 2500,
   kellyMultiplier = 0.1,
@@ -301,7 +297,7 @@ describe("BetLegCard", () => {
     "shows unavailable dollar sizing without bankroll",
     () => {
         renderCard({
-        bankroll: null,
+          bankroll: null,
         });
 
         const analysisSection =

@@ -382,8 +382,6 @@ class TestLoadEdgesForWeek:
             season="2026-2027",
             week=1,
             min_ev=0.03,
-            bankroll=2500.0,
-            kelly_multiplier=0.10,
         )
 
         assert result is not expected
@@ -395,8 +393,8 @@ class TestLoadEdgesForWeek:
                 "season": "2026-2027",
                 "week": 1,
                 "min_ev": 0.03,
-                "bankroll": 2500.0,
-                "kelly_multiplier": 0.10,
+                "bankroll": None,
+                "kelly_multiplier": 0.25,
                 "repo": tmp_path,
             }
         ]

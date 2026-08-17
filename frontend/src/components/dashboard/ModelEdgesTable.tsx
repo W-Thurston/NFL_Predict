@@ -269,9 +269,6 @@ export function ModelEdgesTable() {
                               edge,
                               source: "dashboard-model-edges",
                               addedAt: new Date().toISOString(),
-                              referenceBankroll: data?.bankroll ?? null,
-                              referenceKellyMultiplier:
-                                data?.kelly_multiplier ?? null,
                             }),
                           );
                         }}

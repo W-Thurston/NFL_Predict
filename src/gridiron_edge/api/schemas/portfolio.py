@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gridiron_edge.api.schemas._base import BaseListResponse, BaseResponse
 
@@ -71,6 +73,53 @@ class BetRow(BaseModel):
     clv: float | None = None
     model_name: str | None = None
     model_type: str | None = None
+    recommended_bet_result_id: str | None = None
+    recommendation_evaluation_id: str | None = None
+    candidate_reference_id: str | None = None
+    recommendation_policy_id: str | None = None
+
+
+class RecordBetRequest(BaseModel):
+    """Recorded wager terms plus an optional complete Unit 24 identity chain."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    game_id: str = Field(min_length=1)
+    market_type: Literal["moneyline", "spread", "total"]
+    side: str = Field(min_length=1)
+    line: float | None = None
+    odds: int
+    stake: float = Field(gt=0)
+    book: str = Field(min_length=1)
+    recommended_bet_result_id: str | None = None
+    recommendation_evaluation_id: str | None = None
+    candidate_reference_id: str | None = None
+    recommendation_policy_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_recommendation_chain(self) -> RecordBetRequest:
+        """Require recommendation identities to be complete or absent."""
+        identities = (
+            self.recommended_bet_result_id,
+            self.recommendation_evaluation_id,
+            self.candidate_reference_id,
+            self.recommendation_policy_id,
+        )
+        if any(value is not None for value in identities) and any(
+            value is None or not value.strip() for value in identities
+        ):
+            raise ValueError("Recommendation identities must be entirely absent or complete.")
+        return self
+
+
+class RecordBetResponse(BaseModel):
+    """One successfully recorded wager and its bankroll transaction."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    bet: BetRow
+    bankroll_transaction_id: str
+    message: str = "Wager recorded in Gridiron Edge. No sportsbook wager was placed."
 
 
 class CurveBucket(BaseModel):

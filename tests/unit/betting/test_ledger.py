@@ -140,7 +140,13 @@ class TestLedgerSchema:
     """Current bet-ledger schema invariants."""
 
     def test_model_identity_columns_are_canonical(self) -> None:
-        assert _BET_COLUMNS[17:19] == ["model_name", "model_type"]
+        assert _BET_COLUMNS[17:21] == [
+            "recommended_bet_result_id",
+            "recommendation_evaluation_id",
+            "candidate_reference_id",
+            "recommendation_policy_id",
+        ]
+        assert _BET_COLUMNS[21:23] == ["model_name", "model_type"]
 
 
 class TestLogBetModelIdentity:
@@ -589,7 +595,13 @@ class TestBetReferenceProvenance:
     def test_reference_columns_are_canonical(self) -> None:
         """Reference evidence follows actual wager terms in schema order."""
         assert _BET_COLUMNS[9:17] == self._REFERENCE_COLUMNS
-        assert _BET_COLUMNS[17:19] == ["model_name", "model_type"]
+        assert _BET_COLUMNS[17:21] == [
+            "recommended_bet_result_id",
+            "recommendation_evaluation_id",
+            "candidate_reference_id",
+            "recommendation_policy_id",
+        ]
+        assert _BET_COLUMNS[21:23] == ["model_name", "model_type"]
 
     def test_manual_bet_has_null_reference_provenance(
         self,

@@ -10,8 +10,8 @@ import {
   createPropBetLeg,
   isPriceAtLeastAsGood,
   modelBreakEvenAmericanOdds,
-  parseBetLegsV3,
-  parseBetLegV3,
+  parseBetLegsV4,
+  parseBetLegV4,
   propSideFromLean,
   type BetLegSource,
   type GameBetLeg,
@@ -31,6 +31,7 @@ function edge(overrides: Partial<EdgeApiRow> = {}): EdgeApiRow {
     sportsbook_updated_at: "2026-09-05T11:59:00Z",
     commence_time: "2026-09-06T00:20:00Z",
     american_odds: -110,
+    is_live: false,
     away_team: "KC",
     confidence_tier: "High",
     cover_prob: null,
@@ -38,8 +39,6 @@ function edge(overrides: Partial<EdgeApiRow> = {}): EdgeApiRow {
     ev: 0.08,
     game_id: "2026_01_KC_LAC",
     home_team: "LAC",
-    kelly_frac: 0.08,
-    kelly_stake: 20,
     market_type: "moneyline",
     market_value: 0.45,
     model_key: "random_forest_win_prob",
@@ -83,8 +82,6 @@ function gameLeg(
     edge: edge(),
     source: "betslip-edges",
     addedAt: ADDED_AT,
-    referenceBankroll: 2500,
-    referenceKellyMultiplier: 0.1,
   });
   return { ...base, ...overrides };
 }
@@ -167,19 +164,17 @@ describe("createGameBetLeg", () => {
       edge: edgeValue,
       source,
       addedAt: ADDED_AT,
-      referenceBankroll: 2500,
-      referenceKellyMultiplier: 0.1,
     });
 
   it("keeps moneyline market probability separate from price", () => {
     const leg = create(edge());
     expect(leg.line).toBeNull();
-    expect(leg.recommendation.referenceMarketValue).toBe(0.45);
-    expect(leg.recommendation.referenceAmericanOdds).toBe(-110);
-    expect(leg.recommendation.referenceModelProbability).toBe(0.58);
+    expect(leg.edgeAnalytics.referenceMarketValue).toBe(0.45);
+    expect(leg.edgeAnalytics.referenceAmericanOdds).toBe(-110);
+    expect(leg.edgeAnalytics.referenceModelProbability).toBe(0.58);
     expect(leg.draft.currentAmericanOdds).toBe(-110);
     expect(leg.draft.sportsbook).toBe("draftkings");
-    expect(leg.recommendation).toMatchObject({
+    expect(leg.edgeAnalytics).toMatchObject({
       referenceProvider: "the_odds_api",
       referenceProviderEventId: "event-1",
       referenceSportsbook: "draftkings",
@@ -198,12 +193,13 @@ describe("createGameBetLeg", () => {
         model_value: -6.25,
         cover_prob: 0.59,
         american_odds: -108,
+        is_live: false,
       }),
     );
     expect(leg.line).toBe(-3.5);
-    expect(leg.recommendation.referenceAmericanOdds).toBe(-108);
-    expect(leg.recommendation.referenceModelProbability).toBe(0.59);
-    expect(leg.recommendation.referenceModelValue).toBe(-6.25);
+    expect(leg.edgeAnalytics.referenceAmericanOdds).toBe(-108);
+    expect(leg.edgeAnalytics.referenceModelProbability).toBe(0.59);
+    expect(leg.edgeAnalytics.referenceModelValue).toBe(-6.25);
   });
 
   it("keeps a total line separate from its selected-side price", () => {
@@ -215,23 +211,33 @@ describe("createGameBetLeg", () => {
         model_value: 51.2,
         cover_prob: 0.63,
         american_odds: 105,
+        is_live: false,
       }),
     );
     expect(leg.line).toBe(47.5);
-    expect(leg.recommendation.referenceAmericanOdds).toBe(105);
-    expect(leg.recommendation.referenceModelProbability).toBe(0.63);
+    expect(leg.edgeAnalytics.referenceAmericanOdds).toBe(105);
+    expect(leg.edgeAnalytics.referenceModelProbability).toBe(0.63);
   });
 
-  it("retains recommendation sizing provenance", () => {
+  it("does not manufacture persisted sizing from analytical edges", () => {
     const leg = create(edge());
-    expect(leg.recommendation).toMatchObject({
+    expect(leg.edgeAnalytics).toMatchObject({
       referenceExpectedValue: 0.08,
       referenceEdgeStrength: "strong",
-      referenceKellyFraction: 0.08,
-      referenceKellyStake: 20,
-      referenceBankroll: 2500,
-      referenceKellyMultiplier: 0.1,
     });
+
+    expect(leg.edgeAnalytics).not.toHaveProperty(
+      "referenceKellyFraction",
+    );
+    expect(leg.edgeAnalytics).not.toHaveProperty(
+      "referenceKellyStake",
+    );
+    expect(leg.edgeAnalytics).not.toHaveProperty(
+      "referenceBankroll",
+    );
+    expect(leg.edgeAnalytics).not.toHaveProperty(
+      "referenceKellyMultiplier",
+    );
   });
 
   it("uses a canonical ID independent of producer source", () => {
@@ -281,8 +287,8 @@ describe("createPropBetLeg", () => {
       source: "player-prop",
       addedAt: ADDED_AT,
     });
-    expect(over.recommendation.referenceModelProbability).toBe(0.61);
-    expect(under.recommendation.referenceModelProbability).toBeCloseTo(0.39);
+    expect(over.edgeAnalytics.referenceModelProbability).toBe(0.61);
+    expect(under.edgeAnalytics.referenceModelProbability).toBeCloseTo(0.39);
   });
 
   it("keeps probability null when p_over is unavailable", () => {
@@ -293,12 +299,12 @@ describe("createPropBetLeg", () => {
       addedAt: ADDED_AT,
     });
     expect(leg.line).toBeNull();
-    expect(leg.recommendation.referenceModelProbability).toBeNull();
+    expect(leg.edgeAnalytics.referenceModelProbability).toBeNull();
   });
 
   it("never fabricates a reference or current price", () => {
     const leg = propLeg();
-    expect(leg.recommendation.referenceAmericanOdds).toBeNull();
+    expect(leg.edgeAnalytics.referenceAmericanOdds).toBeNull();
     expect(leg.draft.currentAmericanOdds).toBeNull();
   });
 
@@ -574,8 +580,8 @@ describe("analyzeBetLeg", () => {
           currentAmericanOdds: -110,
           proposedStake: 25,
         },
-        recommendation: {
-          ...propLeg().recommendation,
+        edgeAnalytics: {
+          ...propLeg().edgeAnalytics!,
           referenceModelProbability:
             null,
         },
@@ -637,7 +643,7 @@ describe("analyzeBetLeg", () => {
   it("blocks dollar sizing without an explicit Kelly multiplier", () => {
     const analysis = analyzeBetLeg({
       leg: gameLeg(),
-      bankroll: 2500,
+      bankroll: null,
       kellyMultiplier: null,
     });
 
@@ -670,31 +676,31 @@ describe("analyzeBetLeg", () => {
   });
 });
 
-describe("v3 runtime parsing", () => {
+describe("v4 runtime parsing", () => {
   it("accepts valid game and prop legs", () => {
-    expect(parseBetLegV3(gameLeg())).toEqual(gameLeg());
-    expect(parseBetLegV3(propLeg())).toEqual(propLeg());
+    expect(parseBetLegV4(gameLeg())).toEqual(gameLeg());
+    expect(parseBetLegV4(propLeg())).toEqual(propLeg());
   });
 
   it("rejects retired versions and malformed sources", () => {
-    expect(parseBetLegV3({ ...gameLeg(), version: 2 })).toBeNull();
-    expect(parseBetLegV3({ ...gameLeg(), source: "unknown" })).toBeNull();
+    expect(parseBetLegV4({ ...gameLeg(), version: 2 })).toBeNull();
+    expect(parseBetLegV4({ ...gameLeg(), source: "unknown" })).toBeNull();
   });
 
   it("rejects invalid market-side combinations", () => {
     expect(
-      parseBetLegV3({ ...gameLeg(), market: "total", side: "home" }),
+      parseBetLegV4({ ...gameLeg(), market: "total", side: "home" }),
     ).toBeNull();
   });
 
   it("rejects a noncanonical ID", () => {
-    expect(parseBetLegV3({ ...gameLeg(), id: "producer-specific" })).toBeNull();
+    expect(parseBetLegV4({ ...gameLeg(), id: "producer-specific" })).toBeNull();
   });
 
   it("rejects zero, NaN, and infinite prices", () => {
     for (const currentAmericanOdds of [0, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(
-        parseBetLegV3({
+        parseBetLegV4({
           ...gameLeg(),
           draft: { ...gameLeg().draft, currentAmericanOdds },
         }),
@@ -703,18 +709,18 @@ describe("v3 runtime parsing", () => {
   });
 
   it("rejects malformed nested blocks", () => {
-    expect(parseBetLegV3({ ...gameLeg(), recommendation: null })).toBeNull();
-    expect(parseBetLegV3({ ...gameLeg(), draft: {} })).toBeNull();
+    expect(parseBetLegV4({ ...gameLeg(), edgeAnalytics: null })).toBeNull();
+    expect(parseBetLegV4({ ...gameLeg(), draft: {} })).toBeNull();
   });
 
   it("salvages valid legs from a mixed array", () => {
     expect(
-      parseBetLegsV3([gameLeg(), { ...propLeg(), version: 1 }, propLeg()]),
+      parseBetLegsV4([gameLeg(), { ...propLeg(), version: 1 }, propLeg()]),
     ).toEqual([gameLeg(), propLeg()]);
   });
 
   it("returns an empty list for non-array input", () => {
-    expect(parseBetLegsV3(gameLeg())).toEqual([]);
+    expect(parseBetLegsV4(gameLeg())).toEqual([]);
   });
 });
 

@@ -41,9 +41,9 @@ const sizing: BetSlipSizingResult = {
     whatIfBankroll: null,
     kellyMultiplier: 0.25,
   },
-  bankroll: 2500,
   bankrollSource: "tracked",
   trackedBankroll: 2500,
+  bankroll: 2500,
   bankrollMode: "tracked",
   whatIfBankroll: null,
   kellyMultiplier: 0.25,
@@ -70,16 +70,14 @@ function edge({
   side: "home" | "away";
 }): EdgeApiRow {
   return {
-    american_odds:
-      americanOdds,
+    american_odds: americanOdds,
+    is_live: false,
     away_team: awayTeam,
     cover_prob: null,
     edge_strength: "strong",
     ev: 0.08,
     game_id: gameId,
     home_team: homeTeam,
-    kelly_frac: 0.08,
-    kelly_stake: 20,
     market_type: "moneyline",
     market_value: 0.45,
     model_key:
@@ -115,9 +113,6 @@ function gameLeg({
     }),
     source: "betslip-edges",
     addedAt: ADDED_AT,
-    referenceBankroll: 2500,
-    referenceKellyMultiplier:
-      0.25,
   });
 
   return {
@@ -168,7 +163,7 @@ function propLeg(): BetLeg {
 
 function storeLegs(legs: BetLeg[]) {
   localStorage.setItem(
-    "hm-betslip-v3",
+    "hm-betslip-v4",
     JSON.stringify(legs),
   );
 }
@@ -177,7 +172,7 @@ function storeMode(
   mode: "single" | "parlay",
 ) {
   localStorage.setItem(
-    "hm-betslip-mode-v3",
+    "hm-betslip-mode-v4",
     mode,
   );
 }

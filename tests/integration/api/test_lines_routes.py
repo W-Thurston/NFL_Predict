@@ -11,6 +11,7 @@ import pytest
 
 from gridiron_edge.api.app import create_app
 from gridiron_edge.api.deps import settings_dependency
+from gridiron_edge.api.loaders import LoadedRecommendedBetResult
 from gridiron_edge.api.routes import lines as lines_route
 from gridiron_edge.ingest.odds.store import (
     QUOTE_COLUMNS,
@@ -154,3 +155,35 @@ def test_missing_selected_product_preserves_raw_quotes(
     assert len(body["items"][0]["offers"]) == 2
     assert body["items"][0]["guidance"] == []
     assert {offer["model_status"] for offer in body["items"][0]["offers"]} == {"model_unavailable"}
+
+
+def test_route_loads_persisted_results_once_and_preserves_null_when_unmatched(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def load_results(
+        _settings: object, *, season: str, week: int
+    ) -> tuple[LoadedRecommendedBetResult, ...]:
+        calls.append((season, week))
+        return ()
+
+    monkeypatch.setattr(lines_route, "load_recommended_bet_results_for_week", load_results)
+
+    def missing_product(
+        *_args: object,
+        **_kwargs: object,
+    ) -> pd.DataFrame:
+        raise FileNotFoundError("No selected weekly product")
+
+    monkeypatch.setattr(
+        lines_route,
+        "load_games_for_week",
+        missing_product,
+    )
+    write_current_odds_snapshot(quote_rows(), repo=tmp_path)
+    body = client.get("/lines?season=2026-2027&week=1&market=spread").json()
+    assert calls == [("2026-2027", 1)]
+    assert all(offer["recommendation"] is None for offer in body["items"][0]["offers"])

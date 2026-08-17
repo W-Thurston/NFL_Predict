@@ -61,6 +61,10 @@ _BET_COLUMNS: Final[list[str]] = [
     "reference_commence_time",
     "reference_american_odds",
     "reference_line",
+    "recommended_bet_result_id",
+    "recommendation_evaluation_id",
+    "candidate_reference_id",
+    "recommendation_policy_id",
     "model_name",
     "model_type",
     "model_prob",
@@ -154,6 +158,32 @@ def _validate_model_identity(
 
     if not model_type.strip():
         raise ValueError("model_type must be a nonempty string when model identity is provided.")
+
+
+def _validate_recommendation_provenance(
+    *,
+    recommended_bet_result_id: str | None,
+    recommendation_evaluation_id: str | None,
+    candidate_reference_id: str | None,
+    recommendation_policy_id: str | None,
+) -> None:
+    """Require Unit 24 recommendation identities to be complete or absent."""
+    identities = {
+        "recommended_bet_result_id": recommended_bet_result_id,
+        "recommendation_evaluation_id": recommendation_evaluation_id,
+        "candidate_reference_id": candidate_reference_id,
+        "recommendation_policy_id": recommendation_policy_id,
+    }
+    if all(value is None for value in identities.values()):
+        return
+    if any(value is None for value in identities.values()):
+        raise ValueError(
+            "Recommendation provenance must be entirely absent or provide "
+            "result, evaluation, candidate, and policy identities."
+        )
+    for label, value in identities.items():
+        if value is None or not value.strip():
+            raise ValueError(f"{label} must be a nonempty string.")
 
 
 def _require_utc_timestamp(
@@ -341,6 +371,10 @@ def log_bet(
     reference_commence_time: datetime | None = None,
     reference_american_odds: int | None = None,
     reference_line: float | None = None,
+    recommended_bet_result_id: str | None = None,
+    recommendation_evaluation_id: str | None = None,
+    candidate_reference_id: str | None = None,
+    recommendation_policy_id: str | None = None,
     placed_at: datetime | None = None,
     repo: Path | None = None,
 ) -> str:
@@ -373,6 +407,13 @@ def log_bet(
         reference_commence_time: Optional UTC kickoff evidence.
         reference_american_odds: Optional reference-offer American odds.
         reference_line: Optional reference-offer point value.
+        recommended_bet_result_id: Optional persisted Unit 24 result identity.
+        recommendation_evaluation_id: Optional persisted Unit 24 evaluation
+            identity.
+        candidate_reference_id: Optional persisted recommendation candidate
+            identity.
+        recommendation_policy_id: Optional persisted recommendation policy
+            identity.
         placed_at: Timestamp of bet placement. Defaults to ``utcnow()``.
         repo: Repository root override.
 
@@ -384,6 +425,12 @@ def log_bet(
             model_name or model_type.
     """
     _validate_model_identity(model_name, model_type)
+    _validate_recommendation_provenance(
+        recommended_bet_result_id=recommended_bet_result_id,
+        recommendation_evaluation_id=recommendation_evaluation_id,
+        candidate_reference_id=candidate_reference_id,
+        recommendation_policy_id=recommendation_policy_id,
+    )
     _validate_reference_provenance(
         reference_provider=reference_provider,
         reference_provider_event_id=reference_provider_event_id,
@@ -417,6 +464,10 @@ def log_bet(
         "reference_commence_time": reference_commence_time,
         "reference_american_odds": reference_american_odds,
         "reference_line": reference_line,
+        "recommended_bet_result_id": recommended_bet_result_id,
+        "recommendation_evaluation_id": recommendation_evaluation_id,
+        "candidate_reference_id": candidate_reference_id,
+        "recommendation_policy_id": recommendation_policy_id,
         "model_name": model_name,
         "model_type": model_type,
         "model_prob": model_prob,

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query
 from gridiron_edge.api.deps import SettingsDep
 from gridiron_edge.api.loaders import (
     load_edges_for_week,
+    load_recommended_bet_results_for_week,
     resolve_current_season_week,
 )
 from gridiron_edge.api.meta import ResponseMeta, Unavailable
@@ -52,20 +53,6 @@ def list_edges(
         ge=0.0,
         description="Minimum EV threshold. Rows with ev <= min_ev excluded.",
     ),
-    bankroll: float | None = Query(
-        default=None,
-        ge=0.0,
-        description=(
-            "Bankroll for Kelly stake sizing. When omitted, "
-            "kelly_stake is unavailable while kelly_frac remains populated."
-        ),
-    ),
-    kelly_multiplier: float = Query(
-        default=0.25,
-        ge=0.0,
-        le=1.0,
-        description=("Fraction of full Kelly, constrained to [0, 1] (e.g. 0.25 = quarter-Kelly)."),
-    ),
 ) -> EdgeList:
     """Return ranked edges from the selected persisted weekly product."""
     resolved_season, resolved_week = _resolve_scope(settings, season, week)
@@ -74,8 +61,11 @@ def list_edges(
         season=resolved_season,
         week=resolved_week,
         min_ev=min_ev,
-        bankroll=bankroll,
-        kelly_multiplier=kelly_multiplier,
+    )
+    recommendations = load_recommended_bet_results_for_week(
+        settings,
+        season=resolved_season,
+        week=resolved_week,
     )
 
     unavailable = {
@@ -97,7 +87,6 @@ def list_edges(
     return serialize_edges_list(
         result,
         min_ev=min_ev,
-        bankroll=bankroll,
-        kelly_multiplier=kelly_multiplier,
+        recommendations=recommendations,
         response_meta=meta,
     )

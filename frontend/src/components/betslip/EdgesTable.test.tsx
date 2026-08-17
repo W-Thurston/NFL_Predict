@@ -42,8 +42,6 @@ function response(overrides: Partial<EdgeList> = {}): EdgeList {
     diagnostics: diagnostics(),
     items: [],
     total: 0,
-    bankroll: null,
-    kelly_multiplier: 0.25,
     ...overrides,
   };
 }
@@ -64,10 +62,9 @@ function moneylineEdge(
     model_value: 0.58,
     market_value: 0.45,
     american_odds: 170,
+    is_live: false,
     ev: 0.08,
     edge_strength: "strong",
-    kelly_frac: 0.08,
-    kelly_stake: 20,
     ...overrides,
   };
 }
@@ -201,36 +198,30 @@ describe("EdgesTable", () => {
     ).toBeInTheDocument();
   });
 
-  it("passes an explicit bankroll and multiplier", () => {
+  it("keeps bankroll and multiplier out of the edge request", () => {
     render(
       <TestWrapper>
         <EdgesTable bankroll={2500} kellyMultiplier={0.1} />
       </TestWrapper>,
     );
 
-    expect(useEdges).toHaveBeenCalledWith({
-      bankroll: 2500,
-      kelly_multiplier: 0.1,
-    });
+    expect(useEdges).toHaveBeenCalledWith({});
   });
 
-  it("omits bankroll when unavailable and preserves zero", () => {
+  it("never sends local bankroll modes to the edge request", () => {
     const { rerender } = render(
       <TestWrapper>
         <EdgesTable bankroll={null} kellyMultiplier={0.25} />
       </TestWrapper>,
     );
-    expect(useEdges).toHaveBeenLastCalledWith({ kelly_multiplier: 0.25 });
+    expect(useEdges).toHaveBeenLastCalledWith({});
 
     rerender(
       <TestWrapper>
         <EdgesTable bankroll={0} kellyMultiplier={0.25} />
       </TestWrapper>,
     );
-    expect(useEdges).toHaveBeenLastCalledWith({
-      bankroll: 0,
-      kelly_multiplier: 0.25,
-    });
+    expect(useEdges).toHaveBeenLastCalledWith({});
   });
 
 
@@ -243,6 +234,7 @@ describe("EdgesTable", () => {
           provider_event_id: "event-2",
           sportsbook: "fanduel",
           american_odds: 180,
+          is_live: false,
           ev: 0.1,
         }),
       ],
@@ -293,6 +285,7 @@ describe("EdgesTable", () => {
           provider_event_id: "event-2",
           sportsbook: "fanduel",
           american_odds: 180,
+          is_live: false,
           ev: 0.1,
         }),
       ],
@@ -321,6 +314,7 @@ describe("EdgesTable", () => {
           side: "home",
           market_value: -3.5,
           american_odds: -110,
+          is_live: false,
           ev: 0.08,
         }),
         moneylineEdge({
@@ -330,6 +324,7 @@ describe("EdgesTable", () => {
           side: "home",
           market_value: -4,
           american_odds: 105,
+          is_live: false,
           ev: 0.1,
         }),
       ],
@@ -360,6 +355,7 @@ describe("EdgesTable", () => {
           provider_event_id: "event-2",
           sportsbook: "fanduel",
           american_odds: 180,
+          is_live: false,
           ev: 0.1,
         }),
       ],
