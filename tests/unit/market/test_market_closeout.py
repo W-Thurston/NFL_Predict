@@ -18,6 +18,7 @@ from gridiron_edge.market.candidate_issuance import (
     CandidateIssuanceRow,
     CandidateIssuanceState,
     candidate_issuance_id,
+    candidate_issuance_row_id,
 )
 from gridiron_edge.market.market_closeout import (
     MarketCloseoutReference,
@@ -527,3 +528,12 @@ def test_candidate_unavailable_reference_does_not_calculate_clv() -> None:
     result = close_candidate_issuance(changed, _quotes(_quote()))[0]
     assert result.status is MarketCloseoutStatus.REFERENCE_UNAVAILABLE
     assert result.clv is None
+
+
+def test_candidate_closeout_reference_uses_shared_row_identity() -> None:
+    issuance = _issuance()
+    result = close_candidate_issuance(issuance, _quotes(_quote()))[0]
+    candidate = next(row for row in issuance.rows if row.state is CandidateIssuanceState.CANDIDATE)
+    assert result.reference.reference_id == candidate_issuance_row_id(
+        issuance.issuance_id, candidate
+    )

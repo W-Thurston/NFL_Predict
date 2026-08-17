@@ -121,6 +121,34 @@ def candidate_issuance_id(
     return sha256(encoded).hexdigest()
 
 
+def candidate_issuance_row_id(
+    issuance_id: str,
+    row: CandidateIssuanceRow,
+) -> str:
+    """Return the stable identity of one exact row within an issuance.
+
+    The payload preserves the candidate-reference identity originally owned by
+    the market closeout boundary so peer consumers share one lasting identity.
+    """
+    normalized_issuance_id = _nonempty(issuance_id, label="issuance_id")
+    identity = {
+        "issuance_id": normalized_issuance_id,
+        "provider": row.provider,
+        "provider_event_id": row.provider_event_id,
+        "sportsbook": row.sportsbook,
+        "game_id": row.game_id,
+        "market": row.market,
+        "side": row.side,
+        "fetched_at": row.fetched_at.isoformat(),
+        "american_price": row.american_price,
+        "line": row.line,
+    }
+    digest = sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return f"{normalized_issuance_id}:{digest}"
+
+
 def issue_pregame_candidates(
     *,
     product: DataFrame,

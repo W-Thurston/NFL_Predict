@@ -2039,3 +2039,188 @@ input DataFrame is mutated.
 No staking, bankroll, exposure, portfolio construction, ledger mutation,
 candidate qualification, recommendation emission, recommendation persistence,
 CLI, API, frontend, or operational-worker behavior was introduced.
+
+---
+
+### Market Unit 23: Lock Versioned Recommendation Policy [Completed]
+
+#### Completed
+
+2026-08-17
+
+#### Goal
+
+Derive, validate, and persist an immutable versioned policy that determines
+whether one exact issued candidate may remain unqualified, become a qualified
+opportunity, or become eligible for recommendation.
+
+Policy derivation evaluates Moneyline, Spread, and Total independently from the
+empirical evidence produced by Market Unit 22. Descriptive evidence does not
+become a qualification threshold without a validated threshold-selection
+method, and insufficient evidence remains an explicit valid policy result.
+
+The policy boundary separates empirically derived qualification evidence from
+governed operational inputs, evaluates exact candidate, freshness, bankroll,
+sizing, duplicate, conflict, and exposure requirements deterministically, and
+remains independent from API, frontend, CLI, ledger mutation, bankroll mutation,
+and operational request paths.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- `src/gridiron_edge/market/recommendation_policy.py`
+- `src/gridiron_edge/market/recommendation_policy_store.py`
+- `tests/unit/market/test_recommendation_policy.py`
+- `tests/unit/market/test_recommendation_policy_evaluation.py`
+- `tests/unit/market/test_recommendation_policy_store.py`
+
+Changed:
+
+- `PLAN.md`
+- `src/gridiron_edge/market/candidate_issuance.py`
+- `src/gridiron_edge/market/market_closeout.py`
+- `tests/unit/market/test_candidate_issuance.py`
+- `tests/unit/market/test_market_closeout.py`
+
+Removed:
+
+- Temporary Market Unit 23 implementation and correction helpers.
+
+#### Tests
+
+- One stable exact candidate-row identity was shared by candidate issuance,
+  market closeout, and recommendation-policy evaluation.
+- Existing closeout candidate-reference identities remained unchanged.
+- Complete Market Unit 22 evidence received one canonical deterministic
+  SHA-256 fingerprint.
+- Governed operational inputs received a separate canonical deterministic
+  SHA-256 fingerprint.
+- Policy identity included schema, evidence, derivation, family-policy, and
+  governance content while excluding observational `created_at` metadata.
+- Repeated derivation from identical evidence and governance produced the same
+  policy identity.
+- Governance changes produced a different policy identity.
+- Moneyline, Spread, and Total policies were derived independently.
+- Descriptive quantile cohort boundaries were not promoted into qualification
+  thresholds.
+- Families with descriptive evidence but no validated threshold-selection
+  method remained explicitly insufficient.
+- Governed Kelly, stake, rounding, duplicate, conflict, and exposure values
+  remained distinct from empirical evidence provenance.
+- Invalid fractions, stake increments, exposure ordering, status ordering, and
+  provenance were rejected.
+- Exact immutable candidate references resolved within their parent issuance.
+- Unknown or altered candidate references were rejected.
+- Historical non-candidate and unavailable issuance states could not be
+  promoted by recommendation policy.
+- Explicit UTC decision time controlled recommendation quote freshness.
+- Issuance quote age and decision quote age remained distinct evidence.
+- Inactive family policies stopped before Kelly sizing and stake-dependent
+  exposure evaluation.
+- Mandatory unavailable or conflicting checks could not silently pass.
+- Missing bankroll, portfolio, or mandatory correlation evidence prevented
+  recommendation eligibility.
+- Exact duplicate wagers and same-game opposing positions were detected.
+- Portfolio snapshots rejected duplicate bet identities, future rows, invalid
+  stakes, unsupported markets, and non-UTC timestamps.
+- Full Kelly was calculated by the existing `kelly_fraction()` owner.
+- Fractional-Kelly multiplication used the explicit persisted governance value.
+- Raw, constrained, rounded, and actionable stake values remained distinct.
+- Candidate, per-game, total portfolio, and explicit correlation capacities
+  constrained proposed stakes deterministically.
+- Minimum actionable stake and persisted rounding behavior were enforced.
+- Policy checks were returned in stable deterministic order.
+- Repeated evaluation produced identical immutable decisions.
+- Candidate issuance, policy, bankroll, portfolio, and correlation inputs were
+  not mutated.
+- Recommendation policies round-tripped through strict versioned JSON.
+- Policy paths were addressed by schema version and deterministic policy ID.
+- Exact immutable artifact replay was idempotent.
+- Conflicting content under an existing policy identity was rejected.
+- Malformed top-level and nested keys were rejected.
+- Unsupported schema versions, invalid fingerprints, mismatched policy IDs,
+  unsafe paths, and filename-to-identity mismatches were rejected.
+- No implicit current-policy selection artifact was introduced.
+- Source inspection verified policy modules do not depend on API, CLI, mutable
+  bankroll storage, or the betting ledger.
+- Focused Ruff checks passed.
+- The configured repository-wide Pyrefly check passed with zero errors.
+- Focused candidate identity, policy derivation, evaluation, and persistence
+  tests passed.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check` passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- No temporary Market Unit 23 helper files remain in the repository.
+
+#### Acceptance
+
+A caller can derive one immutable recommendation-policy artifact from one exact
+Market Unit 22 evaluation report and explicit governed operational inputs.
+Moneyline, Spread, and Total are evaluated independently, and evidence or
+thresholds are never transferred between market families.
+
+The complete Unit 22 report receives a canonical source-evidence fingerprint.
+Governed operational inputs receive a separate fingerprint. Policy identity is
+deterministic from schema, evidence, derivation method, independent family
+policies, and governance content. Observational creation time does not alter
+policy identity.
+
+Current Unit 22 marginal empirical cohorts do not establish a validated joint
+threshold-selection method. Market families with otherwise available
+descriptive evidence therefore remain explicitly insufficient and contain no
+invented expected-value, quote-age, observation-depth, CLV, or realized-return
+thresholds.
+
+Operational fractional-Kelly, stake increment, rounding, minimum actionable
+stake, duplicate, opposing-position, bankroll, candidate exposure, per-game
+exposure, portfolio exposure, and correlation requirements are explicit
+versioned governed inputs. They are not represented as empirical Unit 22
+findings.
+
+One policy evaluation consumes an exact candidate row within its immutable
+parent issuance, an explicit UTC decision time, and supplied immutable
+bankroll, portfolio, and correlation evidence. It never reopens current market
+products, reconstructs source identity, or recalculates the original issuance
+evidence.
+
+Recommendation freshness uses decision time minus the exact quote fetch time.
+The historical issuance quote age remains preserved separately. Missing
+kickoff, live evidence, at-kickoff or post-kickoff evidence, future timestamps,
+and policy-age violations cannot pass freshness checks.
+
+Mandatory checks have explicit passed, failed, unavailable, conflicting, or
+not-applicable states. Failed mandatory checks prohibit promotion. Unavailable
+or conflicting mandatory checks preserve insufficient evidence and are never
+treated as passed.
+
+Sizing reuses the existing full-Kelly arithmetic, applies the persisted
+fractional multiplier, constrains the proposed amount by candidate, game,
+portfolio, and explicit correlation capacities, applies persisted rounding,
+and requires the persisted minimum actionable stake. Raw, constrained, rounded,
+and actionable values remain independently auditable.
+
+Exact duplicate exposure uses the shared immutable candidate reference.
+Opposing positions use canonical game, market, and side evidence. Correlation is
+never inferred from labels and requires separately supplied evidence when the
+check is mandatory.
+
+Policies persist under schema-versioned, identity-addressed immutable JSON
+paths. Reads validate exact top-level and nested schemas, timestamps, enums,
+provenance, fingerprints, canonical policy identity, and filename agreement.
+Exact replay is idempotent, while conflicting content under one policy identity
+is rejected.
+
+Policy derivation and evaluation are deterministic and do not mutate candidate
+issuance, policy artifacts, quote evidence, bankroll evidence, portfolio
+evidence, the betting ledger, or input objects.
+
+No production family policy was activated from insufficient evidence. Synthetic
+active policies exist only in tests of evaluation mechanics and are not
+represented as empirically derived policies.
+
+No recommendation was emitted, persisted, published, displayed, transmitted,
+or placed. No current-policy selector, policy activation command, staking
+execution, sportsbook integration, automatic wagering, ledger mutation,
+bankroll mutation, API route, frontend component, CLI command, notification, or
+operational-worker behavior was introduced.

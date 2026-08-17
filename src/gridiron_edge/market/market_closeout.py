@@ -9,8 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from hashlib import sha256
-import json
 from typing import Any, cast
 
 import pandas as pd
@@ -25,6 +23,7 @@ from gridiron_edge.market.bet_reference_matching import (
 from gridiron_edge.market.candidate_issuance import (
     CandidateIssuance,
     CandidateIssuanceRow,
+    candidate_issuance_row_id,
 )
 from gridiron_edge.market.clv import closing_line_value, spread_clv, total_clv
 from gridiron_edge.market.odds_math import american_to_implied_prob
@@ -277,23 +276,8 @@ def _candidate_reference(
     row: CandidateIssuanceRow,
 ) -> MarketCloseoutReference:
     """Adapt one immutable candidate row into the common reference contract."""
-    identity = {
-        "issuance_id": issuance_id,
-        "provider": row.provider,
-        "provider_event_id": row.provider_event_id,
-        "sportsbook": row.sportsbook,
-        "game_id": row.game_id,
-        "market": row.market,
-        "side": row.side,
-        "fetched_at": row.fetched_at.isoformat(),
-        "american_price": row.american_price,
-        "line": row.line,
-    }
-    digest = sha256(
-        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
     return MarketCloseoutReference(
-        reference_id=f"{issuance_id}:{digest}",
+        reference_id=candidate_issuance_row_id(issuance_id, row),
         reference_kind=MarketCloseoutReferenceKind.CANDIDATE_ISSUANCE,
         provider=row.provider,
         provider_event_id=row.provider_event_id,
