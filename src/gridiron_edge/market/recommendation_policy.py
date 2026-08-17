@@ -559,11 +559,23 @@ def evaluate_recommendation_candidate(
         all(not check.mandatory or check.status is PolicyCheckStatus.PASSED for check in checks)
         and sizing.actionable_stake is not None
     )
-    state = (
-        RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
-        if eligible
-        else RecommendationDecisionState.UNQUALIFIED
+    qualification_check_ids = {
+        "candidate_issuance",
+        "market_family_policy",
+        "quote_freshness",
+        "expected_value_threshold",
+    }
+    qualification_passed = all(
+        check.status is PolicyCheckStatus.PASSED
+        for check in checks
+        if check.check_id in qualification_check_ids
     )
+    if eligible:
+        state = RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
+    elif qualification_passed:
+        state = RecommendationDecisionState.QUALIFIED_OPPORTUNITY
+    else:
+        state = RecommendationDecisionState.UNQUALIFIED
     return RecommendationPolicyDecision(
         policy.policy_id,
         candidate_reference_id,

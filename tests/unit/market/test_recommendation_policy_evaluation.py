@@ -266,7 +266,8 @@ def test_below_minimum_constrained_stake_is_not_actionable() -> None:
     result = _evaluate(correlation=_correlation(existing_stake=49.0))
     assert result.sizing.constrained_stake == pytest.approx(1.0)
     assert result.sizing.actionable_stake is None
-    assert result.state is RecommendationDecisionState.UNQUALIFIED
+    assert result.state is RecommendationDecisionState.QUALIFIED_OPPORTUNITY
+    assert not result.recommendation_eligible
 
 
 def test_repeated_evaluation_is_deterministic_and_inputs_are_unchanged() -> None:
@@ -306,3 +307,9 @@ def test_portfolio_snapshot_rejects_duplicate_ids_and_future_rows() -> None:
     future = replace(row, placed_at=DECISION)
     with pytest.raises(ValueError, match="later"):
         portfolio_exposure_snapshot(observed_at=EVALUATED, rows=(future,))
+
+
+def test_qualified_opportunity_requires_all_qualification_checks() -> None:
+    stale = _evaluate(decision_at=datetime(2026, 9, 1, 12, 20, tzinfo=UTC))
+    assert stale.state is RecommendationDecisionState.UNQUALIFIED
+    assert not stale.recommendation_eligible

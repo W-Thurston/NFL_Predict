@@ -2224,3 +2224,157 @@ or placed. No current-policy selector, policy activation command, staking
 execution, sportsbook integration, automatic wagering, ledger mutation,
 bankroll mutation, API route, frontend component, CLI command, notification, or
 operational-worker behavior was introduced.
+
+---
+
+### Market Unit 24: Persist Recommended-Bet Results [Completed]
+
+#### Completed
+
+2026-08-17
+
+#### Goal
+
+Persist one immutable qualification and recommendation result for every exact
+offer that enters recommendation-policy evaluation while preserving the full
+candidate, selected-product, forecast, policy, check, sizing, bankroll,
+portfolio, and correlation evidence used by the decision.
+
+The result boundary distinguishes qualified, recommended, failed, unavailable,
+and conflicting outcomes without rerunning qualification during persistence or
+placing a sportsbook wager.
+
+#### Files Added/Removed/Changed
+
+Added:
+
+- `src/gridiron_edge/market/recommended_bet_result.py`
+- `src/gridiron_edge/market/recommended_bet_result_store.py`
+- `tests/fixtures/recommended_bet_results.py`
+- `tests/unit/market/test_recommended_bet_result.py`
+- `tests/unit/market/test_recommended_bet_result_store.py`
+
+Changed:
+
+- `PLAN.md`
+- `src/gridiron_edge/market/recommendation_policy.py`
+- `tests/unit/market/test_recommendation_policy_evaluation.py`
+
+Removed:
+
+- Temporary Market Unit 24 implementation and correction helpers.
+
+#### Tests
+
+- Qualified opportunities remained distinct from recommendation-eligible
+  results when empirical qualification passed but no actionable stake existed.
+- Recommendation eligibility continued to require all mandatory checks and an
+  actionable stake.
+- One immutable result was produced for every historically issued candidate in
+  canonical issuance order.
+- Historical not-candidate and unavailable issuance rows were not duplicated
+  into recommendation-result artifacts.
+- Exact candidate, offer, selected-product, forecast-event, model, and policy
+  provenance was preserved.
+- Policy schema, evidence fingerprint, governance fingerprint, and derivation
+  method were preserved.
+- Decision time, issuance quote age, and decision quote age were preserved
+  independently.
+- Every ordered policy check and its mandatory classification, state, reason,
+  observed value, and required value was preserved.
+- Recommended, qualified, failed, unavailable, and conflicting persisted states
+  mapped deterministically from the original policy decision.
+- Full-Kelly, fractional-Kelly, raw, constrained, rounded, and actionable stake
+  evidence remained distinct.
+- Bankroll basis, portfolio snapshot identity, and correlation evidence were
+  preserved when available.
+- Inactive production-compatible policies produced immutable unavailable
+  results with null actionable stake.
+- Synthetic active policies remained limited to evaluation and persistence
+  mechanics tests.
+- Result identity was deterministic and changed when decision evidence changed.
+- Evaluation identity preserved issuance, policy, decision time, and ordered
+  result identities.
+- Policy-to-decision provenance and quote-age mismatches were rejected.
+- Multiple matching correlation groups were rejected as ambiguous.
+- Individual results round-tripped through strict versioned JSON.
+- Evaluation manifests round-tripped and resolved every referenced result by
+  immutable identity.
+- Exact result and evaluation replay was idempotent.
+- Conflicting content under an existing result or evaluation identity was
+  rejected.
+- Malformed nested contracts, unsupported schema versions, unsafe identities,
+  missing referenced results, duplicate manifest result IDs, identity changes,
+  filename mismatches, and evaluation provenance disagreement were rejected.
+- Store reads strictly reconstructed enum, timestamp, scalar, tuple, optional,
+  and nested immutable evidence.
+- Result, evaluation, policy, issuance, bankroll, portfolio, and correlation
+  inputs were not mutated.
+- Source inspection verified no API, CLI, mutable bankroll, betting-ledger, or
+  implicit current-result selection dependency was introduced.
+- Focused Ruff checks passed.
+- The configured repository-wide Pyrefly check passed with zero errors.
+- Focused recommendation-policy, recommended-bet result, and persistence tests
+  passed.
+- `uv run ruff check . --fix` passed.
+- `uvx pyrefly check` passed with zero errors.
+- `uv run pytest -m "unit and not slow"` passed.
+- No temporary Market Unit 24 helper files remain in the repository.
+
+#### Acceptance
+
+A caller can evaluate every historically issued candidate in one immutable
+candidate issuance against one exact recommendation policy and receive one
+immutable result for every evaluated exact offer. Failed, unavailable,
+conflicting, qualified, and recommended outcomes are retained rather than
+filtered from the evaluation.
+
+Each result preserves exact parent issuance and candidate-row identity together
+with provider, provider event, sportsbook, canonical game, market, side, quote
+fetch time, sportsbook update time, kickoff, live state, American price, and
+line evidence.
+
+Selected-product identity, product-run identity, forecast event, forecast run,
+forecast role, forecast generation time, model identity, model probability,
+expected value, policy version, source-evidence fingerprint, governance
+fingerprint, and derivation method remain explicit provenance.
+
+Decision time, issuance quote age, and decision quote age remain independently
+preserved. Persistence does not call the clock, re-evaluate freshness, rerun
+qualification, recalculate Kelly sizing, or reload mutable bankroll or portfolio
+state.
+
+Every policy check remains preserved in deterministic order with its stable
+identifier, mandatory classification, state, reason, observed evidence, and
+required value. Qualified opportunities remain distinct from recommendations.
+Recommendation eligibility requires all mandatory recommendation checks and an
+actionable stake.
+
+When sizing was available, full-Kelly, fractional-Kelly, raw, constrained,
+rounded, and actionable stake values remain independently auditable. When
+evaluation stopped before sizing, unavailable values remain null.
+
+Bankroll basis, portfolio snapshot identity and observation time, and explicit
+correlation evidence are preserved when supplied. Correlation membership is
+never inferred, and multiple matching groups are rejected.
+
+Individual result and evaluation identities are deterministic from canonical
+immutable evidence. Repeated construction and persistence from identical
+evidence produces identical identities and exact idempotent replay.
+
+Results and evaluation manifests persist under schema-versioned,
+identity-addressed immutable paths. Reads validate exact nested schemas,
+supported versions, UTC timestamps, enum and scalar values, candidate identity,
+result identity, evaluation identity, ordered result references, and filename
+agreement. Existing content cannot be replaced by different content under the
+same identity.
+
+A production result may validly remain unavailable because its market-family
+policy is not active. Persistence never manufactures qualification or a
+recommendation merely because an artifact is required.
+
+No request-time qualification, current-result selector, Bet Slip creation,
+wager recording, sportsbook integration, automatic wagering, ledger mutation,
+bankroll mutation, API route, frontend component, CLI command, notification, or
+operational-worker behavior was introduced. The system does not place a
+sportsbook wager.
