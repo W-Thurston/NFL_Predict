@@ -8,6 +8,7 @@ import { GameDetail } from "./screens/GameDetail";
 import { GamesList } from "./screens/GamesList";
 import { LineShopping } from "./screens/LineShopping";
 import { LiveGame } from "./screens/LiveGame";
+import { ModelPerformance } from "./screens/ModelPerformance";
 import { NewsWire } from "./screens/NewsWire";
 import { Onboarding } from "./screens/Onboarding";
 import { PlayerProp } from "./screens/PlayerProp";
@@ -50,6 +51,8 @@ export function Router() {
       return <LineShopping />;
     case "/live":
       return <LiveGame />;
+    case "/performance":
+      return <ModelPerformance />;
     case "/news":
       return <NewsWire />;
     case "/tools":

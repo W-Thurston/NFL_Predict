@@ -57,6 +57,7 @@ describe("ModelPerformanceRail", () => {
     expect(screen.getByText("3,274-3,129-95 · 6,498 decisions")).toBeInTheDocument();
     expect(screen.getByText("145 more wins than losses")).toBeInTheDocument();
     expect(screen.getByText("Historical validation pending")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View full performance →" })).toBeInTheDocument();
   });
 
   it("does not render dashboard charts or view controls", () => {

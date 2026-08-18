@@ -1,4 +1,5 @@
 import { useHistoricalModelPerformance } from "../../api/hooks";
+import { useNav } from "../../context/NavContext";
 
 /**
  * Compact historical validation snapshot for the dashboard.
@@ -6,6 +7,7 @@ import { useHistoricalModelPerformance } from "../../api/hooks";
  */
 export function ModelPerformanceRail() {
   const summary = useHistoricalModelPerformance();
+  const { navigate } = useNav();
 
   if (summary.isLoading) return <StateCard message="Loading…" />;
   if (summary.error) return <StateCard message="Couldn't load performance data." />;
@@ -61,6 +63,18 @@ export function ModelPerformanceRail() {
         <div className="mono dim2" style={{ fontSize: 10, marginTop: 3 }}>
           Historical validation pending
         </div>
+        <button
+          type="button"
+          onClick={() => navigate("/performance")}
+          style={{
+            width: "100%", marginTop: 12, padding: "7px 10px",
+            background: "transparent", color: "var(--ink-2)",
+            border: "1px solid var(--line-soft)", borderRadius: 4,
+            fontFamily: "var(--f-sans)", fontSize: 10, cursor: "pointer",
+          }}
+        >
+          View full performance →
+        </button>
       </div>
     </div>
   );
