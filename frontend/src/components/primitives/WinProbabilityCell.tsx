@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { formatCalendarDate } from "../../utils/datePresentation";
 import { createPortal } from "react-dom";
 import { BlockedField } from "../field-status/BlockedField";
 import { PendingField } from "../field-status/PendingField";
@@ -424,19 +425,8 @@ function formatDateTime(
 ): string | null {
   const parts: string[] = [];
 
-  if (gameDate) {
-    const date = new Date(`${gameDate}T00:00:00Z`);
-    if (!Number.isNaN(date.getTime())) {
-      parts.push(
-        date.toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          timeZone: "UTC",
-        }),
-      );
-    }
-  }
+  const formattedDate = formatCalendarDate(gameDate);
+  if (formattedDate) parts.push(formattedDate);
 
   const formattedTime = formatGameTime(gameTime);
   if (formattedTime) parts.push(formattedTime);

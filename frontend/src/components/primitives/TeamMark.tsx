@@ -1,8 +1,10 @@
 import { useTeamByAbbr } from "../../api/team_metadata_hook";
+import { boundedTeamIdentity } from "./teamIdentity";
 
 type TeamMarkProps = {
   abbr: string;
   size?: number;
+  accessibleLabel?: string;
 };
 
 /**
@@ -15,16 +17,22 @@ type TeamMarkProps = {
  * Sized via optional prop; default 22px matches the prototype
  * convention.
  */
-export function TeamMark({ abbr, size = 22 }: TeamMarkProps) {
+export function TeamMark({
+  abbr,
+  size = 22,
+  accessibleLabel,
+}: TeamMarkProps) {
   const team = useTeamByAbbr(abbr);
-  const displayAbbr = team?.abbr ?? abbr;
+  const displayAbbr = team?.abbr ?? boundedTeamIdentity(abbr);
   const primaryColor = team?.primary_color;
+  const label = accessibleLabel ?? `${team?.name ?? abbr} team mark`;
 
   const bg = primaryColor ?? "var(--bg-3)";
   const textColor = primaryColor ? "#fff" : "var(--ink)";
 
   return (
     <span
+      aria-label={label}
       className="team-mark mono"
       style={{
         background: bg,
@@ -38,6 +46,10 @@ export function TeamMark({ abbr, size = 22 }: TeamMarkProps) {
         fontWeight: 600,
         borderRadius: 3,
         letterSpacing: "0.02em",
+        lineHeight: 1,
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
       }}
     >
       {displayAbbr}

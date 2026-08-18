@@ -41,6 +41,36 @@ describe("TeamMark", () => {
     expect(screen.queryByText("Kansas City Chiefs")).not.toBeInTheDocument();
   });
 
+  it("uses a bounded fallback while a long team name is unresolved", () => {
+    vi.mocked(useTeamByAbbr).mockReturnValue(null);
+    render(
+      <TestWrapper>
+        <TeamMark abbr="Kansas City Chiefs" size={18} />
+      </TestWrapper>,
+    );
+
+    const mark = screen.getByLabelText("Kansas City Chiefs team mark");
+    expect(mark).toHaveTextContent("KCC");
+    expect(mark).toHaveStyle({
+      width: "18px",
+      height: "18px",
+      overflow: "hidden",
+      whiteSpace: "nowrap",
+    });
+    expect(screen.queryByText("Kansas City Chiefs")).not.toBeInTheDocument();
+  });
+
+  it("bounds an unresolved single-token identity to four characters", () => {
+    vi.mocked(useTeamByAbbr).mockReturnValue(null);
+    render(
+      <TestWrapper>
+        <TeamMark abbr="Jaguars" />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByLabelText("Jaguars team mark")).toHaveTextContent("JAGU");
+  });
+
   it("uses team primary color when available", () => {
     vi.mocked(useTeamByAbbr).mockReturnValue({
       abbr: "KAN",

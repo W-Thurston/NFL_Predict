@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
+import sys
 from typing import Any, Final
 
 import pandas as pd
@@ -555,6 +556,50 @@ def select_current_weekly_product(
         product_id=normalized_id,
         selected_at=selected_at,
     )
+
+
+def list_current_weekly_product_selections(
+    *,
+    repo: Path | None = None,
+) -> tuple[WeeklyProductSelection, ...]:
+    """List every explicitly selected weekly product in deterministic scope order."""
+    current = _read_current(repo)
+    selections_payload = current["selections"]
+    if not isinstance(selections_payload, dict):
+        raise ValueError("Weekly product current 'selections' must be an object.")
+
+    selections = tuple(
+        _selection_from_payload(str(key), payload) for key, payload in selections_payload.items()
+    )
+    scopes = [(selection.season, selection.week) for selection in selections]
+    if len(scopes) != len(set(scopes)):
+        raise ValueError("Weekly product current manifest contains duplicate scopes.")
+
+    records_by_id = {record.product_id: record for record in list_weekly_products(repo=repo)}
+    for selection in selections:
+        record = records_by_id.get(selection.product_id)
+        if record is None:
+            raise ValueError(
+                "Weekly product selection references an unindexed product: "
+                f"{selection.product_id!r}."
+            )
+        if record.season != selection.season or record.week != selection.week:
+            raise ValueError(
+                "Weekly product selection scope does not match indexed product: "
+                f"selection={selection.season} week {selection.week}, "
+                f"product={record.season} week {record.week}."
+            )
+        load_weekly_product(selection.product_id, repo=repo)
+
+    def sort_key(selection: WeeklyProductSelection) -> tuple[int, str, int, str]:
+        start_text = selection.season.split("-", maxsplit=1)[0]
+        try:
+            start_year = int(start_text)
+        except ValueError:
+            start_year = sys.maxsize
+        return (start_year, selection.season, selection.week, selection.product_id)
+
+    return tuple(sorted(selections, key=sort_key))
 
 
 def get_current_weekly_product_selection(

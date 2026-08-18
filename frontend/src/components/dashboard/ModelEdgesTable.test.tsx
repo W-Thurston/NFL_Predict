@@ -138,6 +138,45 @@ describe("ModelEdgesTable", () => {
     expect(screen.getByText("No edges passed this filter.")).toBeInTheDocument();
   });
 
+  it("explains analytical columns without implying a recommendation", async () => {
+    const user = userEvent.setup();
+    mockLoaded(response({ items: [edge()], total: 1 }));
+    render(<TestWrapper><ModelEdgesTable /></TestWrapper>);
+
+    const evHeader = screen.getByRole("button", {
+      name: "Explain EV column",
+    });
+    await user.hover(evHeader);
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent(
+      "Positive expected value is analytical evidence only.",
+    );
+    expect(tooltip).toHaveTextContent(
+      "It does not by itself make this offer a persisted recommended bet.",
+    );
+  });
+
+  it("explains fair value and cover probability by their owning semantics", async () => {
+    const user = userEvent.setup();
+    mockLoaded(response({ items: [edge()], total: 1 }));
+    render(<TestWrapper><ModelEdgesTable /></TestWrapper>);
+
+    await user.click(screen.getByRole("button", {
+      name: "Explain Fair column",
+    }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Moneyline shows win probability, while Spread and Total show projected points.",
+    );
+
+    await user.click(screen.getByRole("button", {
+      name: "Explain Cover Prob column",
+    }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "the displayed side wins or covers at this exact market line",
+    );
+  });
+
   it("renders real fair and cover probabilities without a synthetic band", () => {
     mockLoaded(response({ items: [edge()], total: 1 }));
     render(<TestWrapper><ModelEdgesTable /></TestWrapper>);

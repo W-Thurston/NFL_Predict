@@ -29,6 +29,7 @@ import {
 } from "../utils/sportsbookPreferences";
 import { useNav } from "../context/NavContext";
 import { probToAmerican } from "../utils/odds";
+import { formatCalendarDate } from "../utils/datePresentation";
 import {
   buildGameBetLegId,
   buildPropBetLegId,
@@ -123,7 +124,6 @@ export function GameDetail() {
           awayTeam={data.away_team}
           homeTeam={data.home_team}
           gameDate={data.game_date}
-          dayOfWeek={data.day_of_week}
         />
         <ModelLeanCallout
           gameId={data.game_id}
@@ -186,12 +186,10 @@ function GameHeader({
   awayTeam,
   homeTeam,
   gameDate,
-  dayOfWeek,
 }: {
   awayTeam: string;
   homeTeam: string;
   gameDate: string | null | undefined;
-  dayOfWeek: string | null | undefined;
 }) {
   const away = useTeamByAbbr(awayTeam);
   const home = useTeamByAbbr(homeTeam);
@@ -242,7 +240,7 @@ function GameHeader({
             letterSpacing: "0.1em",
           }}
         >
-          {formatKickLabel(gameDate, dayOfWeek)}
+          {formatKickLabel(gameDate)}
         </div>
         <div
           style={{
@@ -297,38 +295,13 @@ function GameHeader({
 /**
  * Format game date + day-of-week into prototype-style compact kick label.
  *
- * Examples:
- * - gameDate "2026-02-08", dayOfWeek "Sunday" → "SUN · FEB 8"
- * - gameDate "2026-02-08", dayOfWeek null → "FEB 8"
- * - gameDate null → "—"
- *
- * When we get real kick times from the schedule, this expands to include
- * time-of-day (e.g., "SUN · FEB 8 · 4:25 PM ET").
+ * Date-only values use the shared timezone-safe calendar convention.
+ * Missing or invalid values render an em dash.
  */
 function formatKickLabel(
   gameDate: string | null | undefined,
-  dayOfWeek: string | null | undefined,
 ): string {
-  if (!gameDate) return "—";
-
-  const dateObj = new Date(gameDate);
-  if (isNaN(dateObj.getTime())) return "—";
-
-  const monthNames = [
-    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
-  ];
-  const month = monthNames[dateObj.getUTCMonth()];
-  const day = dateObj.getUTCDate();
-
-  const dayShort = dayOfWeek
-    ? dayOfWeek.slice(0, 3).toUpperCase()
-    : null;
-
-  const parts = [];
-  if (dayShort) parts.push(dayShort);
-  parts.push(`${month} ${day}`);
-  return parts.join(" · ");
+  return formatCalendarDate(gameDate) ?? "—";
 }
 
 /**
@@ -442,13 +415,29 @@ function WinProbabilityCard({
                 letterSpacing: "-0.01em",
               }}
             >
-              <span style={{ color: "var(--ink-2)" }}>
+              <span
+                data-projected-score-team="away"
+                style={{
+                  color: projectedScoreColor(
+                    projectedScore.away,
+                    projectedScore.home,
+                  ),
+                }}
+              >
                 {awayTeam} {projectedScore.away.toFixed(1)}
               </span>
               <span className="dim2" style={{ margin: "0 10px" }}>
                 —
               </span>
-              <span style={{ color: "var(--pos)" }}>
+              <span
+                data-projected-score-team="home"
+                style={{
+                  color: projectedScoreColor(
+                    projectedScore.home,
+                    projectedScore.away,
+                  ),
+                }}
+              >
                 {homeTeam} {projectedScore.home.toFixed(1)}
               </span>
             </div>
@@ -487,6 +476,11 @@ function WinProbabilityCard({
     </div>
   );
 }
+
+function projectedScoreColor(score: number, opponentScore: number): string {
+  return score > opponentScore ? "var(--pos)" : "var(--ink-2)";
+}
+
 
 function ProbabilityRow({
   team,

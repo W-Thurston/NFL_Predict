@@ -17,6 +17,7 @@ from gridiron_edge.datasets.loaders import load_current_weekly_product, load_gam
 from gridiron_edge.evaluation.forecast_store import load_forecast_events
 
 _AVAILABLE_WIN = "available"
+_AVAILABLE_SPREAD = "available"
 _AVAILABLE_TOTAL = {"available", "uncertainty_unavailable"}
 
 
@@ -28,6 +29,16 @@ class WinCloseoutMetrics:
     brier: float | None
     log_loss: float | None
     accuracy: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class SpreadCloseoutMetrics:
+    """Metrics for evaluated selected live Spread forecasts."""
+
+    evaluated_count: int
+    mae: float | None
+    rmse: float | None
+    bias: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,14 +63,19 @@ class LiveForecastCloseout:
     completed_outcome_count: int
     selected_win_count: int
     matched_win_event_count: int
+    selected_spread_count: int
+    matched_spread_event_count: int
     selected_total_count: int
     matched_total_event_count: int
     missing_win_component_game_ids: tuple[str, ...]
+    missing_spread_component_game_ids: tuple[str, ...]
     missing_total_component_game_ids: tuple[str, ...]
     missing_win_event_game_ids: tuple[str, ...]
+    missing_spread_event_game_ids: tuple[str, ...]
     missing_total_event_game_ids: tuple[str, ...]
     missing_outcome_game_ids: tuple[str, ...]
     win: WinCloseoutMetrics
+    spread: SpreadCloseoutMetrics
     total: TotalCloseoutMetrics
     reconciliation: DataFrame
 
@@ -69,8 +85,10 @@ class LiveForecastCloseout:
         return not any(
             (
                 self.missing_win_component_game_ids,
+                self.missing_spread_component_game_ids,
                 self.missing_total_component_game_ids,
                 self.missing_win_event_game_ids,
+                self.missing_spread_event_game_ids,
                 self.missing_total_event_game_ids,
                 self.missing_outcome_game_ids,
             )
@@ -90,6 +108,10 @@ _PRODUCT_COLUMNS = {
     "win_run_id",
     "win_model_name",
     "win_model_type",
+    "spread_status",
+    "spread_source_event_id",
+    "spread_model_name",
+    "spread_model_type",
     "total_status",
     "total_event_id",
     "total_run_id",
@@ -113,6 +135,7 @@ _EVENT_COLUMNS = {
     "model_name",
     "model_type",
     "home_win_prob",
+    "model_spread",
     "model_total",
 }
 
@@ -130,16 +153,36 @@ def _single_text(frame: DataFrame, column: str, *, label: str) -> str:
     return values[0]
 
 
-def _event_matches(row: Series, event: Series, *, family: str) -> bool:
+def _family_reference_columns(family: str) -> tuple[str, str, str, str]:
+    """Return event, run, model-name, and model-type columns for one family."""
+    if family == "spread":
+        return (
+            "spread_source_event_id",
+            "win_run_id",
+            "spread_model_name",
+            "spread_model_type",
+        )
     prefix = "win" if family == "win" else "total"
+    return (
+        f"{prefix}_event_id",
+        f"{prefix}_run_id",
+        f"{prefix}_model_name",
+        f"{prefix}_model_type",
+    )
+
+
+def _event_matches(row: Series, event: Series, *, family: str) -> bool:
+    event_column, run_column, model_name_column, model_type_column = _family_reference_columns(
+        family
+    )
     return all(
         (
-            str(event["event_id"]) == str(row[f"{prefix}_event_id"]),
+            str(event["event_id"]) == str(row[event_column]),
             str(event["game_id"]) == str(row["game_id"]),
-            str(event["run_id"]) == str(row[f"{prefix}_run_id"]),
+            str(event["run_id"]) == str(row[run_column]),
             str(event["role"]) == "live",
-            str(event["model_name"]) == str(row[f"{prefix}_model_name"]),
-            str(event["model_type"]) == str(row[f"{prefix}_model_type"]),
+            str(event["model_name"]) == str(row[model_name_column]),
+            str(event["model_type"]) == str(row[model_type_column]),
             str(event["season"]) == str(row["season"]),
             int(event["week"]) == int(row["week"]),
         )
@@ -152,8 +195,8 @@ def _referenced_event(
     *,
     family: str,
 ) -> Series | None:
-    prefix = "win" if family == "win" else "total"
-    event_id = row[f"{prefix}_event_id"]
+    event_column, _, _, _ = _family_reference_columns(family)
+    event_id = row[event_column]
     if pd.isna(event_id) or str(event_id).strip() == "":
         return None
     if str(event_id) not in events_by_id.index:
@@ -182,6 +225,28 @@ def _win_metrics(rows: DataFrame) -> WinCloseoutMetrics:
     loss = float(-(outcome * np.log(clipped) + (1 - outcome) * np.log(1 - clipped)).mean())
     accuracy = float(((probability >= 0.5) == outcome.astype(bool)).mean())
     return WinCloseoutMetrics(count, brier, loss, accuracy)
+
+
+def _spread_metrics(rows: DataFrame) -> SpreadCloseoutMetrics:
+    evaluable = rows.loc[rows["spread_evaluable"], :]
+    count = len(evaluable)
+    if count == 0:
+        return SpreadCloseoutMetrics(0, None, None, None)
+    prediction = cast(
+        Series,
+        pd.to_numeric(evaluable["projected_home_margin"], errors="coerce"),
+    ).astype(float)
+    actual = cast(
+        Series,
+        pd.to_numeric(evaluable["actual_margin"], errors="coerce"),
+    ).astype(float)
+    error = prediction - actual
+    return SpreadCloseoutMetrics(
+        count,
+        float(error.abs().mean()),
+        float(math.sqrt(float((error**2).mean()))),
+        float(error.mean()),
+    )
 
 
 def _total_metrics(rows: DataFrame) -> TotalCloseoutMetrics:
@@ -262,8 +327,12 @@ def close_live_forecasts(  # noqa: PLR0915
     for _, row in product.iterrows():
         game_id = str(row["game_id"])
         win_selected = str(row["win_status"]) == _AVAILABLE_WIN
+        spread_selected = str(row["spread_status"]) == _AVAILABLE_SPREAD
         total_selected = str(row["total_status"]) in _AVAILABLE_TOTAL
         win_event = _referenced_event(row, events_by_id, family="win") if win_selected else None
+        spread_event = (
+            _referenced_event(row, events_by_id, family="spread") if spread_selected else None
+        )
         total_event = (
             _referenced_event(row, events_by_id, family="total") if total_selected else None
         )
@@ -283,6 +352,10 @@ def close_live_forecasts(  # noqa: PLR0915
             if not tied:
                 actual_home_win = home_score > away_score
         home_win_prob = win_event["home_win_prob"] if win_event is not None else pd.NA
+        model_spread = spread_event["model_spread"] if spread_event is not None else pd.NA
+        projected_home_margin: float | object = pd.NA
+        if pd.notna(model_spread):
+            projected_home_margin = -float(cast(float | int, model_spread))
         model_total = total_event["model_total"] if total_event is not None else pd.NA
         records.append(
             {
@@ -293,6 +366,11 @@ def close_live_forecasts(  # noqa: PLR0915
                 "win_event_id": row["win_event_id"],
                 "win_event_matched": win_event is not None,
                 "home_win_prob": home_win_prob,
+                "spread_component_selected": spread_selected,
+                "spread_event_id": row["spread_source_event_id"],
+                "spread_event_matched": spread_event is not None,
+                "model_spread": model_spread,
+                "projected_home_margin": projected_home_margin,
                 "total_component_selected": total_selected,
                 "total_event_id": row["total_event_id"],
                 "total_event_matched": total_event is not None,
@@ -309,6 +387,9 @@ def close_live_forecasts(  # noqa: PLR0915
                     and not tied
                     and pd.notna(home_win_prob)
                 ),
+                "spread_evaluable": bool(
+                    spread_event is not None and outcome_available and pd.notna(model_spread)
+                ),
                 "total_evaluable": bool(
                     total_event is not None and outcome_available and pd.notna(model_total)
                 ),
@@ -321,9 +402,13 @@ def close_live_forecasts(  # noqa: PLR0915
         return tuple(sorted(reconciliation.loc[mask, "game_id"].astype(str).tolist()))
 
     missing_win_components = ids(~reconciliation["win_component_selected"])
+    missing_spread_components = ids(~reconciliation["spread_component_selected"])
     missing_total_components = ids(~reconciliation["total_component_selected"])
     missing_win_events = ids(
         reconciliation["win_component_selected"] & ~reconciliation["win_event_matched"]
+    )
+    missing_spread_events = ids(
+        reconciliation["spread_component_selected"] & ~reconciliation["spread_event_matched"]
     )
     missing_total_events = ids(
         reconciliation["total_component_selected"] & ~reconciliation["total_event_matched"]
@@ -339,14 +424,19 @@ def close_live_forecasts(  # noqa: PLR0915
         completed_outcome_count=int(reconciliation["outcome_available"].sum()),
         selected_win_count=int(reconciliation["win_component_selected"].sum()),
         matched_win_event_count=int(reconciliation["win_event_matched"].sum()),
+        selected_spread_count=int(reconciliation["spread_component_selected"].sum()),
+        matched_spread_event_count=int(reconciliation["spread_event_matched"].sum()),
         selected_total_count=int(reconciliation["total_component_selected"].sum()),
         matched_total_event_count=int(reconciliation["total_event_matched"].sum()),
         missing_win_component_game_ids=missing_win_components,
+        missing_spread_component_game_ids=missing_spread_components,
         missing_total_component_game_ids=missing_total_components,
         missing_win_event_game_ids=missing_win_events,
+        missing_spread_event_game_ids=missing_spread_events,
         missing_total_event_game_ids=missing_total_events,
         missing_outcome_game_ids=missing_outcomes,
         win=_win_metrics(reconciliation),
+        spread=_spread_metrics(reconciliation),
         total=_total_metrics(reconciliation),
         reconciliation=reconciliation,
     )

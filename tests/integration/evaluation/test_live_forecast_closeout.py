@@ -35,6 +35,7 @@ def _event(
     model_name: str,
     model_type: str,
     home_win_prob: float | None,
+    model_spread: float | None,
     model_total: float | None,
 ) -> DataFrame:
     values: dict[str, object] = {
@@ -54,7 +55,7 @@ def _event(
         "home_elo": None,
         "away_win_prob": (None if home_win_prob is None else 1.0 - home_win_prob),
         "home_win_prob": home_win_prob,
-        "model_spread": None,
+        "model_spread": model_spread,
         "model_total": model_total,
         "projected_home_score": None,
         "projected_away_score": None,
@@ -120,6 +121,7 @@ def test_persisted_selected_product_closes_against_completed_outcome(
             model_name="win_prob",
             model_type="logistic",
             home_win_prob=0.70,
+            model_spread=-3.0,
             model_total=None,
         ),
         _event(
@@ -127,6 +129,7 @@ def test_persisted_selected_product_closes_against_completed_outcome(
             model_name="total",
             model_type="random_forest",
             home_win_prob=None,
+            model_spread=None,
             model_total=45.0,
         ),
     ]
@@ -165,10 +168,15 @@ def test_persisted_selected_product_closes_against_completed_outcome(
     assert closeout.scheduled_game_count == 1
     assert closeout.completed_outcome_count == 1
     assert closeout.matched_win_event_count == 1
+    assert closeout.matched_spread_event_count == 1
     assert closeout.matched_total_event_count == 1
     assert closeout.win.evaluated_count == 1
     assert closeout.win.brier == pytest.approx(0.09)
     assert closeout.win.accuracy == pytest.approx(1.0)
+    assert closeout.spread.evaluated_count == 1
+    assert closeout.spread.mae == pytest.approx(4.0)
+    assert closeout.spread.rmse == pytest.approx(4.0)
+    assert closeout.spread.bias == pytest.approx(-4.0)
     assert closeout.total.evaluated_count == 1
     assert closeout.total.mae == pytest.approx(2.0)
     assert closeout.total.rmse == pytest.approx(2.0)

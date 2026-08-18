@@ -10,6 +10,7 @@ import {
 import { useNav } from "../../context/NavContext";
 import { EdgeResultStatus } from "../field-status/EdgeResultStatus";
 import { Pill } from "../primitives/Pill";
+import { ExplainTooltip } from "../primitives/ExplainTooltip";
 import { TeamMark } from "../primitives/TeamMark";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
 
@@ -140,14 +141,91 @@ export function ModelEdgesTable() {
           <thead>
             <tr style={{ color: "var(--ink-3)", textAlign: "left" }}>
               <th style={{ padding: "8px 12px 8px 0" }}>#</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Match</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Side</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Market</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Sportsbook</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Odds</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Fair</th>
-              <th style={{ padding: "8px 12px 8px 0" }}>Cover Prob</th>
-              <th style={{ padding: "8px 12px 8px 0", textAlign: "right" }}>EV</th>
+              <ModelEdgeHeader
+                label="Match"
+                title="Match"
+                sections={[
+                  {
+                    label: "Game",
+                    text: "The away and home teams for this exact scheduled game. Open the matchup to view its persisted prediction details.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="Side"
+                title="Side"
+                sections={[
+                  {
+                    label: "Outcome",
+                    text: "The team or total outcome evaluated for this row. Cover probability and expected value both apply to this displayed side.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="Market"
+                title="Market"
+                sections={[
+                  {
+                    label: "Bet type",
+                    text: "Moneyline evaluates the game winner, Spread evaluates a team against a point line, and Total evaluates Over or Under against the combined-points line.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="Sportsbook"
+                title="Sportsbook"
+                sections={[
+                  {
+                    label: "Exact offer",
+                    text: "The sportsbook that published this exact line and price. Expanded alternatives remain separate sportsbook-specific offers.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="Odds"
+                title="Odds"
+                sections={[
+                  {
+                    label: "Price",
+                    text: "American odds for this exact sportsbook offer. The price determines the profit or loss used in expected-value calculation.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="Fair"
+                title="Fair value"
+                sections={[
+                  {
+                    label: "Model value",
+                    text: "The model's unpriced estimate for this market. Moneyline shows win probability, while Spread and Total show projected points.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="Cover Prob"
+                title="Cover probability"
+                sections={[
+                  {
+                    label: "Displayed side",
+                    text: "The model-estimated probability that the displayed side wins or covers at this exact market line.",
+                  },
+                ]}
+              />
+              <ModelEdgeHeader
+                label="EV"
+                title="Expected value"
+                align="right"
+                sections={[
+                  {
+                    label: "Estimate",
+                    text: "Estimated return per unit staked from the displayed cover probability and exact sportsbook price.",
+                  },
+                  {
+                    label: "Recommendation boundary",
+                    text: "Positive expected value is analytical evidence only. It does not by itself make this offer a persisted recommended bet.",
+                  },
+                ]}
+              />
               <th style={{ padding: "8px 0" }}></th>
             </tr>
           </thead>
@@ -310,6 +388,42 @@ export function ModelEdgesTable() {
         </div>
       )}
     </div>
+  );
+}
+
+type ModelEdgeHeaderProps = {
+  label: string;
+  title: string;
+  sections: Array<{ label: string; text: string }>;
+  align?: "left" | "right";
+};
+
+function ModelEdgeHeader({
+  label,
+  title,
+  sections,
+  align = "left",
+}: ModelEdgeHeaderProps) {
+  return (
+    <th
+      scope="col"
+      style={{
+        padding: "8px 12px 8px 0",
+        textAlign: align,
+      }}
+    >
+      <ExplainTooltip
+        accessibleLabel={`Explain ${label} column`}
+        title={title}
+        sections={sections}
+        className="model-edge-header-explanation"
+      >
+        <span>{label}</span>
+        <span aria-hidden="true" style={{ marginLeft: 4, opacity: 0.7 }}>
+          ⓘ
+        </span>
+      </ExplainTooltip>
+    </th>
   );
 }
 

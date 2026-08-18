@@ -15,6 +15,7 @@ import {
 } from "../components/primitives/SortableHeader";
 import { TeamMark } from "../components/primitives/TeamMark";
 import { useNav } from "../context/NavContext";
+import { formatTeamRecord } from "../utils/teamRecord";
 
 type ConferenceFilter = "ALL" | "AFC" | "NFC";
 type DivisionFilter = "ALL" | "N" | "S" | "E" | "W";
@@ -540,7 +541,7 @@ export function PlayoffProjections() {
                             color: "var(--ink-2)",
                           }}
                         >
-                          {formatRecord(metadata?.record)}
+                          {formatTeamRecord(metadata?.record)}
                         </td>
                         <td
                           style={{
@@ -1498,30 +1499,6 @@ function getSortableValue(
   }
 
   return row.projection[sortKey] ?? null;
-}
-
-function formatRecord(
-  record:
-    | {
-        wins?: number | null;
-        losses?: number | null;
-        ties?: number | null;
-      }
-    | null
-    | undefined,
-): string {
-  if (
-    record?.wins == null ||
-    record.losses == null
-  ) {
-    return "N/A";
-  }
-
-  if ((record.ties ?? 0) > 0) {
-    return `${record.wins}-${record.losses}-${record.ties}`;
-  }
-
-  return `${record.wins}-${record.losses}`;
 }
 
 function formatDivision(

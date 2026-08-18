@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatKickoffDateTime } from "../utils/datePresentation";
 import type { components } from "../api/schema";
 import { useLines } from "../api/hooks";
 import { ErrorCard } from "../components/error/ErrorCard";
@@ -248,7 +249,7 @@ function GameRows({
           <span><TeamMark abbr={game.away_team} size={18} /> {game.away_team}</span>
           <span><TeamMark abbr={game.home_team} size={18} /> {game.home_team}</span>
           <span className="dim2" style={{ fontSize: 10 }}>
-            {formatKickoff(game.commence_time, game.game_date)}
+            {formatKickoffDateTime(game.commence_time, game.game_date)}
           </span>
         </th>
       )}
@@ -613,31 +614,6 @@ function outcomeLabel(game: LineShoppingGame, side: Side): string {
 
 function formatAmericanOdds(value: number): string {
   return value > 0 ? `+${value}` : String(value);
-}
-
-function formatKickoff(
-  commenceTime: string | null | undefined,
-  fallbackDate: string,
-): string {
-  if (!commenceTime) return fallbackDate;
-  const date = new Date(commenceTime);
-  if (Number.isNaN(date.getTime())) return fallbackDate;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((item) => item.type === type)?.value ?? "";
-  return [
-    part("weekday").toUpperCase(),
-    `${part("month").toUpperCase()} ${part("day")}`,
-    `${part("hour")}:${part("minute")} ${part("dayPeriod").toUpperCase()} ET`,
-  ].join(" · ");
 }
 
 function formatProbability(value: number | null | undefined): string {

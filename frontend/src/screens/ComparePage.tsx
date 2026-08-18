@@ -10,6 +10,10 @@ import { useNav } from "../context/NavContext";
 import { ErrorCard } from "../components/error/ErrorCard";
 import { usePendingHighlight } from "../components/field-status/usePendingHighlight";
 import { BarChart } from "../components/primitives/BarChart";
+import {
+  rankDifferenceText,
+  summarizeRankDifference,
+} from "../components/compare/rankDifference";
 import { PendingChip } from "../components/field-status/PendingChip";
 
 type CompareMode = "team" | "player";
@@ -521,8 +525,15 @@ function EdgeChip({
   offTeam: string;
   defTeam: string;
 }) {
-  const descriptor = edgeDescriptor(edge);
-  if (descriptor === "Even") {
+  const offenseRank = 32;
+  const defenseRank = offenseRank + edge;
+  const summary = summarizeRankDifference(
+    offenseRank,
+    defenseRank,
+    offTeam,
+    defTeam,
+  );
+  if (summary.comparison === "equal") {
     return (
       <span
         className="mono upper"
@@ -532,12 +543,12 @@ function EdgeChip({
           letterSpacing: "0.06em",
         }}
       >
-        — even —
+        equal ranks
       </span>
     );
   }
-  const offenseFavored = edge > 0;
-  const favored = offenseFavored ? offTeam : defTeam;
+
+  const offenseFavored = summary.comparison === "offense";
   const arrow = offenseFavored ? "◄" : "►";
   return (
     <span
@@ -552,8 +563,9 @@ function EdgeChip({
         whiteSpace: "nowrap",
       }}
     >
-      {offenseFavored ? `${arrow} ${favored}` : `${favored} ${arrow}`}{" "}
-      {descriptor}
+      {offenseFavored ? `${arrow} ` : ""}
+      {rankDifferenceText(summary)}
+      {!offenseFavored ? ` ${arrow}` : ""}
     </span>
   );
 }
@@ -1618,51 +1630,56 @@ function formatNumericValue(v: number): string {
   return v.toFixed(1);
 }
 
-type MatchupEdge = {
+type MatchupRankDifference = {
   metric: MatchupMetric;
   offTeam: string;
   defTeam: string;
-  edge: number; // defRank - offRank; positive = offense favored
+  offenseRank: number;
+  defenseRank: number;
 };
 
-/**
- * Find the biggest collision (largest rank-differential edge) for one
- * direction. Returns null if no ranked metric available.
- */
-function biggestCollision(
+/** Select the largest available absolute rank difference for one direction. */
+function largestRankDifference(
   metrics: MatchupMetric[],
   offCohort: Record<string, number>,
   defCohort: Record<string, number>,
   offTeam: string,
   defTeam: string,
-): MatchupEdge | null {
-  let best: MatchupEdge | null = null;
-  for (const m of metrics) {
-    const offRank = offCohort[`rank_${m.off}`];
-    const defRank = defCohort[`rank_${m.def}`];
-    if (offRank == null || defRank == null) continue;
-    const edge = defRank - offRank; // high = strong offense vs weak defense
-    if (best == null || Math.abs(edge) > Math.abs(best.edge)) {
-      best = { metric: m, offTeam, defTeam, edge };
+): MatchupRankDifference | null {
+  let largest: MatchupRankDifference | null = null;
+  for (const metric of metrics) {
+    const offenseRank = offCohort[`rank_${metric.off}`];
+    const defenseRank = defCohort[`rank_${metric.def}`];
+    if (offenseRank == null || defenseRank == null) continue;
+    const difference = Math.abs(defenseRank - offenseRank);
+    const largestDifference = largest == null
+      ? -1
+      : Math.abs(largest.defenseRank - largest.offenseRank);
+    if (difference > largestDifference) {
+      largest = {
+        metric,
+        offTeam,
+        defTeam,
+        offenseRank,
+        defenseRank,
+      };
     }
   }
-  return best;
+  return largest;
 }
 
-/** Rank-differential magnitude → descriptor word. */
-function edgeDescriptor(edge: number): string {
-  const mag = Math.abs(edge);
-  if (mag >= 15) return "Big edge";
-  if (mag >= 7) return "Edge";
-  if (mag >= 3) return "Slight edge";
-  return "Even";
+/** Quantified narrative derived only from the displayed ordinal ranks. */
+function rankDifferenceNarrative(comparison: MatchupRankDifference): string {
+  const summary = summarizeRankDifference(
+    comparison.offenseRank,
+    comparison.defenseRank,
+    comparison.offTeam,
+    comparison.defTeam,
+  );
+  return `${comparison.offTeam}'s ${comparison.metric.title.toLowerCase()} vs ${comparison.defTeam}'s defense: ${rankDifferenceText(summary)}`;
 }
 
-/**
- * Auto-generated narrative banner. Computes the biggest matchup collision
- * in each direction from rank differentials and describes them in plain
- * language. Updates with the selected cohort.
- */
+/** Show the largest available rank difference in each matchup direction. */
 function NarrativeBanner({
   teamA,
   teamB,
@@ -1674,14 +1691,14 @@ function NarrativeBanner({
   cohortA: Record<string, number>;
   cohortB: Record<string, number>;
 }) {
-  const aCollision = biggestCollision(
+  const aDifference = largestRankDifference(
     MATCHUP_METRICS,
     cohortA,
     cohortB,
     teamA,
     teamB,
   );
-  const bCollision = biggestCollision(
+  const bDifference = largestRankDifference(
     MATCHUP_METRICS,
     cohortB,
     cohortA,
@@ -1689,16 +1706,7 @@ function NarrativeBanner({
     teamA,
   );
 
-  if (!aCollision && !bCollision) return null;
-
-  const describe = (c: MatchupEdge): string => {
-    const descriptor = edgeDescriptor(c.edge);
-    if (descriptor === "Even") {
-      return `${c.offTeam}'s ${c.metric.title.toLowerCase()} vs ${c.defTeam}'s defense — even matchup`;
-    }
-    const favored = c.edge > 0 ? c.offTeam : c.defTeam;
-    return `${c.offTeam}'s ${c.metric.title.toLowerCase()} vs ${c.defTeam}'s defense — ${descriptor} ${favored}`;
-  };
+  if (!aDifference && !bDifference) return null;
 
   return (
     <div
@@ -1714,16 +1722,16 @@ function NarrativeBanner({
         ⌖
       </span>
       <div>
-        {aCollision && (
+        {aDifference && (
           <div>
-            <span className="dim">Biggest collision: </span>
-            {describe(aCollision)}.
+            <span className="dim">Largest rank difference: </span>
+            {rankDifferenceNarrative(aDifference)}.
           </div>
         )}
-        {bCollision && (
+        {bDifference && (
           <div style={{ marginTop: 2 }}>
-            <span className="dim">Other side: </span>
-            {describe(bCollision)}.
+            <span className="dim">Other direction: </span>
+            {rankDifferenceNarrative(bDifference)}.
           </div>
         )}
       </div>

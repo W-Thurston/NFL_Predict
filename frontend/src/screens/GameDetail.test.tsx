@@ -98,6 +98,41 @@ describe("GameDetail weekly component readiness", () => {
     expect(screen.getByText("Los Angeles Chargers 25.0")).toBeInTheDocument();
   });
 
+  it("emphasizes the home team only when its projected score is higher", () => {
+    render(<TestWrapper><GameDetail /></TestWrapper>);
+
+    const away = screen.getByText("Kansas City Chiefs 22.5");
+    const home = screen.getByText("Los Angeles Chargers 25.0");
+    expect(away).toHaveStyle({ color: "var(--ink-2)" });
+    expect(home).toHaveStyle({ color: "var(--pos)" });
+  });
+
+  it("emphasizes the away team when its projected score is higher", () => {
+    mockLoaded(detail({
+      spread: { status: "available", model_spread: 3.5 },
+      projected_score: { status: "available", away: 27.5, home: 24 },
+    }));
+    render(<TestWrapper><GameDetail /></TestWrapper>);
+
+    const away = screen.getByText("Kansas City Chiefs 27.5");
+    const home = screen.getByText("Los Angeles Chargers 24.0");
+    expect(away).toHaveStyle({ color: "var(--pos)" });
+    expect(home).toHaveStyle({ color: "var(--ink-2)" });
+  });
+
+  it("uses equal neutral emphasis for tied projected scores", () => {
+    mockLoaded(detail({
+      spread: { status: "available", model_spread: 0 },
+      projected_score: { status: "available", away: 24, home: 24 },
+    }));
+    render(<TestWrapper><GameDetail /></TestWrapper>);
+
+    const away = screen.getByText("Kansas City Chiefs 24.0");
+    const home = screen.getByText("Los Angeles Chargers 24.0");
+    expect(away).toHaveStyle({ color: "var(--ink-2)" });
+    expect(home).toHaveStyle({ color: "var(--ink-2)" });
+  });
+
   it("shows Spread calibration unavailability independently", () => {
     mockLoaded(detail({
       spread: { status: "calibration_unavailable" },

@@ -102,7 +102,7 @@ describe("WinProbabilityCell", () => {
 
     expect(
       within(tooltip).getByText(
-        "Week 1 · Sep 9, 2026 · 8:20 PM",
+        "Week 1 · Wed, Sep 9 · 8:20 PM",
       ),
     ).toBeInTheDocument();
 

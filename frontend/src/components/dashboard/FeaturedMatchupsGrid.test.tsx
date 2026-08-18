@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { components } from "../../api/schema";
 import { useEdges, useGamesList } from "../../api/hooks";
+import { useTeamByAbbr } from "../../api/team_metadata_hook";
 import { TestWrapper } from "../../test/testWrapper";
 import { FeaturedMatchupsGrid } from "./FeaturedMatchupsGrid";
 
@@ -91,6 +92,7 @@ function mockLoaded(edges: EdgeList, games: GameList = gameResponse()) {
 describe("FeaturedMatchupsGrid", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useTeamByAbbr).mockReturnValue(null);
     vi.mocked(useEdges).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -161,6 +163,92 @@ describe("FeaturedMatchupsGrid", () => {
     expect(
       screen.getByText("Markets were evaluated, but no positive edges were found."),
     ).toBeInTheDocument();
+  });
+
+  it("renders cached canonical team records", () => {
+    vi.mocked(useTeamByAbbr).mockImplementation((identity) => {
+      if (identity === "Kansas City Chiefs") {
+        return {
+          abbr: "KC",
+          name: "Kansas City Chiefs",
+          record: { wins: 7, losses: 2, ties: 0 },
+        } as never;
+      }
+      if (identity === "Los Angeles Chargers") {
+        return {
+          abbr: "LAC",
+          name: "Los Angeles Chargers",
+          record: { wins: 6, losses: 2, ties: 1 },
+        } as never;
+      }
+      return null;
+    });
+    mockLoaded(edgeResponse({
+      total: 1,
+      items: [
+        {
+          game_id: "2026_01_KC_LAC",
+          game_date: "2026-09-05",
+          season: "2026-2027",
+          week: 1,
+          away_team: "Kansas City Chiefs",
+          home_team: "Los Angeles Chargers",
+          model_key: "win_prob_elo",
+          market_type: "moneyline",
+          side: "home",
+          model_value: 0.58,
+          market_value: 0.52,
+          american_odds: -110,
+          is_live: false,
+          ev: 0.08,
+          edge_strength: "strong",
+        },
+      ],
+    }));
+
+    render(
+      <TestWrapper>
+        <FeaturedMatchupsGrid />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByText("7-2")).toBeInTheDocument();
+    expect(screen.getByText("6-2-1")).toBeInTheDocument();
+  });
+
+  it("keeps matchup cards available when team records are unavailable", () => {
+    vi.mocked(useTeamByAbbr).mockReturnValue(null);
+    mockLoaded(edgeResponse({
+      total: 1,
+      items: [
+        {
+          game_id: "2026_01_KC_LAC",
+          game_date: "2026-09-05",
+          season: "2026-2027",
+          week: 1,
+          away_team: "Kansas City Chiefs",
+          home_team: "Los Angeles Chargers",
+          model_key: "win_prob_elo",
+          market_type: "moneyline",
+          side: "home",
+          model_value: 0.58,
+          market_value: 0.52,
+          american_odds: -110,
+          is_live: false,
+          ev: 0.08,
+          edge_strength: "strong",
+        },
+      ],
+    }));
+
+    render(
+      <TestWrapper>
+        <FeaturedMatchupsGrid />
+      </TestWrapper>,
+    );
+
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(screen.getByText("Home win prob 58%")).toBeInTheDocument();
   });
 
   it("renders a positive edge joined to its scheduled game", () => {

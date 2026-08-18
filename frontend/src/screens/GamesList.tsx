@@ -2,6 +2,7 @@ import { useAppState } from "../context/AppStateContext";
 import { useGamesList } from "../api/hooks";
 import { useNav } from "../context/NavContext";
 import { TeamMark } from "../components/primitives/TeamMark";
+import { formatCalendarDate } from "../utils/datePresentation";
 import { ErrorCard } from "../components/error/ErrorCard";
 import { WeeklyComponentValue } from "../components/field-status/WeeklyComponentValue";
 import {
@@ -99,7 +100,7 @@ export function GamesList() {
                   }}
                 >
                   <td style={{ padding: "10px 12px 10px 0", color: "var(--ink-2)" }}>
-                    {game.game_date ?? "—"}
+                    {formatCalendarDate(game.game_date) ?? "—"}
                   </td>
                   <td style={{ padding: "10px 12px 10px 0" }}>
                     <span

@@ -1,3 +1,5 @@
+import { TeamMark } from "./TeamMark";
+
 type TeamHeroTeam = {
   /** Short abbreviation, e.g. "KAN" */
   abbr: string;
@@ -53,28 +55,12 @@ export function TeamHero({
   orientation = "left",
   size = 56,
 }: TeamHeroProps) {
-  const primaryColor = team.primary_color ?? "var(--bg-3)";
-  const textColor = team.primary_color ? "#fff" : "var(--ink)";
-
   const mark = (
-    <div
-      style={{
-        width: size,
-        height: size,
-        background: primaryColor,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "var(--f-mono)",
-        fontSize: size * 0.32,
-        fontWeight: 700,
-        color: textColor,
-        borderRadius: 6,
-        flexShrink: 0,
-      }}
-    >
-      {team.abbr}
-    </div>
+    <TeamMark
+      abbr={team.abbr}
+      size={size}
+      accessibleLabel={`${team.city ? `${team.city} ` : ""}${team.name ?? team.abbr} team mark`}
+    />
   );
 
   const info = (

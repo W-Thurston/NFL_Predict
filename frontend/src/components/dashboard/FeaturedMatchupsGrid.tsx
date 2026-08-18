@@ -13,6 +13,8 @@ import { WhyLink } from "../primitives/WhyLink";
 import { useTeamByAbbr } from "../../api/team_metadata_hook";
 import type { components } from "../../api/schema";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
+import { formatCalendarDate } from "../../utils/datePresentation";
+import { formatTeamRecord } from "../../utils/teamRecord";
 
 
 type EdgeApiRow =
@@ -183,7 +185,7 @@ function FeaturedCard({
     );
   };
 
-  const gameDate = game.game_date ?? "TBD";
+  const gameDate = formatCalendarDate(game.game_date) ?? "TBD";
   const week = game.week != null ? `Wk ${game.week}` : "";
   const sportsbook = edge.sportsbook
     ? sportsbookDisplayName(edge.sportsbook)
@@ -230,7 +232,7 @@ function FeaturedCard({
             name: awayTeam?.name ?? undefined,
             primary_color: awayTeam?.primary_color ?? undefined,
           }}
-          record="—"
+          record={formatTeamRecord(awayTeam?.record, "—")}
           size={32}
         />
         <TeamHero
@@ -240,7 +242,7 @@ function FeaturedCard({
             name: homeTeam?.name ?? undefined,
             primary_color: homeTeam?.primary_color ?? undefined,
           }}
-          record="—"
+          record={formatTeamRecord(homeTeam?.record, "—")}
           size={32}
         />
       </div>

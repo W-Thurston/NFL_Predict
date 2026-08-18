@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TeamHero } from "./TeamHero";
+import { useTeamByAbbr } from "../../api/team_metadata_hook";
+
+vi.mock("../../api/team_metadata_hook", () => ({
+  useTeamByAbbr: vi.fn(() => null),
+}));
 
 const TEAM = {
   abbr: "KAN",
@@ -15,6 +20,21 @@ describe("TeamHero", () => {
   it("renders team abbreviation in mark", () => {
     render(<TeamHero team={TEAM} />);
     expect(screen.getByText("KAN")).toBeInTheDocument();
+  });
+
+  it("uses the bounded shared mark for an unresolved long identity", () => {
+    vi.mocked(useTeamByAbbr).mockReturnValue(null);
+    render(
+      <TeamHero
+        team={{ ...TEAM, abbr: "Kansas City Chiefs" }}
+        size={56}
+      />,
+    );
+
+    const mark = screen.getByLabelText("Kansas City Chiefs team mark");
+    expect(mark).toHaveTextContent("KCC");
+    expect(mark).toHaveStyle({ width: "56px", height: "56px" });
+    expect(screen.queryByText("Kansas City Chiefs")).not.toBeInTheDocument();
   });
 
   it("renders city and name", () => {

@@ -25,6 +25,10 @@ def _product() -> pd.DataFrame:
             "win_run_id": ["run-1", "run-1"],
             "win_model_name": ["win_prob", "win_prob"],
             "win_model_type": ["logistic", "logistic"],
+            "spread_status": ["available", "available"],
+            "spread_source_event_id": ["w1", "w2"],
+            "spread_model_name": ["win_prob", "win_prob"],
+            "spread_model_type": ["logistic", "logistic"],
             "total_status": ["available", "available"],
             "total_event_id": ["t1", "t2"],
             "total_run_id": ["run-1", "run-1"],
@@ -41,6 +45,7 @@ def _event(
     model_name: str,
     model_type: str,
     home_win_prob: float | None = None,
+    model_spread: float | None = None,
     model_total: float | None = None,
     role: str = "live",
 ) -> dict[str, object]:
@@ -54,6 +59,7 @@ def _event(
         "model_name": model_name,
         "model_type": model_type,
         "home_win_prob": home_win_prob,
+        "model_spread": model_spread,
         "model_total": model_total,
     }
 
@@ -67,6 +73,7 @@ def _events() -> pd.DataFrame:
                 model_name="win_prob",
                 model_type="logistic",
                 home_win_prob=0.75,
+                model_spread=-3.0,
             ),
             _event(
                 event_id="w2",
@@ -74,6 +81,7 @@ def _events() -> pd.DataFrame:
                 model_name="win_prob",
                 model_type="logistic",
                 home_win_prob=0.40,
+                model_spread=2.0,
             ),
             _event(
                 event_id="t1",
@@ -112,10 +120,16 @@ def test_complete_closeout_uses_exact_selected_live_events() -> None:
     assert result.scheduled_game_count == 2
     assert result.completed_outcome_count == 2
     assert result.matched_win_event_count == 2
+    assert result.matched_spread_event_count == 2
     assert result.matched_total_event_count == 2
     assert result.win.evaluated_count == 1
     assert result.win.brier == pytest.approx(0.0625)
     assert result.win.accuracy == pytest.approx(1.0)
+    assert result.spread.evaluated_count == 2
+    assert result.spread.mae == pytest.approx(3.0)
+    assert result.spread.rmse == pytest.approx(10.0**0.5)
+    assert result.spread.bias == pytest.approx(-3.0)
+    assert result.reconciliation["projected_home_margin"].tolist() == [3.0, -2.0]
     assert result.total.evaluated_count == 2
     assert result.total.mae == pytest.approx(4.5)
     assert result.total.rmse == pytest.approx(22.5**0.5)
@@ -195,3 +209,32 @@ def test_required_columns_are_validated() -> None:
             forecast_events=_events(),
             games=_games(),
         )
+
+
+def test_unavailable_spread_component_is_not_mislabeled_as_missing_event() -> None:
+    product = _product()
+    product.loc[product["game_id"].eq("g2"), "spread_status"] = "win_unavailable"
+    product.loc[
+        product["game_id"].eq("g2"),
+        ["spread_source_event_id", "spread_model_name", "spread_model_type"],
+    ] = pd.NA
+
+    result = close_live_forecasts(product=product, forecast_events=_events(), games=_games())
+
+    assert not result.complete
+    assert result.missing_spread_component_game_ids == ("g2",)
+    assert result.missing_spread_event_game_ids == ()
+
+
+def test_null_model_spread_is_not_evaluable() -> None:
+    events = _events()
+    events.loc[events["event_id"].eq("w2"), "model_spread"] = pd.NA
+
+    result = close_live_forecasts(product=_product(), forecast_events=events, games=_games())
+
+    assert result.spread.evaluated_count == 1
+    assert not bool(
+        result.reconciliation.loc[
+            result.reconciliation["game_id"].eq("g2"), "spread_evaluable"
+        ].iloc[0]
+    )

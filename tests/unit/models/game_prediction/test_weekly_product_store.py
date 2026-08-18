@@ -16,6 +16,7 @@ from gridiron_edge.evaluation.forecast_contracts import WeeklyProductIdentity
 from gridiron_edge.models.game_prediction.weekly_product_store import (
     WEEKLY_PRODUCT_SCHEMA_VERSION,
     get_current_weekly_product_selection,
+    list_current_weekly_product_selections,
     list_weekly_products,
     load_current_weekly_product,
     load_weekly_product,
@@ -465,3 +466,140 @@ def test_current_selection_target_must_remain_loadable(tmp_path: Path) -> None:
             week=identity.week,
             repo=tmp_path,
         )
+
+
+def test_lists_only_explicit_current_selections_in_scope_order(tmp_path: Path) -> None:
+    week_eight = _identity("product-week-8", run_id="run-8")
+    week_nine = WeeklyProductIdentity(
+        product_id="product-week-9",
+        run_id="run-9",
+        season="2026-2027",
+        week=9,
+        generated_at=datetime(2026, 10, 27, 12, tzinfo=UTC),
+    )
+    next_season = WeeklyProductIdentity(
+        product_id="product-next-season",
+        run_id="run-next",
+        season="2027-2028",
+        week=1,
+        generated_at=datetime(2027, 8, 1, 12, tzinfo=UTC),
+    )
+    unselected = _identity("unselected-product", run_id="run-unselected")
+
+    write_weekly_product(
+        _product(run_id=week_eight.run_id),
+        identity=week_eight,
+        repo=tmp_path,
+    )
+    week_nine_product = _product(run_id=week_nine.run_id)
+    week_nine_product["week"] = 9
+    write_weekly_product(week_nine_product, identity=week_nine, repo=tmp_path)
+    next_product = _product(run_id=next_season.run_id)
+    next_product["season"] = next_season.season
+    next_product["week"] = next_season.week
+    write_weekly_product(next_product, identity=next_season, repo=tmp_path)
+    write_weekly_product(
+        _product(run_id=unselected.run_id),
+        identity=unselected,
+        repo=tmp_path,
+    )
+
+    select_current_weekly_product(
+        next_season.product_id,
+        season=next_season.season,
+        week=next_season.week,
+        selected_at=datetime(2027, 8, 1, 13, tzinfo=UTC),
+        repo=tmp_path,
+    )
+    select_current_weekly_product(
+        week_nine.product_id,
+        season=week_nine.season,
+        week=week_nine.week,
+        selected_at=datetime(2026, 10, 27, 13, tzinfo=UTC),
+        repo=tmp_path,
+    )
+    select_current_weekly_product(
+        week_eight.product_id,
+        season=week_eight.season,
+        week=week_eight.week,
+        selected_at=datetime(2026, 10, 20, 13, tzinfo=UTC),
+        repo=tmp_path,
+    )
+
+    selections = list_current_weekly_product_selections(repo=tmp_path)
+
+    assert [
+        (selection.season, selection.week, selection.product_id) for selection in selections
+    ] == [
+        ("2026-2027", 8, "product-week-8"),
+        ("2026-2027", 9, "product-week-9"),
+        ("2027-2028", 1, "product-next-season"),
+    ]
+
+
+def test_lists_no_selections_as_empty_tuple(tmp_path: Path) -> None:
+    write_weekly_product(_product(), identity=_identity(), repo=tmp_path)
+
+    assert list_current_weekly_product_selections(repo=tmp_path) == ()
+
+
+def test_selection_enumeration_rejects_unindexed_target(tmp_path: Path) -> None:
+    root = weekly_product_root(tmp_path)
+    root.mkdir(parents=True)
+    _current_path(tmp_path).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "selections": {
+                    "2026-2027_week_08": {
+                        "season": "2026-2027",
+                        "week": 8,
+                        "product_id": "missing-product",
+                        "selected_at": "2026-10-20T12:00:00+00:00",
+                    }
+                },
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="unindexed product"):
+        list_current_weekly_product_selections(repo=tmp_path)
+
+
+def test_selection_enumeration_rejects_scope_mismatch(tmp_path: Path) -> None:
+    identity = _identity()
+    write_weekly_product(_product(), identity=identity, repo=tmp_path)
+    _current_path(tmp_path).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "selections": {
+                    "2026-2027_week_09": {
+                        "season": "2026-2027",
+                        "week": 9,
+                        "product_id": identity.product_id,
+                        "selected_at": "2026-10-20T12:00:00+00:00",
+                    }
+                },
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="scope does not match"):
+        list_current_weekly_product_selections(repo=tmp_path)
+
+
+def test_selection_enumeration_requires_loadable_artifact(tmp_path: Path) -> None:
+    identity = _identity()
+    artifact = write_weekly_product(_product(), identity=identity, repo=tmp_path)
+    select_current_weekly_product(
+        identity.product_id,
+        season=identity.season,
+        week=identity.week,
+        selected_at=datetime(2026, 10, 20, 13, tzinfo=UTC),
+        repo=tmp_path,
+    )
+    artifact.unlink()
+
+    with pytest.raises(FileNotFoundError, match="artifact is missing"):
+        list_current_weekly_product_selections(repo=tmp_path)

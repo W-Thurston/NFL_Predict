@@ -324,6 +324,28 @@
 }
 
 
+
+.model-edge-header-explanation {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: help;
+}
+.model-edge-header-explanation:hover { color: var(--ink-2); }
+.model-edge-header-explanation:focus-visible {
+  outline: 1px solid var(--ink-3);
+  outline-offset: 2px;
+}
+
 .explain-tooltip { position: fixed; z-index: 1000; padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg-1); color: var(--ink-2); box-shadow: 0 8px 24px rgb(0 0 0 / 40%); text-align: left; pointer-events: none; }
 .explain-tooltip__title { color: var(--ink); font-family: var(--f-sans); font-size: 12px; font-weight: 650; line-height: 1.35; }
 .explain-tooltip__section { margin-top: 9px; font: 10px/1.5 var(--f-mono); }
