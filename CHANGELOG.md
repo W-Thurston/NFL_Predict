@@ -1,5 +1,97 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-18 - Production recommendation-chain rehearsal
+
+### Added
+
+- Added immutable recommendation-governance ownership with deterministic
+  content identity, strict validation, identity-addressed JSON persistence, and
+  exact replay protection.
+- Added explicit production-chain commands for creating and verifying
+  governance, issuing candidates, deriving recommendation policy, and evaluating
+  recommended-bet results from exact persisted identities.
+- Added a real-repository candidate issuance integration boundary.
+- Added focused governance domain, persistence, CLI, exact preflight matching,
+  collection-execution assessment, and postgame-assembly coverage.
+
+### Production orchestration
+
+- Issued one immutable 2026 Week 1 candidate artifact from the explicitly
+  selected weekly product, its exact forecast run, and the canonical weekly
+  quote ledger.
+- Evaluated 1,680 historical quote observations and persisted 698 candidates,
+  982 not-candidates, and zero unavailable rows.
+- Persisted explicit recommendation governance and derived one exact policy.
+- Preserved Moneyline, Spread, and Total policy states as unavailable because
+  completed outcomes, validated market closeouts, and settled-wager return
+  evidence do not yet exist.
+- Evaluated all 698 candidates against the exact policy and persisted 698
+  unavailable recommended-bet results with no actionable stakes.
+- Kept local wager recording explicit and optional. No sportsbook wager was
+  placed.
+
+### Production-chain proof
+
+- Added strict production-chain assessment and immutable checkpoint persistence
+  for selected product, forecast provenance, current quotes, repeated quote
+  history, selected collection plan, planned execution, candidate issuance,
+  recommendation policy, recommendation results, backend serialization,
+  frontend presentation, optional recorded wagers, outcomes, closeout, CLV, and
+  realized performance.
+- Replaced generic artifact-directory checks with strict readers and exact
+  season, week, product, run, issuance, policy, and evaluation identity matching.
+- Added explicit unavailable, incomplete, invalid, conflicting, available, and
+  not-yet-eligible proof states without selecting artifacts by file recency.
+- Grounded collection-execution assessment in the selected plan, existing
+  due-state evaluator, and immutable claim and terminal-result receipts.
+- Added shared postgame evidence assembly that reuses selected-product outcome
+  reconciliation, exact candidate closeout, market-specific CLV,
+  historical-boundary, market-family evaluation, cleaned-game, and optional
+  settled-wager owners once per assessment.
+- Preserved pre-kickoff short-circuit behavior so future outcome, closeout, CLV,
+  and performance evidence is not loaded or claimed before eligibility.
+
+### Real-data validation
+
+- Performed two live The Odds API ingestions of 840 quotes each across 16 games
+  and nine sportsbooks.
+- Verified the canonical Week 1 ledger contains 1,680 observations at two
+  distinct UTC fetch timestamps.
+- Verified all exact identities have repeated depth two: 274 Moneyline, 282
+  Spread, and 284 Total identities.
+- Persisted candidate issuance
+  `278d60da4e2dc089ff7eb973620f49050f83de336034cbff0c8c1a097401ccff`.
+- Persisted recommendation governance
+  `56757db59c2d04a55eb3f980299699403fdc982e4fe7ff4963f0898112f4824e`.
+- Persisted recommendation policy
+  `9e2cc3363656366eae76ec0935f01ff201ce9c9784e2736936fd0af9ab0ab024`.
+- Persisted recommended-bet evaluation
+  `8301fb74e1eaa10437376ff3b616aaa1efc3477944d1a8da0df94abd55de073c`.
+- Persisted production-chain checkpoint
+  `acf50214f67aed1833e38f998685c3bde4f8f5489a3771f1e50adc319bb887fb`.
+- Verified the API attaches recommendation results only to exact matching
+  offers.
+- Verified Line Shopping and Game Detail render Recommendation unavailable and
+  expandable Policy evidence from persisted results.
+
+### Verification
+
+- Repository Ruff passed.
+- The configured repository-wide Pyrefly boundary passed with zero errors.
+- Focused and repository unit and integration tests passed.
+- Frontend recommendation presentation remained mechanically driven by
+  persisted states; no frontend recommendation calculation was added.
+
+### Current scope
+
+- Market Unit 26 remains active.
+- The pregame and recommendation middle chain is proven independently for
+  Moneyline, Spread, and Total.
+- Selected-plan execution remains not yet eligible until the first planned poll
+  at `2026-09-08T12:00:00Z`.
+- Completed outcomes, validated closeout, market-specific CLV, and realized
+  performance remain future real-week acceptance evidence.
+
 ## 2026-08-16 - Quote collection worker deployment
 
 ### Added

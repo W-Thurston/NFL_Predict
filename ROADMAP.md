@@ -51,403 +51,157 @@ Prioritize work by value density and architectural fit:
 
 ### Supported Market Provider and Multi-Book Shopping
 
-**Status:** Active program
-
-**Goal:** establish a dependable supported market-data provider and add
-cross-book execution tooling without coupling forecast publication to market
-availability.
-
-Current state:
-
-- market storage is source-neutral;
-- the nflverse schedule adapter can populate current game-market context when
-  source data is available;
-- the DraftKings adapter is legacy and unreliable because anti-bot responses
-  can block access;
-- weekly prediction consumes an existing current snapshot and does not fetch
-  external prices;
-- missing markets soft-fail only edge generation.
-
-Program sequence:
-
-1. **Provider and contract selection [Complete].** The Odds API v4 selected;
-   normalized quote, freshness, identity, configuration, and failure boundaries
-   locked.
-2. **Source-neutral quote migration [Complete].** Provider and sportsbook
-   identity are separate, provider event and update provenance are preserved,
-   and storage is multi-book safe.
-3. **Current provider adapter [Complete].** Current and upcoming NFL moneyline,
-   spread, and total quotes can be explicitly ingested from The Odds API into
-   the normalized store.
-4. **Operational integration [Complete].** Sportsbook-specific prices remain
-  independently traceable through edge calculation, diagnostics, API, CLI,
-  CSV, frontend selection, and Bet Slip staging while forecast publication
-  remains independent from provider access.
-5. **Real-data frontend integration and audit [Complete].** Dashboard, Game
-  Detail, Available Edges, Model Edges, Settings, browser navigation,
-  responsive presentation, sportsbook provenance, and Bet Slip staging were
-  validated against the real current multi-book snapshot.
-6. **Multi-book shopping [Complete].** The current Line Shopping product
-  preserves every exact sportsbook quote, classifies line and price quality
-  independently, evaluates each offer against the selected weekly product,
-  exposes playable guidance and fair Moneyline prices, and provides persisted
-  accessible visual guidance and detailed offer explanations. Arbitrage, middle
-  detection, movement, and historical market evaluation remain planned as
-  separate follow-on work.
-7. **Market decision semantics [Complete].** Line Shopping now separates model
-  likelihood from exact-offer value, labels positive expected value as a
-  candidate rather than a recommendation, and provides independently persisted
-  controls for each visual comparison layer. Recommended-bet qualification
-  remains planned until an empirically validated edge, reliability, freshness,
-  sizing, and exposure policy is implemented.
-8. **Recommendation evidence foundation [Complete].** Established the evidence
-  and diagnostic contracts required before a positive-EV candidate can become a
-  qualified or recommended bet. The system now provides:
-  - immutable qualification diagnostics that distinguish not-candidate,
-    not-qualified, and qualification-unavailable states without prematurely
-    assigning a recommendation;
-  - deterministic provider-aware historical quote observations with exact
-    replay idempotence, same-fetch conflict rejection, and explicit temporal
-    coverage;
-  - leakage-safe `earliest_observed` and `latest_eligible_pregame` boundaries
-    that preserve provider, provider-event, sportsbook, game, market, and side
-    identity;
-  - explicit missing, conflicting, live, and post-kickoff boundary states;
-  - recorded wager terms stored independently from immutable reference-offer
-    provider, sportsbook, event, timestamps, kickoff, odds, and line evidence;
-  - removal of unsupported development behavior that treated first or last
-    stored quotes as opening, closing, or closing-line-value evidence.
-
-  These contracts establish the provenance chain from an exact evaluated offer
-  through historical market evidence to a recorded wager. They do not yet
-  promote candidates into recommended bets, calculate validated CLV, or define
-  empirical edge and exposure thresholds.
-- **Recommended-bet qualification [Planned].** Complete the remaining evidence,
-  analytical, and policy work that promotes a positive-EV candidate into a
-  qualified opportunity or recommended bet.
-
-  Completed foundations:
-
-  - Exact reference-backed bet matching preserves provider, provider event,
-    sportsbook, game, market, side, fetch timestamp, line, price, sportsbook
-    update time, and kickoff evidence with explicit manual, missing, ambiguous,
-    conflicting, and matched states.
-  - Historical observations are stored in deterministic season-and-week
-    partitions with exact-replay idempotence, same-fetch conflict rejection,
-    canonical ordering, and explicit repeated-observation depth.
-  - Leakage-safe boundaries preserve earliest-observed and latest-eligible
-    non-live pregame observations for each exact provider-aware market identity.
-  - Kickoff-aware weekly collection planning, atomic single-shot execution, and
-    explicit active-plan selection are implemented.
-  - A Raspberry Pi quote-collection worker has been deployed and validated
-    manually; repository-owned installation, verification, documentation, and
-    recovery remain the active implementation unit.
-
-  Remaining sequence:
-
-  1. Codify the deployed quote-collection worker as repository-owned systemd,
-     installation, verification, secret-handling, monitoring, and recovery
-     assets.
-  2. Accumulate repeated exact-identity pregame quote observations through the
-     selected weekly collection plans.
-  3. Persist immutable pregame candidate issuance so later analysis evaluates
-     only the offers and evidence available before kickoff.
-  4. Implement validated same-provider, same-sportsbook closeout using the
-     latest eligible pregame boundary. Populate closing fields and calculate
-     price or point CLV only when the required evidence exists.
-  5. Evaluate model reliability, realized outcomes, CLV, and performance across
-     empirical EV cohorts independently for Moneyline, Spread, and Total.
-     Derive thresholds from observed results rather than intuitive cutoffs.
-  6. Define versioned quote-freshness, fractional-Kelly sizing, duplicate
-     exposure, conflicting exposure, per-game concentration, portfolio
-     concentration, and correlation policies.
-  7. Promote an exact offer only when every mandatory evidence and policy check
-     passes. Preserve explicit failed and unavailable reasons when
-     recommendation qualification cannot be completed.
-
-  The intermediate goal is satisfied when one exact current sportsbook offer
-  can produce a persisted recommended-bet result with exact offer identity,
-  selected-product and forecast provenance, evaluated timestamp, policy
-  version, supporting checks, unavailable reasons, and suggested stake. The
-  system does not place a sportsbook wager.
-
-  Model-favorite status remains descriptive and is not a universal
-  recommendation requirement. A positive-EV candidate remains necessary but
-  insufficient for recommendation.
-
-### Remaining Recommendation Program
-
-The remaining program is divided into bounded units so evidence acquisition,
-historical evaluation, policy calibration, persisted decision state, product
-integration, and production proof do not collapse into one implementation
-boundary.
-
-#### Market Unit 19: Restore the Repository-Wide Pyrefly Boundary
-
-Restore the configured `uvx pyrefly check` boundary as a truthful zero-error
-quality gate across `src/`, `tests/`, and `deploy/bin/`.
-
-Required work:
-
-- define the intended type-check scope for production source, tests, deployment
-  assets, administrative tools, and exploratory notebooks;
-- correct repository and test import roots before treating unresolved fixture
-  imports as source defects;
-- separate configuration failures from production-source, test, fixture,
-  negative-validation, Pandas-inference, and notebook findings;
-- resolve production-source findings before test-only debt;
-- establish explicit conventions for deliberately invalid test inputs, frozen
-  object mutation tests, protocol fakes, and typed fixture construction;
-- exclude non-authoritative exploratory notebooks from automated quality gates
-  through explicit documented configuration;
-- update hooks, verification commands, and operational documentation to use the
-  complete repository target;
-- require configured `uvx pyrefly check` to report zero errors at acceptance.
-
-Focused type checks remain required during this restoration work. Existing
-errors must not become a blanket suppression baseline.
-
-#### Market Unit 20: Persist Immutable Pregame Candidate Issuance
-
-Persist the exact positive-EV candidate evidence available before kickoff so
-later evaluation does not reconstruct historical decisions from newer state.
-
-Required work:
-
-- preserve provider, provider-event, sportsbook, game, market, side, line,
-  American price, fetch timestamp, sportsbook update timestamp, and kickoff;
-- preserve the selected weekly product, exact forecast events, model identity,
-  model probability, and calculated expected value;
-- record the evaluated timestamp and explicit candidate, not-candidate, and
-  unavailable states;
-- reject post-kickoff issuance;
-- provide deterministic identity, immutable persistence, replay idempotence, and
-  conflicting-replay rejection;
-- keep candidate issuance separate from qualification, staking, exposure, and
-  recommendation policy.
-
-#### Market Unit 21: Implement Validated Market Closeout and CLV
-
-Close issued candidates and recorded wagers against the correct latest eligible
-pregame evidence.
-
-Required work:
-
-- require the same provider, provider event, sportsbook, game, market, and side;
-- preserve exact line identity where the market contract requires it;
-- use only the latest eligible non-live quote observed before kickoff;
-- preserve missing, ambiguous, conflicting, live, post-kickoff, and unavailable
-  closeout states;
-- calculate Moneyline price CLV only when valid closing-price evidence exists;
-- calculate Spread and Total point CLV only when valid closing-line evidence
-  exists;
-- never treat the first or last stored quote as an implicit opening or closing
-  definition.
-
-#### Market Unit 22: Build Empirical Market-Family Evaluation
-
-Evaluate issued candidates independently for Moneyline, Spread, and Total.
-
-Required work:
-
-- report candidate counts, evidence coverage, and closeout availability;
-- evaluate model reliability, realized outcomes, expected-value cohorts, CLV
-  cohorts, and realized return;
-- evaluate quote age, historical observation depth, sportsbook, and market-side
-  cohorts;
-- retain market-family-specific results;
-- report sample sizes and insufficient-evidence states explicitly;
-- do not present intuitive thresholds or underpowered cohorts as validated
-  policy.
-
-#### Market Unit 23: Lock Versioned Recommendation Policy
-
-Derive and persist the policy that may promote an exact candidate into a
-qualified opportunity or recommendation.
-
-Required work:
-
-- derive thresholds from Unit 22 evidence independently by market family;
-- define quote-freshness and evidence-sufficiency rules;
-- define fractional-Kelly sizing and bankroll-basis requirements;
-- define duplicate, conflicting, per-game, portfolio-concentration, and
-  correlation exposure rules;
-- define mandatory, failed, and unavailable checks;
-- persist immutable policy versions with provenance;
-- keep policy evaluation deterministic and independent from API or frontend
-  request paths.
-
-#### Market Unit 24: Persist Recommended-Bet Results
-
-Persist one immutable qualification and recommendation result for every
-evaluated exact offer.
-
-Required work:
-
-- preserve exact offer and candidate identity;
-- preserve selected-product, forecast-event, and policy provenance;
-- record the evaluated timestamp and every mandatory check;
-- distinguish qualified, recommended, failed, and unavailable states;
-- preserve suggested stake, bankroll basis, Kelly fraction, and exposure
-  evidence when available;
-- provide deterministic identity, replay idempotence, and conflict rejection;
-- do not place a sportsbook wager.
-
-#### Market Unit 25: Integrate Recommendation Products
-
-Serialize and present persisted recommendation results without request-time
-qualification or frontend decision calculation.
-
-Required work:
-
-- add persisted-result loading and API serialization;
-- integrate qualification and recommendation state into Line Shopping,
-  Available Edges, Game Detail, Bet Slip, and the recorded-bet workflow;
-- present the policy version, supporting checks, failed checks, unavailable
-  reasons, suggested stake, and provenance;
-- keep recording a wager an explicit user action;
-- preserve the distinction between a candidate, qualified opportunity,
-  recommendation, Bet Slip draft, and recorded wager.
-
-#### Market Unit 26: Prove the Full Production Recommendation Chain
-
-Complete a real-week end-to-end proof independently for Moneyline, Spread, and
-Total.
-
-Required proof:
-
-- explicitly selected weekly product and exact forecast provenance;
-- repeated timestamped pregame quote observations;
-- immutable candidate issuance;
-- versioned qualification and recommendation policy;
-- persisted recommended or explicitly unavailable result;
-- backend serialization and frontend presentation;
-- optional explicit recorded-bet action with duplicate protection and bankroll
-  transaction semantics;
-- completed outcome and validated same-provider, same-sportsbook closeout;
-- Moneyline price CLV or Spread and Total point CLV;
-- realized performance and reproducible chronological audit evidence.
-
-Each market family requires separate empirical acceptance. Success for one
-family must not be generalized to another. The system does not place sportsbook
-wagers.
-
-
-10. **Recommendation product integration [Planned].** Add the qualified and
-  recommended states to the backend contract, Line Shopping, Available Edges,
-  Bet Slip, and recorded-bet workflow only after the qualification policy is
-  validated. Present recommendation profile, supporting evidence, unavailable
-  checks, suggested stake, and provenance without placing sportsbook wagers.
-11. **Derived market opportunities [Planned].** Build arbitrage and middle
-  detection on the validated exact-offer comparison contract, preserving book,
-  line, price, timing, and execution constraints. Keep these opportunities
-  distinct from model-value recommendations.
-12. **Market movement and historical evaluation [Planned].** Add append-only
-  quote history, opening and closing definitions, leakage-safe pre-kickoff quote
-  selection, line-movement and closing-line-value analysis, provider backfill,
-  and coverage reporting. Use the historical evidence to validate and recalibrate
-  recommendation thresholds rather than choosing intuitive cutoffs.
-
-Current and historical market data are separate workstreams within this
-program. The current-market workstream comes first because it unlocks immediate
-weekly operation and frontend usability. Historical archive and evaluation
-follow after the provider and normalized quote contract are stable.
-
-- **Recurring quote acquisition [Implementation complete; deployment codification active].**
-  Kickoff-aware weekly collection planning, bounded
-  provider-credit allocation, versioned plan persistence, atomic single-shot
-  execution, immutable claims and terminal results, quota-reserve safeguards,
-  partial-persistence reporting, and explicit global active-plan selection are
-  implemented.
-
-  A Raspberry Pi 4 worker has been validated against the selected 2026 Week 1
-  plan using a systemd oneshot service and five-minute timer. The worker runs
-  from a 2 TB SSD over the proven stable USB 2 path, resolves the selected plan,
-  generates an explicit UTC evaluation time, preserves the provider secret in a
-  root-owned environment file, and returns `not_due` without provider access or
-  execution artifacts before the first planned poll.
-
-  The active implementation work is to make this deployment reproducible and
-  repository-owned. It must preserve:
-
-  - explicit plan generation and selection outside the timer;
-  - no season or week inference;
-  - no implicit retry or catch-up request;
-  - one provider request at most per claimed due poll;
-  - non-root service execution;
-  - protected secret configuration;
-  - systemd journal observability;
-  - installation, verification, disablement, and recovery guidance;
-  - explicit storage-health checks for the deployed Raspberry Pi worker.
-
-  Full API and frontend appliance hosting on the Raspberry Pi remains a
-  separate future deployment decision.
-
-- **Moneyline, Spread, and Total production recommendation proof [Planned].**
-  Confirm the complete production chain independently for all three game-market
-  families:
-
-  1. canonical schedule and selected weekly prediction product;
-  2. repeated exact timestamped multi-book quote observations;
-  3. immutable pregame candidate issuance;
-  4. versioned qualification, freshness, sizing, and exposure policy;
-  5. persisted recommended or explicitly unavailable result;
-  6. backend serialization and frontend presentation;
-  7. explicit optional recorded-bet action with duplicate protection and
-     bankroll transaction semantics;
-  8. completed outcome and same-source, same-sportsbook closeout;
-  9. Moneyline price CLV or Spread and Total point CLV;
-  10. realized performance and a reproducible end-to-end audit trail.
-
-  Moneyline, Spread, and Total require separate empirical acceptance. A policy
-  validated for one family must not be assumed valid for another. Production
-  confirmation requires a real-week rehearsal proving identity, chronology,
-  evidence, recommendation state, presentation, optional recording, closeout,
-  and performance without request-time model computation or fabricated market
-  evidence.
-
-Current-market scope:
-
-- documented supported API and secret/configuration boundary;
-- sportsbook-level current and upcoming moneyline, spread, and total quotes;
-- provider, book, event, market, outcome, line, price, and fetch provenance;
-- canonical game identity resolution and unmatched-event diagnostics;
-- source-neutral snapshot validation and atomic replacement;
-- freshness, staleness, partial coverage, malformed response, rate-limit, and
-  provider-failure states;
-- `verify-week`, unified edge service, API, Dashboard, Games, Game Detail, and
-  BetSlip integration.
-
-Historical-market foundations implemented:
-
-- append-only timestamped provider-aware quote observations;
-- deterministic season-and-week partitioning;
-- exact-replay idempotence and same-fetch conflict rejection;
-- explicit temporal coverage and repeated-observation depth;
-- leakage-safe earliest-observed and latest-eligible-pregame boundaries;
-- exact reference-backed bet matching;
-- preservation of missing, conflicting, live, and post-kickoff states.
-
-Historical-market work remaining:
-
-- sufficient repeated real pregame coverage;
-- immutable pregame candidate issuance;
-- validated same-source, same-sportsbook closeout;
-- price and point CLV;
-- line and price movement interpretation;
-- empirical market-family cohort analysis;
-- recommendation-policy calibration;
+**Status:** Active program, with Market Unit 26 as the only active bounded unit.
+
+**Goal:** operate a truthful provider-aware, multi-book recommendation product
+whose persisted evidence can be followed from selected forecasts and exact
+pregame quotes through candidate issuance, policy evaluation, presentation,
+optional local wager recording, closeout, CLV, and realized performance.
+
+#### Implemented Platform
+
+The supported current-market and recommendation foundations are implemented:
+
+- The Odds API v4 is the supported current and upcoming NFL market provider.
+- The canonical quote contract preserves provider, provider event, sportsbook,
+  game, market, side, price, line, local fetch time, sportsbook update time,
+  kickoff, and live state.
+- Current snapshots and append-preserved season-and-week quote history have
+  separate storage and operational semantics.
+- Exact replay is idempotent, same-fetch conflicts are rejected, later
+  observations remain distinct, and historical loading is deterministic.
+- Leakage-safe historical boundaries preserve earliest observed and latest
+  eligible non-live pregame evidence independently for each exact
+  provider-aware market identity.
+- Current ingestion, weekly collection planning, active-plan selection,
+  single-shot due execution, immutable claims and results, quota safeguards,
+  and partial-persistence reporting are implemented.
+- The Raspberry Pi systemd worker deployment, installation, verification,
+  secret handling, monitoring, rollback, and recovery assets are
+  repository-owned and validated.
+- Sportsbook-specific Moneyline, Spread, and Total offers remain independently
+  traceable through edge calculation, diagnostics, API, CLI, CSV, Line
+  Shopping, Game Detail, Available Edges, and Bet Slip staging.
+- Line Shopping preserves every exact offer, classifies line and price quality,
+  evaluates exact-offer expected value against the selected weekly product, and
+  keeps model likelihood, analytical value, and recommendation semantics
+  separate.
+- Immutable pregame candidate issuance preserves the exact product, forecast,
+  offer, model probability, expected value, evaluation time, state, and reason.
+- Exact candidate and recorded-wager references can be closed against the
+  latest eligible pregame observation from the same provider, provider event,
+  sportsbook, game, market, and side.
+- Moneyline price CLV, Spread point CLV, and Total point CLV are calculated only
+  from complete validated closeout terms.
+- Empirical Moneyline, Spread, and Total evaluation reports outcomes, closeout,
+  CLV, observation depth, quote age, cohorts, and exact settled-wager return
+  evidence without converting descriptive evidence into intuitive thresholds.
+- Immutable recommendation governance, deterministic policy derivation,
+  mandatory policy checks, Kelly sizing, bankroll and portfolio constraints,
+  and immutable recommended-bet result persistence are implemented.
+- Persisted recommendation states are serialized mechanically and presented in
+  Line Shopping, Available Edges, Game Detail, and Bet Slip without request-time
+  qualification or frontend decision calculation.
+- A user may explicitly record a wager locally through one rollback-safe ledger
+  and bankroll operation. Gridiron Edge does not place sportsbook wagers.
+- Production-chain preflight validates exact selected-product, quote-history,
+  collection-plan, candidate, policy, result, backend, frontend, collection
+  execution, outcome, closeout, CLV, and performance evidence independently by
+  market family.
+- The repository-wide Ruff, Pyrefly, Python test, and frontend quality
+  boundaries are restored and enforced.
+
+#### Active Proof: Market Unit 26
+
+The active unit is proving the complete production recommendation chain for one
+real completed NFL week independently for Moneyline, Spread, and Total.
+
+The real 2026 Week 1 rehearsal has already established:
+
+- one explicitly selected 16-game weekly product with complete selected
+  forecast provenance;
+- a current 840-row multi-book quote snapshot across 16 games and nine
+  sportsbooks;
+- a canonical 1,680-row weekly quote ledger at two distinct UTC fetch
+  timestamps;
+- repeated depth of two for all 274 Moneyline, 282 Spread, and 284 Total exact
+  historical identities;
+- immutable candidate issuance across all 1,680 observations, containing 698
+  candidates, 982 not-candidates, and zero unavailable rows;
+- 228 Moneyline, 226 Spread, and 244 Total candidates;
+- explicit immutable recommendation governance;
+- one persisted family-specific recommendation policy whose three families are
+  unavailable because required completed-outcome, closeout, and return evidence
+  is not yet available;
+- 698 persisted recommended-bet results, all explicitly unavailable and none
+  qualified, recommended, failed, or conflicting;
+- exact-offer API attachment and frontend rendering of Recommendation
+  unavailable with expandable Policy evidence;
+- strict preflight resolution of the exact candidate issuance, policy, and
+  recommendation evaluation;
+- shared postgame evidence assembly through existing outcome, closeout, CLV,
+  historical-boundary, market-family evaluation, cleaned-game, and optional
+  settled-wager owners.
+
+The persisted rehearsal identities are maintained in the active `PLAN.md` unit.
+
+#### Remaining Unit 26 Acceptance
+
+The active unit remains open for evidence that cannot exist yet:
+
+1. Execute due polls from the selected 2026 Week 1 collection plan through the
+   repository-owned worker and preserve immutable claim and terminal-result
+   receipts. The first planned poll is `2026-09-08T12:00:00Z`.
+2. Refresh cleaned completed-game outcomes after Week 1 games finish and
+   reconcile them to the exact selected weekly product and forecast events.
+3. Close exact issued candidates against the latest eligible non-live quote
+   observed strictly before kickoff from the same provider, provider event,
+   sportsbook, game, market, and side.
+4. Validate Moneyline price CLV, Spread point CLV, and Total point CLV
+   independently. Evidence from one market family cannot satisfy another.
+5. Evaluate realized performance only from uniquely attributed settled-wager
+   evidence. No recorded wager is required; absent wager evidence must remain
+   explicitly unavailable rather than zero.
+6. Persist chronological production-chain assessments at explicit UTC
+   timestamps and verify exact replay without reassessing mutable repository
+   state.
+7. Complete a final real-data frontend presentation review after outcome,
+   closeout, and CLV evidence exists. Presentation cleanup must not change
+   persisted recommendation semantics.
+
+Market Unit 26 closes only after a real completed week satisfies independent
+Moneyline, Spread, and Total proof or records an explicit evidence-backed
+unavailable state for a component that cannot validly become available.
+
+#### Genuine Follow-On Market Capabilities
+
+The following remain future capabilities after Unit 26:
+
 - supported provider historical backfill if operational collection does not
-  provide sufficient coverage;
-- strategy backtesting and consensus policies.
+  produce sufficient depth for empirical calibration;
+- empirically validated joint threshold-selection methods and later policy
+  calibration from matured Moneyline, Spread, and Total evidence;
+- line and price movement interpretation beyond validated observed boundaries;
+- strategy backtesting with strict chronological evidence controls;
+- arbitrage detection with exact executable book, line, price, timing, and stake
+  constraints;
+- middle detection with explicit paired-line and settlement semantics;
+- consensus or cross-book reference policies that do not weaken exact-offer
+  provenance;
+- frontend density, layout, evidence-detail, and accessibility cleanup informed
+  by the real recommendation and postgame evidence experience;
+- optional API and frontend appliance hosting on the Raspberry Pi as a separate
+  deployment decision.
 
-The initial normalized quote contract must support both current snapshots and a
-future historical archive, but historical ingestion and evaluation are not
-acceptance requirements for the first current-provider implementation.
+Current snapshots and historical evidence remain separate workstreams sharing
+one normalized quote contract. Forecast publication stays independent from
+provider access. Missing market or recommendation evidence remains explicit and
+does not invalidate the selected weekly prediction product.
 
-Do not fabricate production prices, collapse provider quotes to one book before
-normalization, hide a network fetch inside `weekly-predict`, or treat the legacy
-DraftKings adapter as a dependable recovery path.
+Do not fabricate production prices, collapse provider quotes before
+normalization, infer recommendation state from positive expected value, hide a
+network fetch inside weekly prediction, treat manual ingestion as selected-plan
+execution, or use the retired DraftKings adapter as a dependable recovery path.
 
 ### Model Ensemble
 

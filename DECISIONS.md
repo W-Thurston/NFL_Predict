@@ -7,6 +7,114 @@ Each entry documents *why* a choice was made, not just *what* changed
 Format: newest entry at top. Each entry self-contained.
 
 ---
+## D27. Production recommendation proof is an exact immutable evidence chain
+
+**Status:** Accepted
+
+**Date:** 2026-08-18
+
+### Decision
+
+Treat production recommendation proof as a chronological chain of exact
+immutable identities rather than a request-time reconstruction or a directory
+existence check.
+
+The chain begins with one explicitly selected weekly product and its exact
+forecast events. Candidate issuance consumes that product and canonical quote
+history at an explicit UTC evaluation time. Recommendation governance is an
+independent immutable, content-addressed artifact. Recommendation policy is
+derived from exact empirical evidence plus that exact governance. Recommended-
+bet evaluation requires an exact issuance, exact policy, and explicit UTC
+decision time.
+
+Production-chain preflight is the composite chronological audit artifact. One
+assessment reads and validates the exact persisted evidence available at its
+explicit UTC assessment time, classifies every component independently for
+Moneyline, Spread, and Total, and may itself be persisted immutably. It does not
+select candidates, policies, or evaluations by modification time or directory
+presence.
+
+Collection execution remains owned by the selected collection plan, due-state
+evaluator, and immutable claim and terminal-result receipts. Manual quote
+ingestion may establish quote-history depth but cannot prove selected-plan
+execution.
+
+Postgame proof is assembled through existing owners rather than a competing
+postgame store. One assessment reuses selected-product outcome reconciliation,
+exact candidate market closeout, market-specific CLV, historical quote
+boundaries, market-family evaluation, cleaned games, and optional settled-wager
+evidence. Before earliest kickoff, these boundaries are short-circuited and
+remain not yet eligible.
+
+The API and frontend mechanically serialize and present persisted recommended-
+bet results. Positive expected value and candidate state cannot manufacture a
+qualified or recommended result. Recording a wager remains an explicit local
+operation and does not place a sportsbook wager.
+
+### Rationale
+
+The recommendation chain crosses selected forecasts, timestamped market
+observations, candidate decisions, governed policy inputs, policy decisions,
+optional wager evidence, outcomes, closeout, CLV, and realized performance.
+Reconstructing any earlier decision from newer repository state would weaken
+chronology and provenance.
+
+Separate immutable identities make every decision input auditable and allow
+exact replay. Strict relationship checks prevent unrelated artifacts from being
+accepted merely because files exist. Independent family components prevent
+Moneyline evidence from satisfying Spread or Total acceptance.
+
+Using production-chain preflight as the composite audit snapshot avoids adding
+a second persisted postgame report whose responsibilities would overlap the
+outcome, closeout, CLV, market-family evaluation, and preflight owners.
+
+### Consequences
+
+- Candidate issuance requires an explicit selected product, exact forecast run,
+  canonical quote history, and UTC evaluation time.
+- Recommendation governance has its own deterministic content identity and
+  immutable store.
+- Policy derivation and recommendation evaluation operate on exact persisted
+  identities and explicit UTC timestamps.
+- Missing empirical evidence produces persisted unavailable policy and result
+  states rather than invented thresholds or recommendations.
+- Preflight validates artifact content and identity relationships, not file
+  presence or recency.
+- Multiple matching exact artifacts are conflicting unless a separate explicit
+  selection contract is intentionally introduced.
+- Manual quote ingestion does not count as selected-plan execution.
+- Postgame evidence is computed once per assessment through existing domain
+  owners and serialized by the immutable preflight snapshot.
+- Moneyline price CLV, Spread point CLV, and Total point CLV remain distinct
+  family evidence.
+- Realized performance requires uniquely attributed settled-wager evidence;
+  absent wagers remain unavailable rather than zero.
+- The frontend presents persisted lifecycle state and does not infer
+  recommendation eligibility.
+- Gridiron Edge records wagers locally only through explicit user action and
+  does not place sportsbook wagers.
+
+### References
+
+- `src/gridiron_edge/cli/production_chain.py`
+- `src/gridiron_edge/market/recommendation_governance.py`
+- `src/gridiron_edge/market/recommendation_governance_store.py`
+- `src/gridiron_edge/market/production_chain_preflight.py`
+- `src/gridiron_edge/market/production_chain_preflight_store.py`
+- `src/gridiron_edge/market/candidate_issuance.py`
+- `src/gridiron_edge/market/candidate_issuance_store.py`
+- `src/gridiron_edge/market/recommendation_policy.py`
+- `src/gridiron_edge/market/recommendation_policy_store.py`
+- `src/gridiron_edge/market/recommended_bet_result.py`
+- `src/gridiron_edge/market/recommended_bet_result_store.py`
+- `src/gridiron_edge/market/collection_execution.py`
+- `src/gridiron_edge/market/collection_receipt_store.py`
+- `src/gridiron_edge/market/market_closeout.py`
+- `src/gridiron_edge/market/market_family_evaluation.py`
+- `src/gridiron_edge/evaluation/live_forecast_closeout.py`
+- `PLAN.md`
+- `ROADMAP.md`
+
 ## D26. Quote-worker deployment is repository-owned but operator-activated
 
 **Status:** Accepted

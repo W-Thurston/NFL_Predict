@@ -120,6 +120,17 @@ data/output/weekly_products/index.json
 data/output/weekly_products/current.json
 data/output/weekly_products/products/{product_id}.parquet
 data/odds/odds_current.parquet
+data/odds/history/season={season}/week={week}.parquet
+data/odds/collection_plans/current.json
+data/odds/collection_plans/season={season}/week={week}.json
+data/odds/collection_runs/season={season}/week={week}/scheduled_at={timestamp}/claim.json
+data/odds/collection_runs/season={season}/week={week}/scheduled_at={timestamp}/result.json
+data/output/candidate_issuance/issuances/{issuance_id}.json
+data/output/recommendation_governance/schema=1/versions/{governance_id}.json
+data/output/recommendation_policies/schema=1/{policy_id}.json
+data/output/recommended_bet_results/schema=1/evaluations/{evaluation_id}.json
+data/output/recommended_bet_results/schema=1/results/{result_id}.json
+data/output/production_chain_preflight/schema=1/assessments/{preflight_id}.json
 ```
 
 The repository remains intentionally file-backed. Revisit database storage only when multi-user concurrency, transactional integrity, or query complexity requires it.
@@ -283,6 +294,200 @@ returned positive edges
 ```
 
 Missing market data is not “No play.” `No play` is reserved for a completed evaluation with no positive edge. Blocked or analytically empty results remove stale scope-specific edge CSV output.
+
+## Production Recommendation Chain
+
+The production recommendation workflow is explicit and identity-addressed. It
+does not select artifacts by modification time, infer recommendation state from
+positive expected value, or place sportsbook wagers.
+
+### Current 2026 Week 1 identities
+
+```text
+Candidate issuance:
+278d60da4e2dc089ff7eb973620f49050f83de336034cbff0c8c1a097401ccff
+
+Recommendation governance:
+56757db59c2d04a55eb3f980299699403fdc982e4fe7ff4963f0898112f4824e
+
+Recommendation policy:
+9e2cc3363656366eae76ec0935f01ff201ce9c9784e2736936fd0af9ab0ab024
+
+Recommended-bet evaluation:
+8301fb74e1eaa10437376ff3b616aaa1efc3477944d1a8da0df94abd55de073c
+
+Production-chain checkpoint:
+acf50214f67aed1833e38f998685c3bde4f8f5489a3771f1e50adc319bb887fb
+```
+
+The Week 1 candidate issuance evaluated 1,680 canonical quote observations and
+contains 698 candidates, 982 not-candidates, and zero unavailable rows. The
+persisted recommendation evaluation contains 698 unavailable results and no
+qualified, recommended, failed, or conflicting results.
+
+### Issue candidates
+
+```bash
+uv run gridiron production-chain issue-candidates \
+  --season 2026-2027 \
+  --week 1 \
+  --evaluated-at 2026-08-18T14:45:00+00:00 \
+  --write
+```
+
+The command loads the explicitly selected weekly product, restricts immutable
+forecast events to its exact product run, loads the canonical weekly quote
+ledger, evaluates every exact observation, and optionally persists one
+immutable issuance. It requires a timezone-aware UTC evaluation timestamp.
+
+### Create and verify governance
+
+Governance values are explicit inputs. The command supplies no hidden sizing or
+exposure defaults.
+
+```bash
+uv run gridiron production-chain create-governance \
+  --created-at 2026-08-18T15:30:00+00:00 \
+  --fractional-kelly-multiplier 0.25 \
+  --minimum-actionable-stake 5 \
+  --stake-increment 1 \
+  --stake-rounding down \
+  --maximum-candidate-bankroll-fraction 0.02 \
+  --maximum-game-bankroll-fraction 0.05 \
+  --maximum-portfolio-bankroll-fraction 0.20 \
+  --prohibit-opposing-positions \
+  --correlation-check-mandatory \
+  --exposure-eligible-status open \
+  --write
+```
+
+```bash
+uv run gridiron production-chain verify-governance \
+  --governance-id 56757db59c2d04a55eb3f980299699403fdc982e4fe7ff4963f0898112f4824e
+```
+
+Governance identity is derived from governed content and excludes creation time.
+Exact replay is idempotent. Different content cannot reuse an existing identity.
+
+### Derive policy
+
+```bash
+uv run gridiron production-chain derive-policy \
+  --issuance-id 278d60da4e2dc089ff7eb973620f49050f83de336034cbff0c8c1a097401ccff \
+  --governance-id 56757db59c2d04a55eb3f980299699403fdc982e4fe7ff4963f0898112f4824e \
+  --created-at 2026-08-18T15:45:00+00:00 \
+  --write
+```
+
+Policy derivation consumes the exact issuance, governance, canonical quote
+history and boundaries, cleaned outcomes, available closeout evidence, and
+available settled-wager return evidence. Moneyline, Spread, and Total are
+derived independently. Missing required evidence produces an unavailable family
+policy rather than an invented threshold.
+
+### Evaluate recommendations
+
+```bash
+uv run gridiron production-chain evaluate-recommendations \
+  --issuance-id 278d60da4e2dc089ff7eb973620f49050f83de336034cbff0c8c1a097401ccff \
+  --policy-id 9e2cc3363656366eae76ec0935f01ff201ce9c9784e2736936fd0af9ab0ab024 \
+  --decision-at 2026-08-18T15:50:00+00:00 \
+  --write
+```
+
+One immutable result is produced for every candidate row. The result preserves
+exact offer, product, forecast, policy, checks, decision time, quote ages,
+sizing, bankroll, portfolio, and correlation evidence. Historical
+not-candidates and unavailable issuance rows are not duplicated into result
+artifacts.
+
+### Assess and verify the chain
+
+```bash
+uv run gridiron production-chain assess \
+  --season 2026-2027 \
+  --week 1 \
+  --assessed-at 2026-08-18T15:50:00+00:00 \
+  --write
+```
+
+```bash
+uv run gridiron production-chain verify \
+  --preflight-id acf50214f67aed1833e38f998685c3bde4f8f5489a3771f1e50adc319bb887fb
+```
+
+`assess` reads current repository evidence once. `verify` reads one exact stored
+assessment and does not reassess mutable state.
+
+Preflight classifies every component independently as available, incomplete,
+unavailable, invalid, conflicting, or not yet eligible. Candidate issuance,
+policy, and recommendation evidence are accepted only through strict artifact
+readers and exact season, week, product, run, issuance, policy, and evaluation
+relationships.
+
+The current Week 1 assessment reports the selected product, forecast
+provenance, quote snapshot, repeated quote history, selected collection plan,
+candidate issuance, recommendation policy, recommendation results, backend
+serialization, and frontend presentation as available for Moneyline, Spread,
+and Total.
+
+Collection execution remains not yet eligible until the first selected-plan
+poll at `2026-09-08T12:00:00Z`. Completed outcomes, market closeout, CLV, and
+realized performance remain not yet eligible before kickoff.
+
+### Backend and frontend result delivery
+
+The `/lines` and `/edges` loaders read persisted recommended-bet evaluations,
+select the latest unambiguous explicit evaluation time for each exact offer, and
+attach a result only when the full provider-aware offer identity matches.
+Equal-time different results for one exact offer are rejected as conflicting.
+
+The frontend mechanically presents the persisted lifecycle state:
+
+```text
+No persisted result       Candidate
+qualified                 Qualified opportunity
+recommended               Recommended
+failed                    Failed qualification
+unavailable               Recommendation unavailable
+conflicting               Conflicting evidence
+```
+
+The Policy evidence disclosure displays persisted checks, policy identity,
+evaluation time, exact offer provenance, forecast provenance, and persisted
+suggested stake when present. The frontend does not calculate qualification,
+recommendation state, or suggested stake.
+
+### Postgame reassessment
+
+After kickoff, production-chain assessment assembles postgame evidence once and
+reuses the established owners:
+
+```text
+load_live_forecast_closeout()
+close_candidate_issuance()
+select_quote_history_boundaries()
+evaluate_market_families()
+load_games()
+load_bets()
+```
+
+Completed outcomes are reconciled to the exact selected weekly product and live
+forecast events. Candidate closeout requires the same provider, provider event,
+sportsbook, game, market, and side and selects only the latest non-live quote
+observed strictly before kickoff.
+
+CLV kinds remain market-specific:
+
+```text
+Moneyline    moneyline_price
+Spread       spread_points
+Total        total_points
+```
+
+Realized performance requires uniquely attributed settled-wager evidence. If no
+matching wager was recorded, return evidence remains unavailable rather than
+zero.
 
 ## Quote Collection Worker Deployment
 
@@ -522,13 +727,22 @@ Use `--assume-done` only when named prior stages completed and their required ar
 
 ## API Serialization Boundary
 
-The API is read-only and serializes persisted state. It does not:
+Prediction, market, edge, and recommendation reads serialize persisted state.
+The explicit `POST /portfolio/bets` route is the narrow local write boundary for
+recording a completed game-wager draft through the rollback-safe ledger and
+bankroll owner. It does not place a sportsbook wager.
+
+API request paths do not:
 
 - run model inference;
 - resolve a weekly forecast by recency;
 - compare champion metrics;
 - fall back to Elo for Games endpoints;
-- generate products or edges at request time.
+- derive recommendation policy or evaluate candidates;
+- recalculate persisted Kelly sizing;
+- generate products or edges at request time;
+- accept trusted provider, model, expected-value, policy, or reference-offer
+  evidence from the browser.
 
 Games are schedule-first. Scheduled games remain visible when prediction components are unavailable. Win, Spread, Total, and projected score are independent response blocks with independent readiness and provenance.
 
@@ -560,13 +774,37 @@ Do not silently omit unavailable data. Use shared field-status, weekly-component
 
 Context modules intentionally colocate each Provider and matching hook. ESLint’s Fast Refresh export rule is narrowly disabled only for `src/context/*Context.tsx`; all other rules and files retain the standard configuration.
 
-## BetSlip and Betting Ledger Boundaries
+## Bet Slip and Betting Ledger Boundaries
 
-BetSlip is a local draft decision workspace. It does not place sportsbook wagers and is not the betting ledger.
+Bet Slip version 4 is the only active draft contract. It is a local decision
+workspace, not the betting ledger and not sportsbook execution.
 
-A staged leg preserves immutable recommendation provenance separately from editable current odds, proposed stake, sportsbook, and notes. Current-price changes never rewrite the original recommendation snapshot. Missing price blocks price-dependent outputs rather than inventing odds.
+Each game leg keeps three evidence categories separate:
 
-The betting ledger records confirmed bets. Bankroll is managed separately and coordinated by the CLI. BetSlip identity is producer-independent so the same wager deduplicates across frontend surfaces.
+```text
+persistedRecommendation   immutable persisted recommendation evidence
+edgeAnalytics             immutable analytical offer and model evidence
+draft                     editable current odds, line, sportsbook, stake, note
+```
+
+Editing draft values never changes persisted recommendation state, exact
+reference offer, policy identity, original expected value, checks, or persisted
+suggested stake. Local bankroll and Kelly controls are transient what-if inputs.
+
+A user may explicitly record a complete Moneyline, Spread, or Total draft
+through the Portfolio API or betting CLI. Recommendation-backed recording sends
+only the complete persisted result, evaluation, candidate, and policy identity
+chain. The backend resolves trusted offer, forecast, model, expected-value, and
+policy evidence from immutable artifacts.
+
+Recorded terms may differ from the original recommendation reference terms.
+Ledger and bankroll transaction writes share one rollback-safe domain operation.
+If either write fails, prior artifacts are restored. A successful operation
+records a wager in Gridiron Edge and does not place a sportsbook wager.
+
+Manual and Candidate wagers may contain no recommendation identity. A
+recommendation-backed wager requires the complete identity chain. Partial or
+empty identity chains are rejected.
 
 ## Verification Commands
 
@@ -619,6 +857,43 @@ Do not patch a selected product by inferring current events from recency.
 
 The selected prediction product remains valid. Forecast PNG and HTML publication should succeed. Edge generation soft-fails with an explicit market blocker. Do not fabricate prices. Write a supported source-neutral market snapshot before rerunning edge generation.
 
+### Production-chain evidence is unavailable, invalid, or conflicting
+
+1. Run `production-chain assess` for the exact season, week, and UTC assessment
+   time without `--write`.
+2. Inspect the component reason independently for Moneyline, Spread, and Total.
+3. Verify the exact candidate issuance, governance, policy, evaluation, and
+   selected-product identities through their owning strict readers or verify
+   commands.
+4. Do not delete a valid immutable artifact to make another artifact win by
+   recency.
+5. Multiple exact matching issuances, policies, or evaluations are conflicting
+   unless an explicit selection contract is introduced.
+6. After repairing the owning evidence, create a new assessment at an explicit
+   UTC timestamp. Existing persisted assessments remain immutable.
+
+### Recommendation results do not appear in the frontend
+
+1. Confirm a recommended-bet evaluation exists for the requested season and
+   week.
+2. Confirm `/lines` or `/edges` returns a non-null `recommendation` for the exact
+   offer.
+3. Compare provider, provider event, sportsbook, game, market, side, fetch time,
+   sportsbook update time, kickoff, live state, price, and line.
+4. A null recommendation is presented as Candidate. A persisted unavailable
+   result is presented as Recommendation unavailable.
+5. Do not promote a Candidate by modifying frontend presentation logic.
+
+### Collection execution is incomplete
+
+Inspect `data/odds/collection_runs` for the exact scheduled poll. A `claim.json`
+without `result.json` is unresolved and blocks automatic retry. Do not delete or
+reclaim it automatically. Inspect the service journal and the immutable claim,
+then resolve the failure deliberately.
+
+Manual `gridiron ingest odds` runs may add historical observations but do not
+satisfy selected-plan execution evidence.
+
 ### `post-week` is incomplete
 
 Confirm completed outcomes exist for every scheduled game. Running `post-week` before games finish correctly exits nonzero and lists missing outcomes. Do not replace live events with historical backfills.
@@ -659,8 +934,9 @@ Pre-commit runs Python lint, type checking, and unit tests. Pre-push adds integr
 
 ## Known Limitations
 
-- The Odds API v4 current-market path, provider-aware quote storage, recurring selected-plan acquisition, same-book offer evaluation, operational edge integration, multi-book Line Shopping, sportsbook selection, and repository-owned Raspberry Pi worker deployment are implemented. Sufficient repeated real pregame quote coverage still must accumulate.
-- Validated same-provider, same-sportsbook closeout, price and point CLV, empirical recommendation thresholds, qualified recommendation integration, arbitrage, middles, and movement analysis remain incomplete.
+- The Odds API v4 current-market path, provider-aware current and partitioned historical quote storage, selected-plan acquisition, exact-offer evaluation, Line Shopping, immutable candidate issuance, validated closeout and market-specific CLV contracts, recommendation governance, policy, persisted results, API attachment, frontend presentation, explicit local wager recording, and repository-owned Raspberry Pi worker deployment are implemented.
+- The real 2026 Week 1 rehearsal has two fetch timestamps and complete repeated depth for current exact identities. The selected plan has not reached its first scheduled poll, and completed Week 1 outcomes, real latest-eligible closeouts, real CLV, and realized performance are not yet eligible.
+- Current production policy remains unavailable because matured empirical outcome, closeout, and return evidence does not yet support an active threshold-selection method. Arbitrage, middles, movement interpretation, backtesting, and supported historical provider backfill remain future capabilities.
 - Injury and news data are not integrated.
 - Scenario analysis, feature attribution, and historical comparable retrieval remain future capabilities.
 - Live game state, live odds, in-game win probability, and WebSocket updates are not implemented.
