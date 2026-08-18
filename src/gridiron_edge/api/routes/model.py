@@ -10,10 +10,17 @@ from pandas import DataFrame
 from gridiron_edge.api.deps import SettingsDep
 from gridiron_edge.api.loaders import (
     load_bets_df,
+    load_current_model_performance_report,
     load_evaluation_df,
 )
-from gridiron_edge.api.schemas.model_performance import ModelPerformance
+from gridiron_edge.api.schemas.model_performance import (
+    HistoricalModelPerformance,
+    HistoricalModelPerformanceSeries,
+    ModelPerformance,
+)
 from gridiron_edge.api.serializers.model_performance import (
+    serialize_historical_model_performance,
+    serialize_historical_model_performance_series,
     serialize_model_performance,
 )
 
@@ -92,3 +99,51 @@ def get_model_performance(
         model_bet_summary,
         filters,
     )
+
+
+@router.get(
+    "/historical-performance",
+    response_model=HistoricalModelPerformance,
+)
+def get_historical_model_performance(
+    settings: SettingsDep,
+) -> HistoricalModelPerformance:
+    """Return the explicitly selected historical walk-forward summary."""
+    try:
+        current = load_current_model_performance_report(settings)
+    except FileNotFoundError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=500,
+            detail="Historical model-performance artifacts failed verification.",
+        ) from exc
+    return serialize_historical_model_performance(current)
+
+
+@router.get(
+    "/historical-performance/series",
+    response_model=HistoricalModelPerformanceSeries,
+)
+def get_historical_model_performance_series(
+    settings: SettingsDep,
+) -> HistoricalModelPerformanceSeries:
+    """Return verified persisted historical chart series."""
+    try:
+        current = load_current_model_performance_report(settings)
+    except FileNotFoundError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=500,
+            detail="Historical model-performance artifacts failed verification.",
+        ) from exc
+    return serialize_historical_model_performance_series(current)

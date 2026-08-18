@@ -9,7 +9,7 @@ for fields that are null due to data limits.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -22,6 +22,15 @@ from gridiron_edge.api.schemas.model_performance import (
     ModelPerformanceFilters,
     ModelQualityBlock,
 )
+
+if TYPE_CHECKING:
+    from gridiron_edge.api.schemas.model_performance import (
+        HistoricalModelPerformance,
+        HistoricalModelPerformanceSeries,
+    )
+    from gridiron_edge.evaluation.historical_backtest_report_loader import (
+        CurrentHistoricalBacktestReport,
+    )
 
 
 def _none_if_nan(v: Any) -> Any:  # noqa: ANN401
@@ -186,3 +195,108 @@ def serialize_model_performance(
         by_group=by_group,
         response_meta=meta if meta.field_status else None,  # pyrefly: ignore[unexpected-keyword]
     )
+
+
+def serialize_historical_model_performance(
+    current: CurrentHistoricalBacktestReport,
+) -> HistoricalModelPerformance:
+    """Map one verified current report to its summary wire contract."""
+    from gridiron_edge.api.schemas.model_performance import (
+        HistoricalModelPerformance,
+        HistoricalMoneylinePerformance,
+        HistoricalPerformanceFinalValues,
+        HistoricalSpreadPerformance,
+        HistoricalTotalPerformance,
+    )
+
+    report = current.report
+    summary = report.summary
+    last = current.series.iloc[-1]
+    return HistoricalModelPerformance(
+        report_id=report.report_id,
+        selected_at=current.selected_at.isoformat(),
+        generated_at=report.generated_at.isoformat(),
+        first_season=summary.first_season,
+        last_season=summary.last_season,
+        evidence_row_count=summary.evidence_row_count,
+        rolling_decision_window=report.rolling_decision_window,
+        moneyline=HistoricalMoneylinePerformance(
+            model_type=report.win_model_type,
+            run_id=report.win_run_id,
+            evaluated_count=summary.moneyline.evaluated_count,
+            wins=summary.moneyline.win_count,
+            losses=summary.moneyline.loss_count,
+            net_wins=summary.moneyline.net_wins,
+            accuracy=summary.moneyline.accuracy,
+            brier=summary.moneyline.brier,
+            log_loss=summary.moneyline.log_loss,
+            price_evidence_status="unavailable",
+            unit_return_reason=summary.moneyline.unit_return_reason,
+        ),
+        total=HistoricalTotalPerformance(
+            model_type=report.total_model_type,
+            run_id=report.total_run_id,
+            decision_count=summary.total.decision_count,
+            wins=summary.total.win_count,
+            losses=summary.total.loss_count,
+            pushes=summary.total.push_count,
+            no_bets=summary.total.no_bet_count,
+            net_wins=summary.total.net_wins,
+            hit_rate_excluding_pushes=summary.total.hit_rate_excluding_pushes,
+            mae=summary.total.mae,
+            rmse=summary.total.rmse,
+            bias=summary.total.bias,
+            net_units=summary.total.net_units,
+            roi_per_unit_staked=summary.total.roi_per_unit_staked,
+            price_evidence_status="assumed",
+            assumed_american_price=summary.total.assumed_american_price,
+            methodology=summary.total.methodology,
+        ),
+        spread=HistoricalSpreadPerformance(
+            reason="Historical Spread awaits leakage-safe calibration.",
+        ),
+        final_values=HistoricalPerformanceFinalValues(
+            moneyline_cumulative_net_wins=float(last["moneyline_cumulative_net_wins"]),
+            total_cumulative_net_wins=float(last["total_cumulative_net_wins"]),
+            total_cumulative_units=float(last["total_cumulative_units"]),
+        ),
+    )
+
+
+def serialize_historical_model_performance_series(
+    current: CurrentHistoricalBacktestReport,
+) -> HistoricalModelPerformanceSeries:
+    """Map verified persisted series rows without recomputing chart values."""
+    from gridiron_edge.api.schemas.model_performance import (
+        HistoricalModelPerformancePoint,
+        HistoricalModelPerformanceSeries,
+    )
+
+    items = [
+        HistoricalModelPerformancePoint(
+            season=str(row["season"]),
+            week=int(row["week"]),
+            game_id=str(row["game_id"]),
+            game_date=str(row["game_date"]),
+            moneyline_cumulative_net_wins=float(row["moneyline_cumulative_net_wins"]),
+            moneyline_cumulative_accuracy=_optional_float(row["moneyline_cumulative_accuracy"]),
+            moneyline_rolling_accuracy_100=_optional_float(row["moneyline_rolling_accuracy_100"]),
+            total_cumulative_net_wins=float(row["total_cumulative_net_wins"]),
+            total_cumulative_accuracy=_optional_float(row["total_cumulative_accuracy"]),
+            total_rolling_accuracy_100=_optional_float(row["total_rolling_accuracy_100"]),
+            total_cumulative_units=float(row["total_cumulative_units"]),
+        )
+        for _, row in current.series.iterrows()
+    ]
+    return HistoricalModelPerformanceSeries(
+        report_id=current.report.report_id,
+        items=items,
+        total=len(items),
+    )
+
+
+def _optional_float(value: object) -> float | None:
+    """Normalize one chart scalar without changing persisted values."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    return float(value)  # type: ignore[arg-type]

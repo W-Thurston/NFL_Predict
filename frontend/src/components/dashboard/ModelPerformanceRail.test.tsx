@@ -4,147 +4,75 @@ import { ModelPerformanceRail } from "./ModelPerformanceRail";
 import { TestWrapper } from "../../test/testWrapper";
 
 vi.mock("../../api/hooks", () => ({
-  usePortfolioSummary: vi.fn(),
-  usePortfolioCurve: vi.fn(),
+  useHistoricalModelPerformance: vi.fn(),
 }));
 
-import { usePortfolioCurve, usePortfolioSummary } from "../../api/hooks";
+import { useHistoricalModelPerformance } from "../../api/hooks";
+
+const summary = {
+  first_season: "2002-2003",
+  last_season: "2025-2026",
+  moneyline: {
+    evaluated_count: 6483,
+    wins: 4134,
+    losses: 2349,
+    net_wins: 1785,
+    accuracy: 0.6377,
+  },
+  total: {
+    decision_count: 6498,
+    wins: 3274,
+    losses: 3129,
+    pushes: 95,
+    net_wins: 145,
+    hit_rate_excluding_pushes: 0.5113,
+  },
+};
 
 describe("ModelPerformanceRail", () => {
-  it("renders header", () => {
-    vi.mocked(usePortfolioSummary).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      error: null,
-    } as never);
-    vi.mocked(usePortfolioCurve).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      error: null,
-    } as never);
-
-    render(
-      <TestWrapper>
-        <ModelPerformanceRail />
-      </TestWrapper>,
-    );
-    expect(screen.getByText("Model Performance")).toBeInTheDocument();
-  });
-
   it("renders loading state", () => {
-    vi.mocked(usePortfolioSummary).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      error: null,
-    } as never);
-    vi.mocked(usePortfolioCurve).mockReturnValue({
+    vi.mocked(useHistoricalModelPerformance).mockReturnValue({
       data: undefined,
       isLoading: true,
       error: null,
     } as never);
 
-    render(
-      <TestWrapper>
-        <ModelPerformanceRail />
-      </TestWrapper>,
-    );
+    render(<TestWrapper><ModelPerformanceRail /></TestWrapper>);
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
-  it("renders empty state when no bets", () => {
-    vi.mocked(usePortfolioSummary).mockReturnValue({
-      data: {
-        bankroll: 0,
-        total_pnl: 0,
-        roi_pct: 0,
-        wins: 0,
-        losses: 0,
-        pushes: 0,
-        total_bets: 0,
-        _meta: {},
-      },
-      isLoading: false,
-      error: null,
-    } as never);
-    vi.mocked(usePortfolioCurve).mockReturnValue({
-      data: { items: [], _meta: {} },
+  it("renders a compact historical validation snapshot", () => {
+    vi.mocked(useHistoricalModelPerformance).mockReturnValue({
+      data: summary,
       isLoading: false,
       error: null,
     } as never);
 
-    render(
-      <TestWrapper>
-        <ModelPerformanceRail />
-      </TestWrapper>,
-    );
-    expect(screen.getByText(/No performance data yet/)).toBeInTheDocument();
+    render(<TestWrapper><ModelPerformanceRail /></TestWrapper>);
+
+    expect(screen.getByText("63.8% accuracy")).toBeInTheDocument();
+    expect(screen.getByText("4,134-2,349 · 6,483 games")).toBeInTheDocument();
+    expect(screen.getByText("1,785 more correct than incorrect")).toBeInTheDocument();
+    expect(screen.getByText("51.1% hit rate")).toBeInTheDocument();
+    expect(screen.getByText("3,274-3,129-95 · 6,498 decisions")).toBeInTheDocument();
+    expect(screen.getByText("145 more wins than losses")).toBeInTheDocument();
+    expect(screen.getByText("Historical validation pending")).toBeInTheDocument();
   });
 
-  it("renders ROI and stats when data available", () => {
-    vi.mocked(usePortfolioSummary).mockReturnValue({
-      data: {
-        bankroll: 10000,
-        total_pnl: 500,
-        roi_pct: 24.3,
-        wins: 15,
-        losses: 8,
-        pushes: 1,
-        total_bets: 24,
-        _meta: {},
-      },
-      isLoading: false,
-      error: null,
-    } as never);
-    vi.mocked(usePortfolioCurve).mockReturnValue({
-      data: {
-        items: [
-            { timestamp: "2026-01-01", bankroll: 9500 },
-            { timestamp: "2026-01-02", bankroll: 10000 },
-            { timestamp: "2026-01-03", bankroll: 10500 },
-        ],
-        _meta: {},
-        },
+  it("does not render dashboard charts or view controls", () => {
+    vi.mocked(useHistoricalModelPerformance).mockReturnValue({
+      data: summary,
       isLoading: false,
       error: null,
     } as never);
 
-    render(
-      <TestWrapper>
-        <ModelPerformanceRail />
-      </TestWrapper>,
+    const { container } = render(
+      <TestWrapper><ModelPerformanceRail /></TestWrapper>,
     );
-    expect(screen.getByText("+24.3%")).toBeInTheDocument();
-    expect(screen.getByText("All-Time ROI")).toBeInTheDocument();
-    expect(screen.getByText(/15-8-1/)).toBeInTheDocument();
-    expect(screen.getByText(/24 bets/)).toBeInTheDocument();
-  });
 
-  it("renders 'Open bankroll →' button", () => {
-    vi.mocked(usePortfolioSummary).mockReturnValue({
-      data: {
-        bankroll: 10000,
-        total_pnl: 500,
-        roi_pct: 24.3,
-        wins: 15,
-        losses: 8,
-        pushes: 1,
-        total_bets: 24,
-        _meta: {},
-      },
-      isLoading: false,
-      error: null,
-    } as never);
-    vi.mocked(usePortfolioCurve).mockReturnValue({
-      data: { items: [], _meta: {} },
-      isLoading: false,
-      error: null,
-    } as never);
-
-    render(
-      <TestWrapper>
-        <ModelPerformanceRail />
-      </TestWrapper>,
-    );
-    expect(screen.getByText("Open bankroll →")).toBeInTheDocument();
+    expect(container.querySelector("svg")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Net Wins" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accuracy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Units" })).not.toBeInTheDocument();
   });
 });

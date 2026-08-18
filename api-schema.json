@@ -2296,6 +2296,495 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HistoricalModelPerformance": {
+        "additionalProperties": false,
+        "description": "Current immutable historical walk-forward report summary.",
+        "properties": {
+          "_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResponseMeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional metadata describing unpopulated fields (per D14)."
+          },
+          "evidence_row_count": {
+            "title": "Evidence Row Count",
+            "type": "integer"
+          },
+          "final_values": {
+            "$ref": "#/components/schemas/HistoricalPerformanceFinalValues"
+          },
+          "first_season": {
+            "title": "First Season",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "last_season": {
+            "title": "Last Season",
+            "type": "string"
+          },
+          "moneyline": {
+            "$ref": "#/components/schemas/HistoricalMoneylinePerformance"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          },
+          "rolling_decision_window": {
+            "title": "Rolling Decision Window",
+            "type": "integer"
+          },
+          "selected_at": {
+            "title": "Selected At",
+            "type": "string"
+          },
+          "spread": {
+            "$ref": "#/components/schemas/HistoricalSpreadPerformance"
+          },
+          "total": {
+            "$ref": "#/components/schemas/HistoricalTotalPerformance"
+          }
+        },
+        "required": [
+          "report_id",
+          "selected_at",
+          "generated_at",
+          "first_season",
+          "last_season",
+          "evidence_row_count",
+          "rolling_decision_window",
+          "moneyline",
+          "total",
+          "spread",
+          "final_values"
+        ],
+        "title": "HistoricalModelPerformance",
+        "type": "object"
+      },
+      "HistoricalModelPerformancePoint": {
+        "additionalProperties": false,
+        "description": "One persisted chart point from the historical report series.",
+        "properties": {
+          "game_date": {
+            "title": "Game Date",
+            "type": "string"
+          },
+          "game_id": {
+            "title": "Game Id",
+            "type": "string"
+          },
+          "moneyline_cumulative_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moneyline Cumulative Accuracy"
+          },
+          "moneyline_cumulative_net_wins": {
+            "title": "Moneyline Cumulative Net Wins",
+            "type": "number"
+          },
+          "moneyline_rolling_accuracy_100": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moneyline Rolling Accuracy 100"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "total_cumulative_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cumulative Accuracy"
+          },
+          "total_cumulative_net_wins": {
+            "title": "Total Cumulative Net Wins",
+            "type": "number"
+          },
+          "total_cumulative_units": {
+            "title": "Total Cumulative Units",
+            "type": "number"
+          },
+          "total_rolling_accuracy_100": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Rolling Accuracy 100"
+          },
+          "week": {
+            "title": "Week",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season",
+          "week",
+          "game_id",
+          "game_date",
+          "moneyline_cumulative_net_wins",
+          "moneyline_cumulative_accuracy",
+          "moneyline_rolling_accuracy_100",
+          "total_cumulative_net_wins",
+          "total_cumulative_accuracy",
+          "total_rolling_accuracy_100",
+          "total_cumulative_units"
+        ],
+        "title": "HistoricalModelPerformancePoint",
+        "type": "object"
+      },
+      "HistoricalModelPerformanceSeries": {
+        "additionalProperties": false,
+        "description": "Verified persisted chart series for the current historical report.",
+        "properties": {
+          "_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResponseMeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional metadata describing unpopulated fields (per D14)."
+          },
+          "items": {
+            "description": "List payload. May be empty when blocked (see `_meta`).",
+            "items": {
+              "$ref": "#/components/schemas/HistoricalModelPerformancePoint"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total count when applicable. None implies the response contains all items; an integer implies a subset of a larger collection.",
+            "title": "Total"
+          }
+        },
+        "required": [
+          "report_id"
+        ],
+        "title": "HistoricalModelPerformanceSeries",
+        "type": "object"
+      },
+      "HistoricalMoneylinePerformance": {
+        "additionalProperties": false,
+        "description": "Walk-forward Moneyline quality without fabricated price returns.",
+        "properties": {
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "brier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brier"
+          },
+          "evaluated_count": {
+            "title": "Evaluated Count",
+            "type": "integer"
+          },
+          "log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Loss"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "model_type": {
+            "title": "Model Type",
+            "type": "string"
+          },
+          "net_wins": {
+            "title": "Net Wins",
+            "type": "integer"
+          },
+          "price_evidence_status": {
+            "const": "unavailable",
+            "title": "Price Evidence Status",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "unit_return_reason": {
+            "title": "Unit Return Reason",
+            "type": "string"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_type",
+          "run_id",
+          "evaluated_count",
+          "wins",
+          "losses",
+          "net_wins",
+          "accuracy",
+          "brier",
+          "log_loss",
+          "price_evidence_status",
+          "unit_return_reason"
+        ],
+        "title": "HistoricalMoneylinePerformance",
+        "type": "object"
+      },
+      "HistoricalPerformanceFinalValues": {
+        "additionalProperties": false,
+        "description": "Final persisted points for compact dashboard presentation.",
+        "properties": {
+          "moneyline_cumulative_net_wins": {
+            "title": "Moneyline Cumulative Net Wins",
+            "type": "number"
+          },
+          "total_cumulative_net_wins": {
+            "title": "Total Cumulative Net Wins",
+            "type": "number"
+          },
+          "total_cumulative_units": {
+            "title": "Total Cumulative Units",
+            "type": "number"
+          }
+        },
+        "required": [
+          "moneyline_cumulative_net_wins",
+          "total_cumulative_net_wins",
+          "total_cumulative_units"
+        ],
+        "title": "HistoricalPerformanceFinalValues",
+        "type": "object"
+      },
+      "HistoricalSpreadPerformance": {
+        "additionalProperties": false,
+        "description": "Explicit unavailable state for historical Spread performance.",
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "HistoricalSpreadPerformance",
+        "type": "object"
+      },
+      "HistoricalTotalPerformance": {
+        "additionalProperties": false,
+        "description": "Walk-forward Total quality and explicitly assumed-price return.",
+        "properties": {
+          "assumed_american_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assumed American Price"
+          },
+          "bias": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias"
+          },
+          "decision_count": {
+            "title": "Decision Count",
+            "type": "integer"
+          },
+          "hit_rate_excluding_pushes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate Excluding Pushes"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "mae": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae"
+          },
+          "methodology": {
+            "title": "Methodology",
+            "type": "string"
+          },
+          "model_type": {
+            "title": "Model Type",
+            "type": "string"
+          },
+          "net_units": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Units"
+          },
+          "net_wins": {
+            "title": "Net Wins",
+            "type": "integer"
+          },
+          "no_bets": {
+            "title": "No Bets",
+            "type": "integer"
+          },
+          "price_evidence_status": {
+            "const": "assumed",
+            "title": "Price Evidence Status",
+            "type": "string"
+          },
+          "pushes": {
+            "title": "Pushes",
+            "type": "integer"
+          },
+          "rmse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rmse"
+          },
+          "roi_per_unit_staked": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roi Per Unit Staked"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_type",
+          "run_id",
+          "decision_count",
+          "wins",
+          "losses",
+          "pushes",
+          "no_bets",
+          "net_wins",
+          "hit_rate_excluding_pushes",
+          "mae",
+          "rmse",
+          "bias",
+          "net_units",
+          "roi_per_unit_staked",
+          "price_evidence_status",
+          "assumed_american_price",
+          "methodology"
+        ],
+        "title": "HistoricalTotalPerformance",
+        "type": "object"
+      },
       "InjuryReport": {
         "additionalProperties": false,
         "description": "A single player injury entry.",
@@ -7933,6 +8422,50 @@
         "summary": "Live game state for a single matchup.",
         "tags": [
           "live"
+        ]
+      }
+    },
+    "/model/historical-performance": {
+      "get": {
+        "description": "Return the explicitly selected historical walk-forward summary.",
+        "operationId": "get_historical_model_performance_model_historical_performance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalModelPerformance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Historical Model Performance",
+        "tags": [
+          "model"
+        ]
+      }
+    },
+    "/model/historical-performance/series": {
+      "get": {
+        "description": "Return verified persisted historical chart series.",
+        "operationId": "get_historical_model_performance_series_model_historical_performance_series_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalModelPerformanceSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Historical Model Performance Series",
+        "tags": [
+          "model"
         ]
       }
     },

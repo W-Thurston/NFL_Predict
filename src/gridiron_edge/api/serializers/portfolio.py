@@ -49,11 +49,16 @@ def serialize_portfolio_summary(
 ) -> PortfolioSummary:
     """Build the /portfolio/summary response from ledger + bankroll + perf."""
     if bets.empty:
+        meta = ResponseMeta()
+        meta = meta.with_blocked("win_pct", *Unavailable.NO_SETTLED_BETS)
+        meta = meta.with_blocked("roi_pct", *Unavailable.NO_SETTLED_BETS)
         return PortfolioSummary(
             bankroll=current_bankroll,
             total_bets=0,
             settled_bets=0,
             open_bets=0,
+            # pyrefly: ignore [unexpected-keyword]
+            response_meta=meta,
         )
 
     settled_mask = bets["status"] != "open"
@@ -66,6 +71,14 @@ def serialize_portfolio_summary(
 
     # Build response_meta for fields that are null due to data limits.
     meta = ResponseMeta()
+    if perf.get("win_pct") is None or (
+        isinstance(perf.get("win_pct"), float) and pd.isna(perf["win_pct"])
+    ):
+        meta = meta.with_blocked("win_pct", *Unavailable.NO_SETTLED_BETS)
+    if perf.get("roi_pct") is None or (
+        isinstance(perf.get("roi_pct"), float) and pd.isna(perf["roi_pct"])
+    ):
+        meta = meta.with_blocked("roi_pct", *Unavailable.NO_SETTLED_BETS)
     if perf.get("mean_clv") is None or (
         isinstance(perf.get("mean_clv"), float) and pd.isna(perf["mean_clv"])
     ):
@@ -226,7 +239,14 @@ def serialize_splits(splits_df: pd.DataFrame, dimension: str) -> PortfolioSplits
     `pushes`, `total`, `win_pct` from `record`; `roi` from `roi`.
     """
     if splits_df.empty:
-        return PortfolioSplits(items=[], total=0, dimension=dimension)
+        meta = ResponseMeta().with_blocked("items", *Unavailable.NO_SPLIT_DATA)
+        return PortfolioSplits(
+            items=[],
+            total=0,
+            dimension=dimension,
+            # pyrefly: ignore [unexpected-keyword]
+            response_meta=meta,
+        )
 
     rows = [
         SplitRow(

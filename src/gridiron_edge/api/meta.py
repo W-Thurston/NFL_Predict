@@ -159,6 +159,8 @@ class Unavailable:
     NO_PRIOR_SNAPSHOT: tuple[str, str] = ("no_prior_snapshot", "data")
     NO_PROJECTIONS_DATA: tuple[str, str] = ("no_projections_data", "data")
     NO_SCHEDULE_DATA: tuple[str, str] = ("no_schedule_data", "data")
+    NO_SETTLED_BETS: tuple[str, str] = ("no_settled_bets", "data")
+    NO_SPLIT_DATA: tuple[str, str] = ("no_split_data", "data")
     NO_STREAK_ACTIVITY: tuple[str, str] = ("no_streak_activity", "data")
     OFF_DEF_DECOMPOSITION: tuple[str, str] = ("off_def_decomposition", "data")
     PERIOD_NOT_REQUESTED: tuple[str, str] = ("period_not_requested", "request")

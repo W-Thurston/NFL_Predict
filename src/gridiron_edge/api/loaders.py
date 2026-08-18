@@ -25,6 +25,9 @@ from pandas import DataFrame
 from gridiron_edge.core.settings import Settings
 
 if TYPE_CHECKING:
+    from gridiron_edge.evaluation.historical_backtest_report_loader import (
+        CurrentHistoricalBacktestReport,
+    )
     from gridiron_edge.market.recommendations import EdgeResult
     from gridiron_edge.market.recommended_bet_result import RecommendedBetResult
 
@@ -1369,4 +1372,16 @@ def load_recorded_bet_df(settings: Settings, *, bet_id: str) -> DataFrame:
     bets = load_bets_df(settings)
     if bets.empty or "bet_id" not in bets.columns:
         return DataFrame()
-    return bets.loc[bets["bet_id"].astype(str) == bet_id].copy()
+    result = bets.loc[bets["bet_id"].astype(str) == bet_id].copy()
+    return DataFrame(result)
+
+
+def load_current_model_performance_report(
+    settings: Settings,
+) -> CurrentHistoricalBacktestReport:
+    """Return the explicitly selected and fully verified historical report."""
+    from gridiron_edge.evaluation.historical_backtest_report_loader import (
+        load_current_historical_backtest_report,
+    )
+
+    return load_current_historical_backtest_report(repo=settings.repo_root)

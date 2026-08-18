@@ -464,3 +464,31 @@ export function useDefenseAllowed(
     enabled: team !== null && !!params.stat_type,
   });
 }
+
+/** Fetches the explicitly selected historical walk-forward report summary. */
+export function useHistoricalModelPerformance() {
+  return useQuery({
+    queryKey: ["historical-model-performance"],
+    queryFn: async () => {
+      const { data, error } = await apiClient.GET(
+        "/model/historical-performance",
+      );
+      if (error) throw new Error(JSON.stringify(error));
+      return data;
+    },
+  });
+}
+
+/** Fetches the verified persisted historical model-performance chart series. */
+export function useHistoricalModelPerformanceSeries() {
+  return useQuery({
+    queryKey: ["historical-model-performance-series"],
+    queryFn: async () => {
+      const { data, error } = await apiClient.GET(
+        "/model/historical-performance/series",
+      );
+      if (error) throw new Error(JSON.stringify(error));
+      return data;
+    },
+  });
+}
