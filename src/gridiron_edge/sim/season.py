@@ -585,6 +585,69 @@ def build_projections_df(
     ).sort_values(["P_WIN_SB", "AVG_WINS"], ascending=[False, False])
 
 
+def build_weekly_elo_forecast_df(
+    *,
+    weekly_elo_by_sim: np.ndarray,
+    team_index: TeamIndex,
+    season: str,
+    forecast_origin_week: int,
+    simulation_count: int,
+    computed_at: str,
+) -> pd.DataFrame:
+    """Aggregate entering-week simulated Elo into a persisted forecast product."""
+    expected_shape = (
+        simulation_count,
+        N_WEEKS_REG + 1,
+        len(team_index.short_names),
+    )
+    if weekly_elo_by_sim.shape != expected_shape:
+        raise ValueError(
+            "weekly Elo tensor shape mismatch: "
+            f"expected {expected_shape}, got {weekly_elo_by_sim.shape}"
+        )
+    if not 1 <= forecast_origin_week <= N_WEEKS_REG:
+        raise ValueError(f"forecast_origin_week must be between 1 and {N_WEEKS_REG}")
+
+    rows: list[dict[str, float | int | str]] = []
+    for week in range(forecast_origin_week, N_WEEKS_REG + 1):
+        values = weekly_elo_by_sim[:, week, :]
+        if np.isnan(values).any():
+            raise ValueError(f"weekly Elo forecast contains null values for week {week}")
+        quantiles = np.quantile(
+            values,
+            (0.10, 0.50, 0.90),
+            axis=0,
+            method="linear",
+        )
+        for team_idx, team in enumerate(team_index.short_names):
+            rows.append(
+                {
+                    "season": season,
+                    "forecast_origin_week": forecast_origin_week,
+                    "team": team,
+                    "week": week,
+                    "elo_p10": float(quantiles[0, team_idx]),
+                    "elo_median": float(quantiles[1, team_idx]),
+                    "elo_p90": float(quantiles[2, team_idx]),
+                    "simulation_count": simulation_count,
+                    "lower_quantile": 0.10,
+                    "center_quantile": 0.50,
+                    "upper_quantile": 0.90,
+                    "quantile_method": "linear",
+                    "computed_at": computed_at,
+                }
+            )
+
+    return (
+        pd.DataFrame(rows)
+        .sort_values(
+            ["week", "team"],
+            kind="mergesort",
+        )
+        .reset_index(drop=True)
+    )
+
+
 def build_season_grid_df(
     team_index: TeamIndex,
     reg_win_counts: np.ndarray,
@@ -750,6 +813,7 @@ def run_full_simulation(
             pts_vs_by_sim,
             wins_vs_by_sim,
             end_elo_by_sim,
+            weekly_elo_by_sim,
             reg_win_counts,
         ) = simulate_remaining_regular_season(
             config.n_sims,
@@ -809,7 +873,18 @@ def run_full_simulation(
             divisor=config.divisor,
         )
 
+    computed_at = datetime.now(UTC).isoformat()
+    forecast_origin_week = final_actual_week + 1
+
     with _log_phase("Build output dataframes"):
+        df_weekly_elo_forecast = build_weekly_elo_forecast_df(
+            weekly_elo_by_sim=weekly_elo_by_sim,
+            team_index=team_index,
+            season=season_year,
+            forecast_origin_week=forecast_origin_week,
+            simulation_count=config.n_sims,
+            computed_at=computed_at,
+        )
         df_projections = build_projections_df(
             team_index,
             pts_total_by_sim,
@@ -824,15 +899,19 @@ def run_full_simulation(
             po_win_counts,
             config.n_sims,
         )
+        logger.info("df_weekly_elo_forecast: %s", df_weekly_elo_forecast.shape)
         logger.info("df_projections: %s", df_projections.shape)
         logger.info("df_season_grid: %s", df_season_grid.shape)
 
     with _log_phase("Save outputs"):
         paths.output_temp_dir.mkdir(parents=True, exist_ok=True)
+        forecast_path: Path = paths.output_temp_dir / "weekly_elo_forecast.parquet"
         proj_path: Path = paths.output_temp_dir / "projections_summary.csv"
         grid_path: Path = paths.output_temp_dir / "season_grid.csv"
+        df_weekly_elo_forecast.to_parquet(forecast_path, index=False)
         df_projections.to_csv(proj_path, index=False)
         df_season_grid.to_csv(grid_path, index=False)
+        logger.info("Wrote: %s", forecast_path)
         logger.info("Wrote: %s", proj_path)
         logger.info("Wrote: %s", grid_path)
 
@@ -841,7 +920,7 @@ def run_full_simulation(
         metadata_path: Path = paths.output_temp_dir / "projections_metadata.json"
         metadata: dict[str, int | str] = {
             "n_simulations": config.n_sims,
-            "computed_at": datetime.now(UTC).isoformat(),
+            "computed_at": computed_at,
         }
         metadata_path.write_text(json.dumps(metadata, indent=2))
         logger.info("Wrote: %s", metadata_path)

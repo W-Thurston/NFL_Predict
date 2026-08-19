@@ -201,13 +201,18 @@ def simulate_remaining_regular_season(
     np.ndarray,
     np.ndarray,
     np.ndarray,
+    np.ndarray,
 ]:
     """Simulate remaining regular season games across n_sims Monte Carlo runs.
 
     Returns:
         (pts_total_by_sim, pts_conf_by_sim, pts_div_by_sim,
          gp_vs_by_sim, pts_vs_by_sim, wins_vs_by_sim,
-         end_elo_by_sim, reg_win_counts)
+         end_elo_by_sim, weekly_elo_by_sim, reg_win_counts)
+
+        ``weekly_elo_by_sim[:, week, :]`` stores Elo entering each
+        simulated regular-season week. Index zero and completed weeks remain
+        NaN. The forecast-origin week equals ``elo_entering_next_week``.
     """
     pts_total_by_sim = np.zeros((n_sims, N_TEAMS), dtype=np.int16)
     pts_conf_by_sim = np.zeros((n_sims, N_TEAMS), dtype=np.int16)
@@ -218,6 +223,11 @@ def simulate_remaining_regular_season(
     wins_vs_by_sim = np.zeros((n_sims, N_TEAMS, N_TEAMS), dtype=np.uint8)
 
     end_elo_by_sim = np.zeros((n_sims, N_TEAMS), dtype=np.float32)
+    weekly_elo_by_sim = np.full(
+        (n_sims, N_WEEKS_REG + 1, N_TEAMS),
+        np.nan,
+        dtype=np.float32,
+    )
     reg_win_counts = reg_win_counts_actual.copy()
 
     for s in range(n_sims):
@@ -232,6 +242,7 @@ def simulate_remaining_regular_season(
         wins_vs = wins_vs_actual.copy()
 
         for w in range(final_actual_week + 1, N_WEEKS_REG + 1):
+            weekly_elo_by_sim[s, w] = elo
             start = week_offsets[w]
             end = week_offsets[w + 1]
 
@@ -304,6 +315,7 @@ def simulate_remaining_regular_season(
         pts_vs_by_sim,
         wins_vs_by_sim,
         end_elo_by_sim,
+        weekly_elo_by_sim,
         reg_win_counts,
     )
 
