@@ -80,6 +80,7 @@ class TeamRatingTimelinePoint(BaseModel):
 
     season: str
     week: int = Field(ge=1, le=22)
+    date: str | None = None
     rating: float | None = None
     state: Literal["observed", "carried_forward", "current", "forecast", "unavailable"]
     game_played: bool = False

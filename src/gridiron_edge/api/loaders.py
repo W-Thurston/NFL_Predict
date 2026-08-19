@@ -627,6 +627,42 @@ def load_weekly_elo_forecast(  # noqa: PLR0911, PLR0912
     if any(scoped[column].nunique() != 1 for column in provenance):
         return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "conflicting provenance")
 
+    schedule_path = settings.repo_root / "data" / "cleaned" / "NFL_upcoming_schedule_rich.parquet"
+    scoped["game_date"] = None
+    if schedule_path.is_file():
+        try:
+            schedule = pd.read_parquet(schedule_path)
+        except (OSError, ValueError):
+            schedule = pd.DataFrame()
+        required_schedule = {"season", "week", "away_team", "home_team", "game_date"}
+        if required_schedule.issubset(schedule.columns):
+            long_to_short = load_team_name_map(settings)
+            team_long_name = next(
+                (
+                    long_name
+                    for long_name, short_name in long_to_short.items()
+                    if short_name == team_abbr.upper()
+                ),
+                None,
+            )
+            if team_long_name is not None:
+                team_schedule = schedule.loc[
+                    schedule["season"].astype(str).eq(season)
+                    & (
+                        schedule["away_team"].astype(str).eq(team_long_name)
+                        | schedule["home_team"].astype(str).eq(team_long_name)
+                    ),
+                    ["week", "game_date"],
+                ].drop_duplicates("week")
+                scoped = scoped.merge(
+                    team_schedule, on="week", how="left", suffixes=("", "_schedule")
+                )
+                scoped["game_date"] = scoped["game_date_schedule"].where(
+                    scoped["game_date_schedule"].notna(),
+                    scoped["game_date"],
+                )
+                scoped = scoped.drop(columns=["game_date_schedule"])
+
     return WeeklyEloForecastLoad(
         scoped.sort_values("week", kind="mergesort").reset_index(drop=True),
         "available",

@@ -14,7 +14,7 @@ function timeline(): Timeline {
     points: [
       { season: "2025-2026", week: 22, rating: 1500, state: "carried_forward", game_played: false },
       { season: "2026-2027", week: 1, rating: 1510, state: "current", game_played: false },
-      { season: "2026-2027", week: 2, rating: 1520, state: "forecast", game_played: false, lower_rating: 1500, upper_rating: 1540, win_out_rating: 1545, lose_out_rating: 1495 },
+      { season: "2026-2027", week: 2, date: "2026-09-20", rating: 1520, state: "forecast", game_played: false, lower_rating: 1500, upper_rating: 1540, win_out_rating: 1545, lose_out_rating: 1495 },
       { season: "2026-2027", week: 18, rating: 1530, state: "forecast", game_played: false, lower_rating: 1480, upper_rating: 1580, win_out_rating: 1650, lose_out_rating: 1400 },
       { season: "2026-2027", week: 19, rating: null, state: "unavailable", game_played: false },
       { season: "2026-2027", week: 22, rating: null, state: "unavailable", game_played: false },
@@ -72,5 +72,17 @@ describe("RatingChart", () => {
   it("renders an explicit empty state without timeline evidence", () => {
     render(<RatingChart timeline={null} range="season" onRangeChange={() => undefined} teamName="Miami Dolphins" />);
     expect(screen.getByText("No rating timeline available.")).toBeInTheDocument();
+  });
+
+  it("shows a visible dated tooltip and labels every axis position with apostrophe years", () => {
+    render(<RatingChart timeline={timeline()} range="season" onRangeChange={() => undefined} teamName="Miami Dolphins" />);
+    const weekTwo = screen.getByRole("button", { name: /Sep 20, 2026.*Week 2.*Projected median: 1520/ });
+    fireEvent.mouseEnter(weekTwo);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Sep 20, 2026");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Week 2");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Rating: 1520");
+    expect(screen.getAllByTestId("rating-axis-label")).toHaveLength(timeline().points.length + 1);
+    expect(screen.getAllByText("'26").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^26$/)).not.toBeInTheDocument();
   });
 });

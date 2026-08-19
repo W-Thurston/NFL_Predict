@@ -7537,6 +7537,17 @@
         "additionalProperties": false,
         "description": "One season-aware entering-week Elo state on a team timeline.",
         "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
           "game_played": {
             "default": false,
             "title": "Game Played",

@@ -58,6 +58,7 @@ def test_early_season_bridge_carries_inactive_weeks_and_offseason() -> None:
         ("2025-2026", 22),
     ]
     assert timeline.points[0].state == "observed"
+    assert timeline.points[0].date == "2026-01-01"
     assert all(point.state == "carried_forward" for point in timeline.points[1:5])
     assert timeline.points[5].state == "current"
     assert timeline.offseason_transition is not None

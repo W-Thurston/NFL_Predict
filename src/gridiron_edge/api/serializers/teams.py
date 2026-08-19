@@ -193,6 +193,7 @@ def _timeline_point(
     return TeamRatingTimelinePoint(
         season=season,
         week=week,
+        date=result.date if result is not None and result.date else None,
         rating=rating,
         state=state,
         game_played=result is not None,
@@ -363,6 +364,11 @@ def build_team_rating_timeline(  # noqa: PLR0912, PLR0915
         points = [
             point.model_copy(
                 update={
+                    "date": (
+                        str(forecast_values[point.week]["game_date"])
+                        if pd.notna(forecast_values[point.week].get("game_date"))
+                        else None
+                    ),
                     "rating": float(forecast_values[point.week]["elo_median"]),
                     "state": "forecast",
                     "lower_rating": float(forecast_values[point.week]["elo_p10"]),

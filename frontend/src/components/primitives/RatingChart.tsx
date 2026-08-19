@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { components } from "../../api/schema";
 import { Pill } from "./Pill";
@@ -21,6 +21,7 @@ type DisplayPoint = {
   label: string;
   season: string;
   week: number | null;
+  date: string | null;
   state: TimelinePoint["state"] | "final";
   rating: number | null;
   lowerRating: number | null;
@@ -42,6 +43,9 @@ export function RatingChart({
   color = "var(--pos)",
 }: RatingChartProps) {
   const [showScenarios, setShowScenarios] = useState(false);
+  const [activePointKey, setActivePointKey] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   if (!timeline || timeline.points.length === 0) {
     return (
@@ -91,14 +95,27 @@ export function RatingChart({
   );
   const intervalPath = areaPath(points, x, y);
   const offseasonPath = buildOffseasonPath(points, timeline, x, y);
-  const xIndexes = Array.from(
-    new Set([0, 1, 2, 3, 4].map((index) =>
-      Math.round(((points.length - 1) * index) / 4),
-    )),
-  );
+  const activePoint = points.find((point) => point.key === activePointKey) ?? null;
+  const openTooltip = (
+    point: DisplayPoint,
+    target: SVGCircleElement,
+  ) => {
+    const chartRect = chartRef.current?.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    if (!chartRect) return;
+    setActivePointKey(point.key);
+    setTooltipPosition({
+      left: targetRect.left + targetRect.width / 2 - chartRect.left,
+      top: targetRect.top - chartRect.top,
+    });
+  };
+  const closeTooltip = () => {
+    setActivePointKey(null);
+    setTooltipPosition(null);
+  };
 
   return (
-    <div>
+    <div ref={chartRef} style={{ position: "relative" }}>
       <div
         style={{
           display: "flex",
@@ -160,19 +177,42 @@ export function RatingChart({
             stroke={color}
             strokeWidth={point.state === "current" ? 2 : 1}
             data-state={point.state}
+            tabIndex={0}
+            role="button"
+            aria-label={tooltipText(point, showScenarios)}
+            onMouseEnter={(event) => openTooltip(point, event.currentTarget)}
+            onMouseLeave={closeTooltip}
+            onFocus={(event) => openTooltip(point, event.currentTarget)}
+            onBlur={closeTooltip}
+            style={{ cursor: "help", outline: "none" }}
           >
             <title>{tooltipText(point, showScenarios)}</title>
           </circle>
         ))}
-        {xIndexes.map((index) => {
-          const point = points[index];
-          return (
-            <text key={`axis:${point.key}`} x={x(index)} y={height - 9} textAnchor="middle" fill="var(--ink-4)" fontFamily="var(--f-mono)" fontSize={9}>
-              {point.label}
-            </text>
-          );
-        })}
+        {points.map((point, index) => (
+          <text
+            key={`axis:${point.key}`}
+            x={x(index)}
+            y={height - 24}
+            textAnchor="middle"
+            fill="var(--ink-4)"
+            fontFamily="var(--f-mono)"
+            fontSize={8}
+            data-testid="rating-axis-label"
+          >
+            <tspan x={x(index)} dy="0">{shortSeason(point.season)}</tspan>
+            <tspan x={x(index)} dy="10">{point.week == null ? "Final" : `W${point.week}`}</tspan>
+          </text>
+        ))}
       </svg>
+      {activePoint && tooltipPosition ? (
+        <RatingTooltip
+          point={activePoint}
+          showScenarios={showScenarios}
+          left={tooltipPosition.left}
+          top={tooltipPosition.top}
+        />
+      ) : null}
 
       <div className="mono dim2" style={{ fontSize: 10, marginTop: 4 }}>
         {provenanceText(timeline)}
@@ -190,6 +230,7 @@ function buildDisplayPoints(timeline: Timeline): DisplayPoint[] {
     label: `${shortSeason(point.season)} W${point.week}`,
     season: point.season,
     week: point.week,
+    date: point.date ?? null,
     state: point.state,
     rating: point.rating ?? null,
     lowerRating: point.lower_rating ?? null,
@@ -208,6 +249,7 @@ function buildDisplayPoints(timeline: Timeline): DisplayPoint[] {
     label: `${shortSeason(final.season)} Final`,
     season: final.season,
     week: null,
+    date: null,
     state: "final",
     rating: final.rating,
     lowerRating: null,
@@ -278,11 +320,12 @@ function findLastIndex<T>(items: T[], predicate: (item: T) => boolean): number {
 }
 
 function tooltipText(point: DisplayPoint, showScenarios: boolean): string {
+  const date = point.date ? `${formatDate(point.date)}. ` : "";
   const location = point.state === "final" ? `Final ${point.season} rating` : `${point.season} Week ${point.week}`;
-  if (point.rating == null) return `${location}. Rating unavailable.`;
+  if (point.rating == null) return `${date}${location}. Rating unavailable.`;
   const value = point.rating.toFixed(0);
   const label = point.state === "forecast" ? "Projected median" : point.state === "current" ? "Current rating" : point.state === "carried_forward" ? "Carried-forward rating" : point.state === "final" ? "Post-Super-Bowl rating" : "Observed rating";
-  const parts = [`${location}. ${label}: ${value}.`];
+  const parts = [`${date}${location}. ${label}: ${value}.`];
   if (point.lowerRating != null && point.upperRating != null) parts.push(`Central 80% interval: ${point.lowerRating.toFixed(0)}–${point.upperRating.toFixed(0)}.`);
   if (showScenarios && point.winOutRating != null) parts.push(`Win-out scenario: ${point.winOutRating.toFixed(0)}.`);
   if (showScenarios && point.loseOutRating != null) parts.push(`Lose-out scenario: ${point.loseOutRating.toFixed(0)}.`);
@@ -305,7 +348,64 @@ function provenanceText(timeline: Timeline): string {
 }
 
 function shortSeason(season: string): string {
-  return season.split("-")[0].slice(-2);
+  return `'${season.split("-")[0].slice(-2)}`;
+}
+
+function formatDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function RatingTooltip({
+  point,
+  showScenarios,
+  left,
+  top,
+}: {
+  point: DisplayPoint;
+  showScenarios: boolean;
+  left: number;
+  top: number;
+}) {
+  return (
+    <div
+      role="tooltip"
+      style={{
+        position: "absolute",
+        zIndex: 20,
+        left,
+        top,
+        transform: "translate(-50%, calc(-100% - 10px))",
+        minWidth: 160,
+        padding: "9px 11px",
+        border: "1px solid var(--line)",
+        borderRadius: 4,
+        backgroundColor: "var(--bg-1)",
+        boxShadow: "0 6px 18px rgb(0 0 0 / 35%)",
+        pointerEvents: "none",
+      }}
+    >
+      <div style={{ color: "var(--ink)", fontSize: 12, fontWeight: 650 }}>
+        {point.date ? formatDate(point.date) : point.state === "final" ? "Season final" : `Week ${point.week}`}
+      </div>
+      <div className="mono dim" style={{ marginTop: 3, fontSize: 10 }}>
+        {point.week == null ? `${shortSeason(point.season)} Final` : `${shortSeason(point.season)} · Week ${point.week}`}
+      </div>
+      <div className="mono" style={{ marginTop: 4, fontSize: 10, lineHeight: 1.45 }}>
+        {point.rating == null ? "Rating unavailable" : `Rating: ${point.rating.toFixed(0)}`}
+        {point.lowerRating != null && point.upperRating != null ? (
+          <div>P10–P90: {point.lowerRating.toFixed(0)}–{point.upperRating.toFixed(0)}</div>
+        ) : null}
+        {showScenarios && point.winOutRating != null ? <div>Win out: {point.winOutRating.toFixed(0)}</div> : null}
+        {showScenarios && point.loseOutRating != null ? <div>Lose out: {point.loseOutRating.toFixed(0)}</div> : null}
+      </div>
+    </div>
+  );
 }
 
 function Legend({ children, swatch, dashed = false, dotted = false, band = false }: { children: React.ReactNode; swatch: string; dashed?: boolean; dotted?: boolean; band?: boolean }) {
