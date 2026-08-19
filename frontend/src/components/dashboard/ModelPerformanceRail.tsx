@@ -1,5 +1,6 @@
 import { useHistoricalModelPerformance } from "../../api/hooks";
 import { useNav } from "../../context/NavContext";
+import { ExplainTooltip, type ExplainTooltipSection } from "../primitives/ExplainTooltip";
 
 /**
  * Compact historical validation snapshot for the dashboard.
@@ -41,12 +42,28 @@ export function ModelPerformanceRail() {
           headline={`${(report.moneyline.accuracy * 100).toFixed(1)}% accuracy`}
           record={`${report.moneyline.wins.toLocaleString()} W · ${report.moneyline.losses.toLocaleString()} L · ${report.moneyline.evaluated_count.toLocaleString()} games`}
           evidence={`${report.moneyline.net_wins.toLocaleString()} more correct than incorrect`}
+          explanation={[
+            {
+              label: "Sample",
+              text: "Moneyline accuracy uses historical games with an eligible Moneyline forecast and a completed winner. Each eligible game is graded correct or incorrect.",
+            },
+          ]}
         />
         <PerformanceBlock
           label="Total"
           headline={`${(report.total.hit_rate_excluding_pushes * 100).toFixed(1)}% hit rate`}
           record={`${report.total.wins.toLocaleString()} W · ${report.total.losses.toLocaleString()} L · ${report.total.pushes.toLocaleString()} P · ${report.total.decision_count.toLocaleString()} decisions`}
           evidence={`${report.total.net_wins.toLocaleString()} more wins than losses`}
+          explanation={[
+            {
+              label: "Sample",
+              text: "Total hit rate uses eligible historical Total decisions. Wins and losses determine the hit rate; pushes are recorded but excluded from the percentage.",
+            },
+            {
+              label: "Why counts differ",
+              text: "Moneyline and Total use independent eligibility rules, so their sample counts may differ.",
+            },
+          ]}
         />
       </div>
 
@@ -85,11 +102,13 @@ function PerformanceBlock({
   headline,
   record,
   evidence,
+  explanation,
 }: {
   label: string;
   headline: string;
   record: string;
   evidence: string;
+  explanation: ExplainTooltipSection[];
 }) {
   return (
     <div
@@ -99,9 +118,16 @@ function PerformanceBlock({
         borderRadius: 5,
       }}
     >
-      <div className="upper dim" style={{ fontSize: 9 }}>
-        {label}
-      </div>
+      <ExplainTooltip
+        accessibleLabel={`Explain ${label} performance sample`}
+        title={`${label} performance`}
+        sections={explanation}
+        className="model-edge-header-explanation"
+      >
+        <span className="upper dim" style={{ fontSize: 9 }}>
+          {label} <span aria-hidden="true">ⓘ</span>
+        </span>
+      </ExplainTooltip>
       <div className="mono tnum" style={{ fontSize: 22, marginTop: 5 }}>
         {headline}
       </div>

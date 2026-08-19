@@ -48,9 +48,7 @@ export function ModelEdgesTable() {
   if (isLoading) {
     return (
       <div className="hm-card" style={{ padding: 24 }}>
-        <div className="upper dim" style={{ fontSize: 10, marginBottom: 16 }}>
-          Model Edges
-        </div>
+        <ModelEdgesHeading style={{ marginBottom: 16 }} />
         <div className="dim">Loading…</div>
       </div>
     );
@@ -59,9 +57,7 @@ export function ModelEdgesTable() {
   if (error) {
     return (
       <div className="hm-card" style={{ padding: 24 }}>
-        <div className="upper dim" style={{ fontSize: 10, marginBottom: 16 }}>
-          Model Edges
-        </div>
+        <ModelEdgesHeading style={{ marginBottom: 16 }} />
         <div className="dim mono" style={{ fontSize: 12 }}>
           Couldn't load edges.
         </div>
@@ -95,10 +91,7 @@ export function ModelEdgesTable() {
           marginBottom: 16,
         }}
       >
-        <div id="model-edges-heading" className="upper dim" style={{ fontSize: 10 }}>
-          Model Edges
-          {data?.week && <> · Wk {data.week}</>}
-        </div>
+        <ModelEdgesHeading week={data?.week} id="model-edges-heading" />
         <div style={{ display: "flex", gap: 6 }}>
           {tabs.map((tab) => (
             <Pill
@@ -388,6 +381,38 @@ export function ModelEdgesTable() {
         </div>
       )}
     </div>
+  );
+}
+
+function ModelEdgesHeading({
+  week,
+  id,
+  style,
+}: {
+  week?: number | null;
+  id?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <ExplainTooltip
+      accessibleLabel="Explain Model Edges"
+      title="Model Edges"
+      sections={[
+        {
+          label: "Comparison",
+          text: "Compares the model's assessment with current sportsbook offers selected in Settings. Offers are grouped by game, market, and side, with the highest-ranked eligible offer shown first and other sportsbook prices available to expand.",
+        },
+        {
+          label: "Independent markets",
+          text: "Moneyline, Spread, and Total are evaluated independently. Positive expected value is analytical evidence and does not by itself mean the model recommends the wager.",
+        },
+      ]}
+      className="model-edge-header-explanation"
+    >
+      <span id={id} className="upper dim" style={{ fontSize: 10, ...style }}>
+        Model Edges{week ? <> · Wk {week}</> : null} <span aria-hidden="true">ⓘ</span>
+      </span>
+    </ExplainTooltip>
   );
 }
 

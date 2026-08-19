@@ -10,6 +10,7 @@ import { useNav } from "../../context/NavContext";
 import { EdgeResultStatus } from "../field-status/EdgeResultStatus";
 import { TeamHero } from "../primitives/TeamHero";
 import { WhyLink } from "../primitives/WhyLink";
+import { ExplainTooltip } from "../primitives/ExplainTooltip";
 import { useTeamByAbbr } from "../../api/team_metadata_hook";
 import type { components } from "../../api/schema";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
@@ -43,9 +44,7 @@ export function FeaturedMatchupsGrid() {
   if (isLoading) {
     return (
       <div className="hm-card" style={{ padding: 24 }}>
-        <div className="upper dim" style={{ fontSize: 10, marginBottom: 16 }}>
-          Featured Matchups
-        </div>
+        <FeaturedMatchupsHeading style={{ marginBottom: 16 }} />
         <div className="dim">Loading…</div>
       </div>
     );
@@ -54,9 +53,7 @@ export function FeaturedMatchupsGrid() {
   if (error) {
     return (
       <div className="hm-card" style={{ padding: 24 }}>
-        <div className="upper dim" style={{ fontSize: 10, marginBottom: 16 }}>
-          Featured Matchups
-        </div>
+        <FeaturedMatchupsHeading style={{ marginBottom: 16 }} />
         <div className="dim mono" style={{ fontSize: 12 }}>
           Couldn't load matchups.
         </div>
@@ -82,9 +79,7 @@ export function FeaturedMatchupsGrid() {
   if (featured.length === 0) {
     return (
       <div className="hm-card" style={{ padding: 24 }}>
-        <div className="upper dim" style={{ fontSize: 10, marginBottom: 16 }}>
-          Featured Matchups
-        </div>
+        <FeaturedMatchupsHeading style={{ marginBottom: 16 }} />
         {edgesResult.data?.diagnostics ? (
           <EdgeResultStatus diagnostics={edgesResult.data.diagnostics} />
         ) : (
@@ -106,9 +101,7 @@ export function FeaturedMatchupsGrid() {
           marginBottom: 12,
         }}
       >
-        <div className="upper dim" style={{ fontSize: 10 }}>
-          Featured Matchups
-        </div>
+        <FeaturedMatchupsHeading />
         <div className="mono dim2" style={{ fontSize: 11 }}>
           Top {featured.length} by EV
         </div>
@@ -311,5 +304,34 @@ function FeaturedCard({
         </div>
       </div>
     </div>
+  );
+}
+
+
+function FeaturedMatchupsHeading({
+  style,
+}: {
+  style?: React.CSSProperties;
+}) {
+  return (
+    <ExplainTooltip
+      accessibleLabel="Explain Featured Matchups"
+      title="Featured Matchups"
+      sections={[
+        {
+          label: "Selection",
+          text: "Shows up to three scheduled games with the highest-ranked eligible edge offers from sportsbooks selected in Settings. One eligible offer is retained per game, and the games are currently ordered by expected value.",
+        },
+        {
+          label: "Recommendation boundary",
+          text: "Featured placement is analytical and does not by itself mean the model recommends a wager.",
+        },
+      ]}
+      className="model-edge-header-explanation"
+    >
+      <span className="upper dim" style={{ fontSize: 10, ...style }}>
+        Featured Matchups <span aria-hidden="true">ⓘ</span>
+      </span>
+    </ExplainTooltip>
   );
 }
