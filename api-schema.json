@@ -2964,6 +2964,16 @@
             ],
             "title": "Is Model Approved"
           },
+          "is_model_recommended_offer": {
+            "default": false,
+            "title": "Is Model Recommended Offer",
+            "type": "boolean"
+          },
+          "is_model_recommended_side": {
+            "default": false,
+            "title": "Is Model Recommended Side",
+            "type": "boolean"
+          },
           "line": {
             "anyOf": [
               {

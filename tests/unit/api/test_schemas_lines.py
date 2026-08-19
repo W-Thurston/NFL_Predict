@@ -90,6 +90,7 @@ def test_line_offer_and_outcome_guidance_preserve_model_contract() -> None:
             "expected_value": 0.069,
             "is_model_approved": True,
             "is_best_model_approved_offer": True,
+            "is_model_recommended_offer": True,
             "product_id": "weekly-product",
             "product_run_id": "weekly-run",
         }

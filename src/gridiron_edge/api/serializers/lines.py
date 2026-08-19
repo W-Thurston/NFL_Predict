@@ -128,6 +128,18 @@ def _serialize_offer(
         expected_value=_optional_number(row.get("expected_value")),
         is_model_approved=_optional_bool(row.get("is_model_approved")),
         is_best_model_approved_offer=bool(row.get("is_best_model_approved_offer", False)),
+        is_model_recommended_offer=bool(
+            row.get(
+                "is_model_recommended_offer",
+                False,
+            )
+        ),
+        is_model_recommended_side=bool(
+            row.get(
+                "is_model_recommended_side",
+                False,
+            )
+        ),
         product_id=_text_or_none(row.get("product_id")),
         product_run_id=_text_or_none(row.get("product_run_id")),
         recommendation=(

@@ -18,8 +18,6 @@ import { TeamHero } from "../components/primitives/TeamHero";
 import { TeamMark } from "../components/primitives/TeamMark";
 import { WhyLink } from "../components/primitives/WhyLink";
 import { useBetSlip } from "../context/BetSlipContext";
-import { RecommendationDetails } from "../components/recommendations/RecommendationDetails";
-import { RecommendationStatus } from "../components/recommendations/RecommendationStatus";
 import { useAppState } from "../context/AppStateContext";
 import {
   filterEdgesBySportsbook,
@@ -702,18 +700,7 @@ function ModelLeanCallout({
           subject={{ kind: "rec", gameId: topEdge.game_id }}
         />
       </div>
-      <RecommendationStatus recommendation={topEdge.recommendation} compact />
-      {topEdge.recommendation?.suggested_stake != null && (
-        <span className="mono" style={{ fontSize: 10, color: "var(--ink-2)" }}>
-          Persisted suggested stake ${topEdge.recommendation.suggested_stake.toFixed(2)}
-        </span>
-      )}
-      {topEdge.recommendation && (
-        <RecommendationDetails
-          recommendation={topEdge.recommendation}
-          summary="Policy evidence"
-        />
-      )}
+
       <button
         onClick={handleAddSlip}
         type="button"
@@ -1031,7 +1018,6 @@ function RecCell({
 
   return (
     <div style={{ display: "grid", gap: 5 }}>
-      <RecommendationStatus recommendation={edge.recommendation} compact />
       <div
         style={{
           color: "var(--pos)",

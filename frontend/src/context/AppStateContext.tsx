@@ -7,7 +7,7 @@ export type OddsFormat = "american" | "decimal";
 export type LineShoppingDisplay = {
   valueHighlights: boolean;
   positiveEv: boolean;
-  preferredPositiveEv: boolean;
+  recommendedBet: boolean;
   bestLine: boolean;
   bestPrice: boolean;
   modelFavorite: boolean;
@@ -15,11 +15,11 @@ export type LineShoppingDisplay = {
 
 const DEFAULT_LINE_SHOPPING_DISPLAY: LineShoppingDisplay = {
   valueHighlights: true,
-  positiveEv: true,
-  preferredPositiveEv: true,
-  bestLine: true,
-  bestPrice: true,
-  modelFavorite: true,
+  recommendedBet: true,
+  positiveEv: false,
+  bestLine: false,
+  bestPrice: false,
+  modelFavorite: false,
 };
 
 export type AppState = {
@@ -60,9 +60,23 @@ function loadInitialState(): AppState {
       const parsed = JSON.parse(stored) as Partial<AppState>;
       const sportsbookMode = parsed.sportsbookMode === "selected" ? "selected" : "all";
       const selectedSportsbooks = normalizeSelectedSportsbooks(parsed.selectedSportsbooks);
+      const storedDisplay =
+        parsed.lineShoppingDisplay ?? {};
       const lineShoppingDisplay = {
         ...DEFAULT_LINE_SHOPPING_DISPLAY,
-        ...(parsed.lineShoppingDisplay ?? {}),
+        ...storedDisplay,
+        recommendedBet:
+          typeof (
+            storedDisplay as Partial<
+              LineShoppingDisplay
+            >
+          ).recommendedBet === "boolean"
+            ? (
+                storedDisplay as Partial<
+                  LineShoppingDisplay
+                >
+              ).recommendedBet
+            : true,
       };
       return {
         ...DEFAULT_STATE,

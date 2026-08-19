@@ -12,8 +12,6 @@ import {
 } from "../../utils/props";
 import { PendingChip } from "../field-status/PendingChip";
 import { TeamMark } from "../primitives/TeamMark";
-import { RecommendationDetails } from "../recommendations/RecommendationDetails";
-import { RecommendationStatus } from "../recommendations/RecommendationStatus";
 
 type OddsFormat =
   | "american"
@@ -88,16 +86,6 @@ export function BetLegCard({
         aria-label={`Persisted policy result for ${accessibleLegLabel}`}
         style={{ marginBottom: 12, display: "grid", gap: 6 }}
       >
-        <RecommendationStatus
-          recommendation={leg.persistedRecommendation}
-          compact
-        />
-        {leg.persistedRecommendation && (
-          <RecommendationDetails
-            recommendation={leg.persistedRecommendation}
-            summary="Persisted policy evidence"
-          />
-        )}
       </section>
 
       <PriceSection

@@ -12,8 +12,6 @@ import {
 } from "../../utils/sportsbookPreferences";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
 import { ErrorCard } from "../../components/error/ErrorCard";
-import { RecommendationDetails } from "../recommendations/RecommendationDetails";
-import { RecommendationStatus } from "../recommendations/RecommendationStatus";
 
 export function EdgesTable({
   bankroll,
@@ -343,16 +341,6 @@ export function EdgesTable({
                     </td>
                     <td style={{ padding: "10px 12px 10px 0" }}>
                       <div style={{ display: "grid", gap: 5 }}>
-                        <RecommendationStatus
-                          recommendation={edge.recommendation}
-                          compact
-                        />
-                        {edge.recommendation && (
-                          <RecommendationDetails
-                            recommendation={edge.recommendation}
-                            summary="Policy evidence"
-                          />
-                        )}
                       </div>
                     </td>
                     <td style={{ padding: "10px 0" }}>

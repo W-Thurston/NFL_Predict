@@ -59,6 +59,8 @@ _MODEL_OUTPUT_COLUMNS: tuple[str, ...] = (
     "expected_value",
     "is_model_approved",
     "is_best_model_approved_offer",
+    "is_model_recommended_offer",
+    "is_model_recommended_side",
     "product_id",
     "product_run_id",
 )
@@ -169,6 +171,10 @@ def evaluate_line_shopping_guidance(
     evaluation_frame = DataFrame(evaluations, index=merged.index)
     output = pd.concat([merged, evaluation_frame], axis=1)
     output["is_best_model_approved_offer"] = _preferred_approved_mask(output)
+    output["is_model_recommended_offer"] = _model_recommended_mask(output)
+    output["is_model_recommended_side"] = _model_recommended_side_mask(
+        output,
+    )
 
     guidance = _build_outcome_guidance(output, reference_odds=reference_odds)
     ordered = output.sort_values(
@@ -322,6 +328,71 @@ def _total_guidance_status(row: Series) -> GuidanceStatus:
     )
 
 
+def _model_recommended_side_mask(
+    offers: DataFrame,
+) -> Series:
+    """Mark every exact offer on each backend-recommended side."""
+    result = Series(
+        False,
+        index=offers.index,
+        dtype="bool",
+    )
+
+    selected = offers.loc[
+        offers["is_model_recommended_offer"].eq(True),
+        ["game_id", "market", "side"],
+    ]
+
+    for game_id, market, side in selected.itertuples(
+        index=False,
+        name=None,
+    ):
+        result.loc[
+            offers["game_id"].eq(game_id) & offers["market"].eq(market) & offers["side"].eq(side)
+        ] = True
+
+    return result
+
+
+def _model_recommended_mask(
+    offers: DataFrame,
+) -> Series:
+    """Select one strongest exact model wager per game and market."""
+    result = Series(
+        False,
+        index=offers.index,
+        dtype="bool",
+    )
+    available = offers.loc[
+        offers["model_status"].eq("available") & offers["model_probability"].notna(),
+        :,
+    ]
+    for _, group in available.groupby(
+        ["game_id", "market"],
+        sort=False,
+    ):
+        ordered = group.sort_values(
+            [
+                "model_probability",
+                "odds",
+                "side",
+                "line",
+                "sportsbook",
+            ],
+            ascending=[
+                False,
+                False,
+                True,
+                False,
+                True,
+            ],
+            na_position="first",
+            kind="stable",
+        )
+        result.loc[ordered.index[0]] = True
+    return result
+
+
 def _preferred_approved_mask(offers: DataFrame) -> Series:
     result = Series(False, index=offers.index, dtype="bool")
     approved = offers.loc[offers["is_model_approved"].eq(True), :]
@@ -409,7 +480,12 @@ def _outcome_model_value(
 
 
 def _empty_model_column(column: str) -> Series:
-    if column in {"is_model_approved", "is_best_model_approved_offer"}:
+    if column in {
+        "is_model_approved",
+        "is_best_model_approved_offer",
+        "is_model_recommended_offer",
+        "is_model_recommended_side",
+    }:
         return Series(dtype="boolean")
     if column in {"model_value", "model_probability", "expected_value"}:
         return Series(dtype="float64")

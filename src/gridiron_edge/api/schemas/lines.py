@@ -58,6 +58,8 @@ class LineOffer(BaseModel):
     expected_value: float | None = None
     is_model_approved: bool | None = None
     is_best_model_approved_offer: bool = False
+    is_model_recommended_offer: bool = False
+    is_model_recommended_side: bool = False
     product_id: str | None = None
     product_run_id: str | None = None
     recommendation: RecommendationPresentation | None = None

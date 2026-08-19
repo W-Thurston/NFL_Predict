@@ -12,8 +12,6 @@ import {
   normalizeSportsbookKey,
   sportsbookDisplayName,
 } from "../utils/sportsbookPreferences";
-import { RecommendationDetails } from "../components/recommendations/RecommendationDetails";
-import { RecommendationStatus } from "../components/recommendations/RecommendationStatus";
 
 type Market = "spread" | "total" | "moneyline";
 type LineOffer = components["schemas"]["LineOffer"];
@@ -97,7 +95,7 @@ export function LineShopping() {
                 valueHighlights: !display.valueHighlights,
               })}
             >
-              Value highlights
+              Highlights
               <span aria-hidden="true">
                 {display.valueHighlights ? "On" : "Off"}
               </span>
@@ -129,9 +127,6 @@ export function LineShopping() {
             {display.positiveEv && (
               <span><i className="line-shopping-key line-shopping-key--positive-ev" />+EV candidate</span>
             )}
-            {display.preferredPositiveEv && (
-              <span><i className="line-shopping-key line-shopping-key--preferred-ev" />Preferred +EV offer</span>
-            )}
             {display.bestLine && (
               <span><i className="line-shopping-key line-shopping-key--line" />Best available line</span>
             )}
@@ -143,7 +138,7 @@ export function LineShopping() {
           </>
         )}
         <span className="line-shopping-value-caveat">
-          +EV identifies estimated price value, not the predicted winner or a recommended wager.
+          +EV identifies estimated price value. The green offer is the model's recommended exact wager.
         </span>
         </div>
         <span className="line-shopping-snapshot">
@@ -242,6 +237,11 @@ function GameRows({
   sportsbooks: string[];
   display: LineShoppingDisplay;
 }) {
+  const recommendedOffer = selectVisibleRecommendedOffer(
+    game.offers ?? [],
+    sportsbooks,
+  );
+
   return SIDE_ORDER[market].map((side, index) => (
     <tr key={`${game.game_id}:${side}`}>
       {index === 0 && (
@@ -274,6 +274,9 @@ function GameRows({
                 game={game}
                 offer={offer}
                 display={display}
+                isRecommended={
+                  recommendedOffer === offer
+                }
               />
             ) : (
               <span className="dim2">Unavailable</span>
@@ -283,6 +286,106 @@ function GameRows({
       })}
     </tr>
   ));
+}
+
+function selectVisibleRecommendedOffer(
+  offers: LineOffer[],
+  visibleSportsbooks: string[],
+): LineOffer | null {
+  const recommendedSide = offers.find(
+    (offer) =>
+      offer.is_model_recommended_side,
+  )?.side;
+
+  if (!recommendedSide) {
+    return null;
+  }
+
+  const visible = offers
+    .filter(
+      (offer) =>
+        offer.side === recommendedSide
+        && visibleSportsbooks.includes(
+          offer.sportsbook,
+        )
+        && offer.model_status === "available"
+        && offer.model_probability != null,
+    )
+    .sort(compareVisibleRecommendedOffers);
+
+  return visible[0] ?? null;
+}
+
+function compareVisibleRecommendedOffers(
+  left: LineOffer,
+  right: LineOffer,
+): number {
+  const probabilityDifference =
+    (right.model_probability ?? 0)
+    - (left.model_probability ?? 0);
+
+  if (probabilityDifference !== 0) {
+    return probabilityDifference;
+  }
+
+  const lineDifference =
+    compareRecommendedLines(left, right);
+
+  if (lineDifference !== 0) {
+    return lineDifference;
+  }
+
+  if (
+    left.american_odds
+    !== right.american_odds
+  ) {
+    return (
+      right.american_odds
+      - left.american_odds
+    );
+  }
+
+  return visibleOfferIdentity(left)
+    .localeCompare(
+      visibleOfferIdentity(right),
+    );
+}
+
+function compareRecommendedLines(
+  left: LineOffer,
+  right: LineOffer,
+): number {
+  if (
+    left.line == null
+    || right.line == null
+    || left.line === right.line
+  ) {
+    return 0;
+  }
+
+  if (
+    left.market === "total"
+    && left.side === "over"
+  ) {
+    return left.line - right.line;
+  }
+
+  return right.line - left.line;
+}
+
+function visibleOfferIdentity(
+  offer: LineOffer,
+): string {
+  return [
+    offer.provider,
+    offer.provider_event_id ?? "",
+    offer.sportsbook,
+    offer.market,
+    offer.side,
+    offer.line ?? "",
+    offer.american_odds,
+    offer.market_fetched_at,
+  ].join(":");
 }
 
 function OutcomeGuidance({
@@ -361,10 +464,12 @@ function OfferCell({
   game,
   offer,
   display,
+  isRecommended,
 }: {
   game: LineShoppingGame;
   offer: LineOffer;
   display: LineShoppingDisplay;
+  isRecommended: boolean;
 }) {
   const classNames = ["line-shopping-offer"];
   const valueHighlights = display.valueHighlights;
@@ -376,10 +481,12 @@ function OfferCell({
   }
   if (
     valueHighlights
-    && display.preferredPositiveEv
-    && offer.is_best_model_approved_offer
+    && display.recommendedBet
+    && isRecommended
   ) {
-    classNames.push("line-shopping-offer--preferred-ev");
+    classNames.push(
+      "line-shopping-offer--recommended",
+    );
   }
   const title = offerTitle(game, offer);
   return (
@@ -397,13 +504,6 @@ function OfferCell({
           </strong>
         </span>
       </ExplainTooltip>
-      <RecommendationStatus recommendation={offer.recommendation} compact />
-      {offer.recommendation && (
-        <RecommendationDetails
-          recommendation={offer.recommendation}
-          summary="Policy evidence"
-        />
-      )}
     </div>
   );
 }
@@ -452,7 +552,7 @@ function offerExplanationSections(
   const marketFacts = [
     offer.is_best_line ? "This is the best available line." : null,
     offer.is_best_price ? "This is the best price available at this exact line." : null,
-    offer.is_best_model_approved_offer ? "This is the preferred +EV offer for this outcome." : null,
+    offer.is_best_model_approved_offer ? "This is the model's recommended exact wager for this market." : null,
   ].filter((value): value is string => value !== null);
   if (marketFacts.length > 0) {
     sections.push({ label: "Market", text: marketFacts.join(" ") });
@@ -518,7 +618,7 @@ function offerModelExplanation(
   const ev = offer.expected_value == null
     ? ""
     : ` Expected value: ${formatPercent(offer.expected_value)}.`;
-  return `${candidate}${likelihood}${ev} +EV describes estimated price value, not the predicted winner or a recommended wager.`;
+  return `${candidate}${likelihood}${ev} +EV describes estimated price value. A green offer is the model's suggested bet.`;
 }
 
 function offerTitle(game: LineShoppingGame, offer: LineOffer): string {
@@ -541,15 +641,19 @@ function DisplayPanel({
     label: string;
     group: string;
   }> = [
+    {
+      key: "recommendedBet",
+      label: "Recommended bet",
+      group: "Recommendation",
+    },
     { key: "positiveEv", label: "+EV candidates", group: "Offer value" },
-    { key: "preferredPositiveEv", label: "Preferred +EV offer", group: "Offer value" },
     { key: "bestLine", label: "Best available line", group: "Market comparison" },
     { key: "bestPrice", label: "Best exact-line price", group: "Market comparison" },
     { key: "modelFavorite", label: "Model favorite / underdog", group: "Outcome context" },
   ];
   return (
     <div className="line-shopping-display-panel" role="dialog" aria-label="Line Shopping display settings">
-      {["Offer value", "Market comparison", "Outcome context"].map((group) => (
+      {["Recommendation", "Offer value", "Market comparison", "Outcome context"].map((group) => (
         <fieldset key={group}>
           <legend>{group}</legend>
           {options.filter((option) => option.group === group).map((option) => (
@@ -564,14 +668,6 @@ function DisplayPanel({
           ))}
         </fieldset>
       ))}
-      <fieldset disabled>
-        <legend>Recommendation</legend>
-        <label>
-          <input type="checkbox" checked={false} readOnly />
-          Recommended bets
-        </label>
-        <span>Unavailable until a qualification policy is implemented.</span>
-      </fieldset>
     </div>
   );
 }

@@ -132,6 +132,7 @@ def _render_governance(version: object) -> None:
 
 @production_chain_app.command("create-governance")
 def create_governance_cmd(
+    *,
     created_at: str = typer.Option(..., "--created-at"),
     fractional_kelly_multiplier: float = typer.Option(..., "--fractional-kelly-multiplier"),
     minimum_actionable_stake: float = typer.Option(..., "--minimum-actionable-stake"),

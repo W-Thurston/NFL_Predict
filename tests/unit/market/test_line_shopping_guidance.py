@@ -280,3 +280,67 @@ class TestEvaluateLineShoppingGuidance:
 
         with pytest.raises(ValueError, match="duplicate game_id"):
             evaluate_line_shopping_guidance(product, _quotes())
+
+
+def test_model_recommendation_selects_higher_probability_moneyline_side() -> None:
+    product = _product()
+    product.loc[:, "away_win_prob"] = 0.474
+    product.loc[:, "home_win_prob"] = 0.526
+
+    quotes = DataFrame(
+        [
+            _quote(
+                market="moneyline",
+                side="away",
+                line=None,
+                odds=120,
+                sportsbook="draftkings",
+            ),
+            _quote(
+                market="moneyline",
+                side="home",
+                line=None,
+                odds=-130,
+                sportsbook="draftkings",
+            ),
+            _quote(
+                market="moneyline",
+                side="home",
+                line=None,
+                odds=-125,
+                sportsbook="fanduel",
+            ),
+        ]
+    )
+
+    offers = evaluate_line_shopping_guidance(
+        product,
+        quotes,
+    ).offers
+    selected = offers.loc[
+        offers["is_model_recommended_offer"],
+        :,
+    ]
+
+    assert len(selected) == 1
+    assert selected.iloc[0]["side"] == "home"
+    assert selected.iloc[0]["sportsbook"] == "fanduel"
+    assert selected.iloc[0]["odds"] == -125
+
+
+def test_model_recommendation_is_one_exact_offer_per_game_market() -> None:
+    result = evaluate_line_shopping_guidance(
+        _product(),
+        _quotes(),
+    )
+    counts = (
+        result.offers.loc[
+            result.offers["is_model_recommended_offer"],
+            :,
+        ]
+        .groupby(["game_id", "market"])
+        .size()
+    )
+
+    assert not counts.empty
+    assert counts.eq(1).all()
