@@ -26,6 +26,33 @@ class _FakeSettings:
     repo_root: Path
 
 
+def _write_weekly_elo_forecast(tmp_path: Path) -> None:
+    path = tmp_path / "data" / "output" / "temp" / "weekly_elo_forecast.parquet"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [
+        {
+            "season": "2026-2027",
+            "forecast_origin_week": 1,
+            "team": team,
+            "week": week,
+            "elo_p10": 1500.0,
+            "elo_median": 1550.0,
+            "elo_p90": 1600.0,
+            "win_out_elo_median": 1650.0,
+            "lose_out_elo_median": 1450.0,
+            "simulation_count": 100,
+            "lower_quantile": 0.1,
+            "center_quantile": 0.5,
+            "upper_quantile": 0.9,
+            "quantile_method": "linear",
+            "computed_at": "2026-08-19T00:00:00+00:00",
+        }
+        for team in ("KAN", "LAC")
+        for week in range(1, 19)
+    ]
+    pd.DataFrame(rows).to_parquet(path, index=False)
+
+
 def _write_percentiles(tmp_path: Path, rows: list[dict]) -> None:
     """Write a percentiles artifact directly."""
     pct_dir = tmp_path / "data" / "output" / "rankings" / "percentiles"
@@ -500,3 +527,56 @@ class TestTeamProfileCohortSplits:
         assert body["cohort_splits"] is None
         status = body["_meta"]["field_status"]
         assert status.get("cohort_splits") == "pending"
+
+
+class TestTeamRatingForecastIntegration:
+    def test_valid_forecast_populates_future_regular_season_points(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        empty_games = cast(pd.DataFrame, _make_games_df().iloc[0:0].copy())
+        (
+            MiniRepoBuilder(tmp_path)
+            .with_games(empty_games)
+            .with_elo_state(_make_elo_df())
+            .with_teams_reference()
+        )
+        _write_weekly_elo_forecast(tmp_path)
+
+        response = client.get("/teams/KAN?season=2026-2027")
+
+        assert response.status_code == 200
+        body = response.json()
+        timeline = body["rating_timeline"]
+        by_week = {point["week"]: point for point in timeline["points"]}
+        assert by_week[1]["state"] == "current"
+        assert by_week[2]["state"] == "forecast"
+        assert by_week[2]["rating"] == 1550.0
+        assert by_week[18]["state"] == "forecast"
+        assert by_week[19]["state"] == "unavailable"
+        assert timeline["forecast_simulation_count"] == 100
+        assert "rating_timeline.forecast" not in body["_meta"]["field_status"]
+
+    def test_missing_forecast_keeps_history_available_and_marks_blocker(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        empty_games = cast(pd.DataFrame, _make_games_df().iloc[0:0].copy())
+        (
+            MiniRepoBuilder(tmp_path)
+            .with_games(empty_games)
+            .with_elo_state(_make_elo_df())
+            .with_teams_reference()
+        )
+
+        response = client.get("/teams/KAN?season=2026-2027")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["rating_timeline"]["points"][0]["state"] == "current"
+        assert (
+            body["_meta"]["field_status"]["rating_timeline.forecast"]["blocker"]
+            == "no_elo_forecast"
+        )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from gridiron_edge.api.loaders import WeeklyEloForecastLoad
 from gridiron_edge.api.serializers.teams import build_team_rating_timeline
 
 LONG_TO_SHORT = {
@@ -186,3 +187,60 @@ def test_recent_range_has_season_aware_history_current_and_unavailable_future() 
     assert [point.week for point in timeline.points if point.state == "unavailable"] == list(
         range(4, 11)
     )
+
+
+def test_forecast_evidence_replaces_future_regular_season_points() -> None:
+    elo = pd.DataFrame(
+        [
+            {"NFL_TEAM": "Miami Dolphins", "NFL_YEAR": "2026-2027", "NFL_WEEK": 1, "ELO": 1477.0},
+        ]
+    )
+    games = pd.DataFrame(
+        columns=["YEAR", "WEEK_NUM", "AWAY_TEAM", "HOME_TEAM", "AWAY_SCORE", "HOME_SCORE"]
+    )
+    forecast = pd.DataFrame(
+        [
+            {
+                "week": week,
+                "elo_p10": 1400.0 + week,
+                "elo_median": 1500.0 + week,
+                "elo_p90": 1600.0 + week,
+                "win_out_elo_median": 1700.0 + week,
+                "lose_out_elo_median": 1300.0 + week,
+                "simulation_count": 10_000,
+                "lower_quantile": 0.1,
+                "center_quantile": 0.5,
+                "upper_quantile": 0.9,
+                "quantile_method": "linear",
+                "computed_at": "2026-08-19T00:00:00+00:00",
+            }
+            for week in range(1, 19)
+        ]
+    )
+
+    timeline = build_team_rating_timeline(
+        elo=elo,
+        games=games,
+        team_long_name="Miami Dolphins",
+        long_to_short=LONG_TO_SHORT,
+        season="2026-2027",
+        completed_through_week=0,
+        current_rating_week=1,
+        timeline_range="season",
+        forecast_load=WeeklyEloForecastLoad(forecast, "available"),
+    )
+
+    assert timeline is not None
+    by_week = {point.week: point for point in timeline.points if point.season == "2026-2027"}
+    assert by_week[1].state == "current"
+    assert by_week[1].rating == 1477.0
+    assert by_week[2].state == "forecast"
+    assert by_week[2].rating == 1502.0
+    assert by_week[2].lower_rating == 1402.0
+    assert by_week[2].upper_rating == 1602.0
+    assert by_week[2].win_out_rating == 1702.0
+    assert by_week[2].lose_out_rating == 1302.0
+    assert by_week[18].state == "forecast"
+    assert by_week[19].state == "unavailable"
+    assert timeline.forecast_simulation_count == 10_000
+    assert timeline.forecast_quantile_method == "linear"

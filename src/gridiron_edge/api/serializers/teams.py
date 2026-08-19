@@ -12,6 +12,7 @@ from typing import Any, Literal
 import pandas as pd
 from pandas import DataFrame, Series
 
+from gridiron_edge.api.loaders import WeeklyEloForecastLoad
 from gridiron_edge.api.meta import Blocker, ResponseMeta, Unavailable
 from gridiron_edge.api.schemas.teams import (
     RatingHistoryPoint,
@@ -200,7 +201,7 @@ def _timeline_point(
     )
 
 
-def build_team_rating_timeline(  # noqa: PLR0912
+def build_team_rating_timeline(  # noqa: PLR0912, PLR0915
     *,
     elo: DataFrame,
     games: DataFrame,
@@ -210,6 +211,7 @@ def build_team_rating_timeline(  # noqa: PLR0912
     completed_through_week: int,
     current_rating_week: int,
     timeline_range: Literal["season", "recent"],
+    forecast_load: WeeklyEloForecastLoad | None = None,
 ) -> TeamRatingTimeline | None:
     """Build a season-aware historical Elo timeline without forecasting."""
     if elo.empty or not season:
@@ -342,6 +344,42 @@ def build_team_rating_timeline(  # noqa: PLR0912
                 )
             )
 
+    forecast_values: dict[int, Series] = {}
+    forecast_computed_at: str | None = None
+    forecast_simulation_count: int | None = None
+    forecast_lower_quantile: float | None = None
+    forecast_center_quantile: float | None = None
+    forecast_upper_quantile: float | None = None
+    forecast_quantile_method: str | None = None
+    if forecast_load is not None and forecast_load.state == "available":
+        forecast_values = {int(row["week"]): row for _, row in forecast_load.frame.iterrows()}
+        first_forecast = forecast_load.frame.iloc[0]
+        forecast_computed_at = str(first_forecast["computed_at"])
+        forecast_simulation_count = int(first_forecast["simulation_count"])
+        forecast_lower_quantile = float(first_forecast["lower_quantile"])
+        forecast_center_quantile = float(first_forecast["center_quantile"])
+        forecast_upper_quantile = float(first_forecast["upper_quantile"])
+        forecast_quantile_method = str(first_forecast["quantile_method"])
+        points = [
+            point.model_copy(
+                update={
+                    "rating": float(forecast_values[point.week]["elo_median"]),
+                    "state": "forecast",
+                    "lower_rating": float(forecast_values[point.week]["elo_p10"]),
+                    "upper_rating": float(forecast_values[point.week]["elo_p90"]),
+                    "win_out_rating": float(forecast_values[point.week]["win_out_elo_median"]),
+                    "lose_out_rating": float(forecast_values[point.week]["lose_out_elo_median"]),
+                }
+            )
+            if (
+                point.season == season
+                and current_rating_week < point.week <= 18
+                and point.week in forecast_values
+            )
+            else point
+            for point in points
+        ]
+
     if show_bridge and 1 in current_ratings:
         source_rating = prior_final.rating if prior_final is not None else previous_ratings.get(22)
         if source_rating is not None:
@@ -359,6 +397,12 @@ def build_team_rating_timeline(  # noqa: PLR0912
         points=points,
         prior_season_final=prior_final if show_bridge else None,
         offseason_transition=transition,
+        forecast_computed_at=forecast_computed_at,
+        forecast_simulation_count=forecast_simulation_count,
+        forecast_lower_quantile=forecast_lower_quantile,
+        forecast_center_quantile=forecast_center_quantile,
+        forecast_upper_quantile=forecast_upper_quantile,
+        forecast_quantile_method=forecast_quantile_method,
     )
 
 
@@ -493,6 +537,7 @@ def serialize_team_profile(
     completed_through_week: int | None = None,
     current_rating_week: int | None = None,
     timeline_range: Literal["season", "recent"] = "season",
+    forecast_load: WeeklyEloForecastLoad | None = None,
 ) -> TeamProfile:
     """Build the /teams/{abbr} response."""
     short_to_long: dict[str, str] = {v: k for k, v in long_to_short.items()}
@@ -567,6 +612,7 @@ def serialize_team_profile(
         completed_through_week=resolved_completed_week,
         current_rating_week=resolved_rating_week,
         timeline_range=timeline_range,
+        forecast_load=forecast_load,
     )
 
     # ------------------------------------------------------------------
@@ -601,6 +647,8 @@ def serialize_team_profile(
         meta = meta.with_blocked("trend", *Unavailable.NO_PRIOR_SNAPSHOT)
     if recent is None:
         meta = meta.with_blocked("recent_results", *Unavailable.NO_EVALUATION_DATA)
+    if forecast_load is None or forecast_load.state != "available":
+        meta = meta.with_blocked("rating_timeline.forecast", *Unavailable.NO_ELO_FORECAST)
     meta = meta.with_blocked("off_rating", *Unavailable.OFF_DEF_DECOMPOSITION)
     meta = meta.with_blocked("def_rating", *Unavailable.OFF_DEF_DECOMPOSITION)
     meta = meta.with_pending("schedule_difficulty")

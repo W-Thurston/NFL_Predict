@@ -18,6 +18,7 @@ from gridiron_edge.api.loaders import (
     load_team_cohort_splits_df,
     load_team_name_map,
     load_team_percentiles_df,
+    load_weekly_elo_forecast,
     resolve_current_season_week,
     team_metadata_lookup,
 )
@@ -153,6 +154,13 @@ def get_team(
         as_of_week=as_of_week,
     )
 
+    forecast_load = load_weekly_elo_forecast(
+        settings,
+        season=resolved_season,
+        forecast_origin_week=current_rating_week,
+        team_abbr=abbr,
+    )
+
     return serialize_team_profile(
         abbr,
         elo,
@@ -167,4 +175,5 @@ def get_team(
         completed_through_week=completed_through_week,
         current_rating_week=current_rating_week,
         timeline_range=rating_range,
+        forecast_load=forecast_load,
     )

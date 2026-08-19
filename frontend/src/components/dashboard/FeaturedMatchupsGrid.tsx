@@ -15,6 +15,7 @@ import type { components } from "../../api/schema";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
 import { formatCalendarDate } from "../../utils/datePresentation";
 import { formatTeamRecord } from "../../utils/teamRecord";
+import { teamCityForDisplay } from "./teamCityForDisplay";
 
 
 type EdgeApiRow =
@@ -127,23 +128,6 @@ export function FeaturedMatchupsGrid() {
 }
 
 
-/** Keep a city only when the supplied team name does not already contain it. */
-export function teamCityForDisplay(
-  city: string | null | undefined,
-  teamName: string,
-): string | undefined {
-  const normalizedCity = city?.trim();
-  const normalizedName = teamName.trim();
-  if (!normalizedCity) return undefined;
-  if (
-    normalizedName.toLocaleLowerCase().startsWith(
-      `${normalizedCity.toLocaleLowerCase()} `,
-    )
-  ) {
-    return undefined;
-  }
-  return normalizedCity;
-}
 
 type FeaturedCardProps = {
   game: components["schemas"]["GameSummary"];

@@ -7422,6 +7422,72 @@
             "title": "Current Rating Week",
             "type": "integer"
           },
+          "forecast_center_quantile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Center Quantile"
+          },
+          "forecast_computed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Computed At"
+          },
+          "forecast_lower_quantile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Lower Quantile"
+          },
+          "forecast_quantile_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Quantile Method"
+          },
+          "forecast_simulation_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Simulation Count"
+          },
+          "forecast_upper_quantile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Upper Quantile"
+          },
           "offseason_transition": {
             "anyOf": [
               {
@@ -7476,6 +7542,28 @@
             "title": "Game Played",
             "type": "boolean"
           },
+          "lose_out_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lose Out Rating"
+          },
+          "lower_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower Rating"
+          },
           "opponent": {
             "anyOf": [
               {
@@ -7523,16 +7611,39 @@
               "observed",
               "carried_forward",
               "current",
+              "forecast",
               "unavailable"
             ],
             "title": "State",
             "type": "string"
+          },
+          "upper_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper Rating"
           },
           "week": {
             "maximum": 22.0,
             "minimum": 1.0,
             "title": "Week",
             "type": "integer"
+          },
+          "win_out_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Out Rating"
           }
         },
         "required": [

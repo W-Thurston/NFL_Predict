@@ -1,13 +1,20 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  render,
+  screen } from "@testing-library/react";
+import { beforeEach,
+  describe,
+  expect,
+  it,
+  vi } from "vitest";
 import type { components } from "../../api/schema";
-import { useEdges, useGamesList } from "../../api/hooks";
+import { useEdges,
+  useGamesList } from "../../api/hooks";
 import { useTeamByAbbr } from "../../api/team_metadata_hook";
 import { TestWrapper } from "../../test/testWrapper";
 import {
   FeaturedMatchupsGrid,
-  teamCityForDisplay,
 } from "./FeaturedMatchupsGrid";
+import { teamCityForDisplay } from "./teamCityForDisplay";
 
 vi.mock("../../api/hooks", () => ({
   useEdges: vi.fn(),

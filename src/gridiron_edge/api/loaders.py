@@ -522,6 +522,117 @@ def load_projection_grid_data(
     )
 
 
+@dataclass(frozen=True)
+class WeeklyEloForecastLoad:
+    """Validated team-scoped weekly Elo forecast evidence."""
+
+    frame: pd.DataFrame
+    state: str
+    reason: str | None = None
+
+
+_WEEKLY_ELO_FORECAST_COLUMNS: frozenset[str] = frozenset(
+    {
+        "season",
+        "forecast_origin_week",
+        "team",
+        "week",
+        "elo_p10",
+        "elo_median",
+        "elo_p90",
+        "win_out_elo_median",
+        "lose_out_elo_median",
+        "simulation_count",
+        "lower_quantile",
+        "center_quantile",
+        "upper_quantile",
+        "quantile_method",
+        "computed_at",
+    }
+)
+
+
+def load_weekly_elo_forecast(  # noqa: PLR0911, PLR0912
+    settings: Settings,
+    *,
+    season: str,
+    forecast_origin_week: int,
+    team_abbr: str,
+) -> WeeklyEloForecastLoad:
+    """Load and strictly validate one team's persisted Elo forecast run."""
+    path = settings.repo_root / "data" / "output" / "temp" / "weekly_elo_forecast.parquet"
+    if not path.is_file():
+        return WeeklyEloForecastLoad(pd.DataFrame(), "missing", "artifact missing")
+
+    try:
+        frame = pd.read_parquet(path)
+    except (OSError, ValueError):
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "artifact unreadable")
+
+    missing_columns = _WEEKLY_ELO_FORECAST_COLUMNS - set(frame.columns)
+    if missing_columns:
+        return WeeklyEloForecastLoad(
+            pd.DataFrame(),
+            "malformed",
+            "missing columns: " + ", ".join(sorted(missing_columns)),
+        )
+    identity = ["season", "forecast_origin_week", "team", "week"]
+    if frame.duplicated(identity).any():
+        return WeeklyEloForecastLoad(pd.DataFrame(), "identity_conflict", "duplicate identity")
+    if frame.empty:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "artifact empty")
+    if frame["season"].astype(str).nunique() != 1:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "multiple seasons")
+    if frame["forecast_origin_week"].nunique() != 1:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "multiple forecast origins")
+    artifact_season = str(frame["season"].iloc[0])
+    if artifact_season != season:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "season_mismatch", artifact_season)
+    artifact_origin = int(frame["forecast_origin_week"].iloc[0])
+    if artifact_origin != forecast_origin_week:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "origin_mismatch", str(artifact_origin))
+
+    numeric = [
+        "elo_p10",
+        "elo_median",
+        "elo_p90",
+        "win_out_elo_median",
+        "lose_out_elo_median",
+        "simulation_count",
+    ]
+    if frame[numeric].isna().any().any():
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "null forecast value")
+    weeks = pd.to_numeric(frame["week"], errors="coerce")
+    if weeks.isna().any() or not weeks.between(1, 18).all():
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "week outside 1-18")
+    if (frame["elo_p10"] > frame["elo_median"]).any() or (
+        frame["elo_median"] > frame["elo_p90"]
+    ).any():
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "invalid quantile ordering")
+    if (frame["lose_out_elo_median"] > frame["win_out_elo_median"]).any():
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "invalid scenario ordering")
+
+    scoped = frame.loc[frame["team"].astype(str).eq(team_abbr.upper()), :].copy()
+    if scoped.empty:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "team_missing", team_abbr.upper())
+    if scoped["simulation_count"].nunique() != 1:
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "conflicting simulation counts")
+    provenance = [
+        "computed_at",
+        "lower_quantile",
+        "center_quantile",
+        "upper_quantile",
+        "quantile_method",
+    ]
+    if any(scoped[column].nunique() != 1 for column in provenance):
+        return WeeklyEloForecastLoad(pd.DataFrame(), "malformed", "conflicting provenance")
+
+    return WeeklyEloForecastLoad(
+        scoped.sort_values("week", kind="mergesort").reset_index(drop=True),
+        "available",
+    )
+
+
 def load_team_percentiles_df(
     settings: Settings,
 ) -> pd.DataFrame:

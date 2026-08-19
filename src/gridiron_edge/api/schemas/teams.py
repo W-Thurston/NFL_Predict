@@ -81,10 +81,14 @@ class TeamRatingTimelinePoint(BaseModel):
     season: str
     week: int = Field(ge=1, le=22)
     rating: float | None = None
-    state: Literal["observed", "carried_forward", "current", "unavailable"]
+    state: Literal["observed", "carried_forward", "current", "forecast", "unavailable"]
     game_played: bool = False
     result: Literal["W", "L", "T"] | None = None
     opponent: str | None = None
+    lower_rating: float | None = None
+    upper_rating: float | None = None
+    win_out_rating: float | None = None
+    lose_out_rating: float | None = None
 
 
 class TeamRatingSeasonFinal(BaseModel):
@@ -124,6 +128,12 @@ class TeamRatingTimeline(BaseModel):
     points: list[TeamRatingTimelinePoint]
     prior_season_final: TeamRatingSeasonFinal | None = None
     offseason_transition: TeamRatingOffseasonTransition | None = None
+    forecast_computed_at: str | None = None
+    forecast_simulation_count: int | None = None
+    forecast_lower_quantile: float | None = None
+    forecast_center_quantile: float | None = None
+    forecast_upper_quantile: float | None = None
+    forecast_quantile_method: str | None = None
 
 
 class RecentResult(BaseModel):
