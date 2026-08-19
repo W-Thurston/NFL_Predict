@@ -7,13 +7,14 @@ type Timeline = components["schemas"]["TeamRatingTimeline"];
 type TimelinePoint = components["schemas"]["TeamRatingTimelinePoint"];
 type RatingRange = "season" | "recent";
 
+const RATING_CHART_COLOR = "#7dd3fc";
+
 type RatingChartProps = {
   timeline?: Timeline | null;
   range: RatingRange;
   onRangeChange: (range: RatingRange) => void;
   teamName: string;
   height?: number;
-  color?: string;
 };
 
 type DisplayPoint = {
@@ -40,7 +41,6 @@ export function RatingChart({
   onRangeChange,
   teamName,
   height = 250,
-  color = "var(--pos)",
 }: RatingChartProps) {
   const [showScenarios, setShowScenarios] = useState(false);
   const [activePointKey, setActivePointKey] = useState<string | null>(null);
@@ -94,8 +94,17 @@ export function RatingChart({
     point.state === "current" ? point.rating : point.loseOutRating,
   );
   const intervalPath = areaPath(points, x, y);
+  const lowerBoundaryPath = pathFor(points, x, y, (point) =>
+    point.state === "forecast" ? point.lowerRating : null,
+  );
+  const upperBoundaryPath = pathFor(points, x, y, (point) =>
+    point.state === "forecast" ? point.upperRating : null,
+  );
   const offseasonPath = buildOffseasonPath(points, timeline, x, y);
   const activePoint = points.find((point) => point.key === activePointKey) ?? null;
+  const activePointIndex = activePoint
+    ? points.findIndex((point) => point.key === activePoint.key)
+    : -1;
   const openTooltip = (
     point: DisplayPoint,
     target: SVGCircleElement,
@@ -140,9 +149,9 @@ export function RatingChart({
       </div>
 
       <div className="mono" style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 10, color: "var(--ink-3)" }}>
-        <Legend swatch={color}>Historical</Legend>
-        <Legend swatch={color} dashed>Projected median</Legend>
-        <Legend swatch={color} band>Central 80% interval</Legend>
+        <Legend swatch={RATING_CHART_COLOR}>Historical</Legend>
+        <Legend swatch={RATING_CHART_COLOR} dashed>Projected median</Legend>
+        <Legend swatch={RATING_CHART_COLOR} band>P10–P90 interval</Legend>
         {showScenarios && <Legend swatch="var(--pos)" dotted>Win-out scenario</Legend>}
         {showScenarios && <Legend swatch="var(--neg)" dotted>Lose-out scenario</Legend>}
       </div>
@@ -161,33 +170,82 @@ export function RatingChart({
             </text>
           </g>
         ))}
-        {intervalPath && <path d={intervalPath} fill={color} opacity={0.13} data-testid="rating-interval" />}
-        {historicalPath && <path d={historicalPath} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" data-testid="historical-rating-line" />}
+        {intervalPath && <path d={intervalPath} fill={RATING_CHART_COLOR} opacity={0.13} data-testid="rating-interval" />}
+        {lowerBoundaryPath && (
+          <path
+            d={lowerBoundaryPath}
+            fill="none"
+            stroke={RATING_CHART_COLOR}
+            strokeWidth={0.9}
+            opacity={0.62}
+            data-testid="lower-rating-boundary"
+          />
+        )}
+        {upperBoundaryPath && (
+          <path
+            d={upperBoundaryPath}
+            fill="none"
+            stroke={RATING_CHART_COLOR}
+            strokeWidth={0.9}
+            opacity={0.62}
+            data-testid="upper-rating-boundary"
+          />
+        )}
+        {historicalPath && <path d={historicalPath} fill="none" stroke={RATING_CHART_COLOR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" data-testid="historical-rating-line" />}
         {offseasonPath && <path d={offseasonPath} fill="none" stroke="var(--ink-3)" strokeWidth={1.5} strokeDasharray="2 5" data-testid="offseason-connector" />}
-        {projectedPath && <path d={projectedPath} fill="none" stroke={color} strokeWidth={2} strokeDasharray="7 5" strokeLinecap="round" strokeLinejoin="round" data-testid="projected-rating-line" />}
+        {projectedPath && <path d={projectedPath} fill="none" stroke={RATING_CHART_COLOR} strokeWidth={2} strokeDasharray="7 5" strokeLinecap="round" strokeLinejoin="round" data-testid="projected-rating-line" />}
         {showScenarios && winOutPath && <path d={winOutPath} fill="none" stroke="var(--pos)" strokeWidth={1.35} strokeDasharray="2 4" data-testid="win-out-line" />}
         {showScenarios && loseOutPath && <path d={loseOutPath} fill="none" stroke="var(--neg)" strokeWidth={1.35} strokeDasharray="2 4" data-testid="lose-out-line" />}
+        {activePointIndex >= 0 ? (
+          <line
+            x1={x(activePointIndex)}
+            x2={x(activePointIndex)}
+            y1={pad.top}
+            y2={pad.top + chartH}
+            stroke="var(--ink-3)"
+            strokeWidth={1}
+            strokeDasharray="2 4"
+            opacity={0.65}
+            pointerEvents="none"
+            data-testid="active-rating-guide"
+          />
+        ) : null}
         {points.map((point, index) => point.rating == null ? null : (
-          <circle
-            key={point.key}
-            cx={x(index)}
-            cy={y(point.rating)}
-            r={point.state === "current" ? 4.5 : point.gamePlayed || point.state === "final" ? 2.7 : 1.8}
-            fill={point.state === "current" ? color : point.state === "forecast" ? "var(--bg)" : color}
-            stroke={color}
-            strokeWidth={point.state === "current" ? 2 : 1}
-            data-state={point.state}
-            tabIndex={0}
-            role="button"
-            aria-label={tooltipText(point, showScenarios)}
-            onMouseEnter={(event) => openTooltip(point, event.currentTarget)}
-            onMouseLeave={closeTooltip}
-            onFocus={(event) => openTooltip(point, event.currentTarget)}
-            onBlur={closeTooltip}
-            style={{ cursor: "help", outline: "none" }}
-          >
-            <title>{tooltipText(point, showScenarios)}</title>
-          </circle>
+          <g key={point.key}>
+            <circle
+              cx={x(index)}
+              cy={y(point.rating)}
+              r={12}
+              fill="transparent"
+              stroke="transparent"
+              tabIndex={0}
+              role="button"
+              aria-label={tooltipText(point, showScenarios)}
+              onMouseEnter={(event) => openTooltip(point, event.currentTarget)}
+              onMouseLeave={closeTooltip}
+              onFocus={(event) => openTooltip(point, event.currentTarget)}
+              onBlur={closeTooltip}
+              style={{ cursor: "help", outline: "none" }}
+              data-testid="rating-point-hit-target"
+            >
+              <title>{tooltipText(point, showScenarios)}</title>
+            </circle>
+            <circle
+              cx={x(index)}
+              cy={y(point.rating)}
+              r={point.state === "current" ? 4.5 : point.gamePlayed || point.state === "final" ? 2.7 : 1.8}
+              fill={
+                point.state === "forecast"
+                  ? "var(--bg)"
+                  : RATING_CHART_COLOR
+              }
+              stroke={RATING_CHART_COLOR}
+              strokeWidth={point.state === "current" ? 2 : 1}
+              data-state={point.state}
+              pointerEvents="none"
+              data-testid="rating-point-marker"
+            />
+          </g>
         ))}
         {points.map((point, index) => (
           <text
@@ -216,6 +274,7 @@ export function RatingChart({
 
       <div className="mono dim2" style={{ fontSize: 10, marginTop: 4 }}>
         {provenanceText(timeline)}
+        {timeline.forecast_simulation_count != null ? " · Median may be asymmetric" : ""}
       </div>
       <div className="mono" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
         {points.map((point) => <span key={`accessible:${point.key}`}>{tooltipText(point, showScenarios)}</span>)}

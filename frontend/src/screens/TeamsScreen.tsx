@@ -511,7 +511,6 @@ function ProfileColumn({
           range={ratingRange}
           onRangeChange={onRatingRangeChange}
           teamName={data.name}
-          color={data.primary_color ?? "var(--pos)"}
         />
         </div>
 

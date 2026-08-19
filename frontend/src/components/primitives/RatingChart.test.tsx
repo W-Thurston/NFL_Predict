@@ -31,11 +31,11 @@ function timeline(): Timeline {
 
 describe("RatingChart", () => {
   it("renders historical, current, forecast, interval, final, and provenance semantics", () => {
-    render(<RatingChart timeline={timeline()} range="season" onRangeChange={() => undefined} teamName="Miami Dolphins" color="#008E97" />);
+    render(<RatingChart timeline={timeline()} range="season" onRangeChange={() => undefined} teamName="Miami Dolphins" />);
     expect(screen.getByRole("img", { name: "Miami Dolphins rating timeline" })).toBeInTheDocument();
     expect(screen.getByText("Historical")).toBeInTheDocument();
     expect(screen.getByText("Projected median")).toBeInTheDocument();
-    expect(screen.getByText("Central 80% interval")).toBeInTheDocument();
+    expect(screen.getByText("P10–P90 interval")).toBeInTheDocument();
     expect(screen.getByText(/10,000 simulations · P10–P90 · linear quantiles/)).toBeInTheDocument();
     expect(
       screen.getAllByText(/Final 2025-2026 rating/),
@@ -85,4 +85,30 @@ describe("RatingChart", () => {
     expect(screen.getAllByText("'26").length).toBeGreaterThan(0);
     expect(screen.queryByText(/^26$/)).not.toBeInTheDocument();
   });
+
+  it("uses large interaction targets, a fixed high-contrast palette, and explicit interval boundaries", () => {
+    render(
+      <RatingChart
+        timeline={timeline()}
+        range="season"
+        onRangeChange={() => undefined}
+        teamName="Miami Dolphins"
+      />,
+    );
+
+    const targets = screen.getAllByTestId("rating-point-hit-target");
+    expect(targets.length).toBeGreaterThan(0);
+    expect(targets[0]).toHaveAttribute("r", "12");
+    expect(screen.getByTestId("historical-rating-line")).toHaveAttribute(
+      "stroke",
+      "#7dd3fc",
+    );
+    expect(screen.getByTestId("lower-rating-boundary")).toBeInTheDocument();
+    expect(screen.getByTestId("upper-rating-boundary")).toBeInTheDocument();
+    expect(screen.getByText(/Median may be asymmetric/)).toBeInTheDocument();
+
+    fireEvent.mouseEnter(targets[0]);
+    expect(screen.getByTestId("active-rating-guide")).toBeInTheDocument();
+  });
+
 });
