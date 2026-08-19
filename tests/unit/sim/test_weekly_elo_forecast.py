@@ -95,8 +95,12 @@ def test_build_weekly_elo_forecast_df_has_exact_quantile_contract() -> None:
         long_to_short={},
     )
 
+    scenario = np.full((2, N_WEEKS_REG + 1), np.nan, dtype=np.float64)
+    scenario[:, 6:] = np.asarray([[1530.0], [1430.0]])
     result = build_weekly_elo_forecast_df(
         weekly_elo_by_sim=weekly,
+        win_out_elo_median=scenario + 10.0,
+        lose_out_elo_median=scenario - 10.0,
         team_index=teams,
         season="2026-2027",
         forecast_origin_week=6,
@@ -128,8 +132,12 @@ def test_build_weekly_elo_forecast_df_rejects_null_forecast_week() -> None:
     )
 
     with pytest.raises(ValueError, match="contains null values for week 2"):
+        scenario = np.full((1, N_WEEKS_REG + 1), np.nan, dtype=np.float64)
+        scenario[:, 1:] = 1500.0
         build_weekly_elo_forecast_df(
             weekly_elo_by_sim=weekly,
+            win_out_elo_median=scenario,
+            lose_out_elo_median=scenario,
             team_index=teams,
             season="2026-2027",
             forecast_origin_week=1,

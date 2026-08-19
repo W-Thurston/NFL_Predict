@@ -320,6 +320,80 @@ def simulate_remaining_regular_season(
     )
 
 
+@njit(cache=True)
+def simulate_conditioned_team_elo(
+    n_sims: int,
+    schedule_home: np.ndarray,
+    schedule_away: np.ndarray,
+    week_offsets: np.ndarray,
+    final_actual_week: int,
+    elo_entering_next_week: np.ndarray,
+    selected_team_id: int,
+    force_selected_team_win: bool,
+    k_factor: float,
+    p_tie: float,
+    base_seed: int,
+    divisor: float = 480.0,
+) -> np.ndarray:
+    """Simulate one team's weekly Elo with all of its results conditioned.
+
+    Other games retain normal seeded Monte Carlo outcomes. Games involving
+    the selected team still consume the normal random draw before the forced
+    result is applied, preserving downstream random alignment. Both teams'
+    Elo ratings are updated, so the conditioned result feeds back into later
+    opponent and league ratings.
+
+    Returns a float32 tensor shaped ``(n_sims, 19)``. Index zero and completed
+    weeks remain NaN. Each retained value is Elo entering that week.
+    """
+    weekly_selected_elo = np.full(
+        (n_sims, N_WEEKS_REG + 1),
+        np.nan,
+        dtype=np.float32,
+    )
+
+    for s in range(n_sims):
+        np.random.seed(base_seed + s)
+        elo = elo_entering_next_week.copy()
+
+        for w in range(final_actual_week + 1, N_WEEKS_REG + 1):
+            weekly_selected_elo[s, w] = elo[selected_team_id]
+            start = week_offsets[w]
+            end = week_offsets[w + 1]
+
+            for gi in range(start, end):
+                h = int(schedule_home[gi])
+                a = int(schedule_away[gi])
+                eh = float(elo[h])
+                ea = float(elo[a])
+                p_home = _elo_win_prob(eh, ea, divisor)
+                u = np.random.random()
+
+                selected_game = selected_team_id in (h, a)
+                if selected_game:
+                    selected_is_home = h == selected_team_id
+                    home_wins = (
+                        selected_is_home if force_selected_team_win else not selected_is_home
+                    )
+                    if home_wins:
+                        new_h, new_a = _elo_update(eh, ea, 1.0, k_factor, divisor)
+                    else:
+                        new_h, new_a = _elo_update(eh, ea, 0.0, k_factor, divisor)
+                elif u < p_tie:
+                    new_h, new_a = _elo_update(eh, ea, 0.5, k_factor, divisor)
+                else:
+                    u2 = (u - p_tie) / (1.0 - p_tie)
+                    if u2 < p_home:
+                        new_h, new_a = _elo_update(eh, ea, 1.0, k_factor, divisor)
+                    else:
+                        new_h, new_a = _elo_update(eh, ea, 0.0, k_factor, divisor)
+
+                elo[h] = np.float32(new_h)
+                elo[a] = np.float32(new_a)
+
+    return weekly_selected_elo
+
+
 # ============================================================================
 # SCHEDULE ANALYSIS
 # ============================================================================

@@ -33,6 +33,7 @@ from gridiron_edge.sim import playoffs as _playoffs_mod
 from gridiron_edge.sim._engine import (
     apply_actuals_to_matrices,
     precompute_game_counts,
+    simulate_conditioned_team_elo,
     simulate_remaining_regular_season,
 )
 from gridiron_edge.sim._types import (
@@ -585,9 +586,64 @@ def build_projections_df(
     ).sort_values(["P_WIN_SB", "AVG_WINS"], ascending=[False, False])
 
 
+def build_conditioned_elo_scenario_medians(
+    *,
+    n_sims: int,
+    schedule_home: np.ndarray,
+    schedule_away: np.ndarray,
+    week_offsets: np.ndarray,
+    final_actual_week: int,
+    elo_entering_next_week: np.ndarray,
+    k_factor: float,
+    p_tie: float,
+    base_seed: int,
+    divisor: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return per-team weekly medians for win-out and lose-out conditions."""
+    win_out = np.full((N_TEAMS, N_WEEKS_REG + 1), np.nan, dtype=np.float64)
+    lose_out = np.full((N_TEAMS, N_WEEKS_REG + 1), np.nan, dtype=np.float64)
+
+    for team_id in range(N_TEAMS):
+        win_paths = simulate_conditioned_team_elo(
+            n_sims,
+            schedule_home,
+            schedule_away,
+            week_offsets,
+            final_actual_week,
+            elo_entering_next_week,
+            team_id,
+            True,
+            k_factor,
+            p_tie,
+            base_seed,
+            divisor,
+        )
+        lose_paths = simulate_conditioned_team_elo(
+            n_sims,
+            schedule_home,
+            schedule_away,
+            week_offsets,
+            final_actual_week,
+            elo_entering_next_week,
+            team_id,
+            False,
+            k_factor,
+            p_tie,
+            base_seed,
+            divisor,
+        )
+        origin = final_actual_week + 1
+        win_out[team_id, origin:] = np.median(win_paths[:, origin:], axis=0)
+        lose_out[team_id, origin:] = np.median(lose_paths[:, origin:], axis=0)
+
+    return win_out, lose_out
+
+
 def build_weekly_elo_forecast_df(
     *,
     weekly_elo_by_sim: np.ndarray,
+    win_out_elo_median: np.ndarray,
+    lose_out_elo_median: np.ndarray,
     team_index: TeamIndex,
     season: str,
     forecast_origin_week: int,
@@ -607,6 +663,17 @@ def build_weekly_elo_forecast_df(
         )
     if not 1 <= forecast_origin_week <= N_WEEKS_REG:
         raise ValueError(f"forecast_origin_week must be between 1 and {N_WEEKS_REG}")
+    scenario_shape = (len(team_index.short_names), N_WEEKS_REG + 1)
+    if win_out_elo_median.shape != scenario_shape:
+        raise ValueError(
+            "win-out Elo scenario shape mismatch: "
+            f"expected {scenario_shape}, got {win_out_elo_median.shape}"
+        )
+    if lose_out_elo_median.shape != scenario_shape:
+        raise ValueError(
+            "lose-out Elo scenario shape mismatch: "
+            f"expected {scenario_shape}, got {lose_out_elo_median.shape}"
+        )
 
     rows: list[dict[str, float | int | str]] = []
     for week in range(forecast_origin_week, N_WEEKS_REG + 1):
@@ -629,6 +696,8 @@ def build_weekly_elo_forecast_df(
                     "elo_p10": float(quantiles[0, team_idx]),
                     "elo_median": float(quantiles[1, team_idx]),
                     "elo_p90": float(quantiles[2, team_idx]),
+                    "win_out_elo_median": float(win_out_elo_median[team_idx, week]),
+                    "lose_out_elo_median": float(lose_out_elo_median[team_idx, week]),
                     "simulation_count": simulation_count,
                     "lower_quantile": 0.10,
                     "center_quantile": 0.50,
@@ -876,9 +945,25 @@ def run_full_simulation(
     computed_at = datetime.now(UTC).isoformat()
     forecast_origin_week = final_actual_week + 1
 
+    with _log_phase("Simulate conditioned Elo scenarios"):
+        win_out_elo_median, lose_out_elo_median = build_conditioned_elo_scenario_medians(
+            n_sims=config.n_sims,
+            schedule_home=schedule.home,
+            schedule_away=schedule.away,
+            week_offsets=schedule.week_offsets,
+            final_actual_week=final_actual_week,
+            elo_entering_next_week=elo_entering_next_week,
+            k_factor=config.k_factor,
+            p_tie=config.p_tie,
+            base_seed=config.base_seed,
+            divisor=config.divisor,
+        )
+
     with _log_phase("Build output dataframes"):
         df_weekly_elo_forecast = build_weekly_elo_forecast_df(
             weekly_elo_by_sim=weekly_elo_by_sim,
+            win_out_elo_median=win_out_elo_median,
+            lose_out_elo_median=lose_out_elo_median,
             team_index=team_index,
             season=season_year,
             forecast_origin_week=forecast_origin_week,
