@@ -301,7 +301,7 @@ function WagerDescription({
           fontSize: 9,
         }}
       >
-        Model:{" "}
+        Evidence:{" "}
         {leg.edgeAnalytics?.modelKey ?? "Unavailable"}
       </div>
     </div>

@@ -7,6 +7,8 @@ import {
 } from "./odds";
 
 type EdgeApiRow = components["schemas"]["EdgeRow"];
+type LineOfferApi = components["schemas"]["LineOffer"];
+type LineShoppingGameApi = components["schemas"]["LineShoppingGame"];
 type PropSummaryApi = components["schemas"]["PropSummary"];
 type PropDetailApi = components["schemas"]["PropDetail"];
 type PropApi = PropSummaryApi | PropDetailApi;
@@ -19,6 +21,7 @@ export type BetLegSource =
   | "dashboard-model-edges"
   | "dashboard-prop-edges"
   | "game-detail-lean"
+  | "games-card"
   | "game-detail-prop"
   | "player-prop";
 
@@ -112,6 +115,7 @@ const SOURCES = new Set<BetLegSource>([
   "dashboard-model-edges",
   "dashboard-prop-edges",
   "game-detail-lean",
+  "games-card",
   "game-detail-prop",
   "player-prop",
 ]);
@@ -227,6 +231,96 @@ export function createGameBetLeg({
       note: null,
     },
   };
+}
+
+
+/** Create one sportsbook-specific game leg from the Line Shopping product. */
+export function createGameBetLegFromLineOffer({
+  game,
+  offer,
+  source,
+  addedAt,
+}: {
+  game: LineShoppingGameApi;
+  offer: LineOfferApi;
+  source: BetLegSource;
+  addedAt: string;
+}): GameBetLeg {
+  if (!isNonemptyString(game.game_id)) throw new Error("Line Shopping game_id is required");
+  if (!isNonemptyString(game.away_team) || !isNonemptyString(game.home_team)) {
+    throw new Error("Line Shopping team names are required");
+  }
+  if (!isNonemptyString(offer.provider) || !isNonemptyString(offer.sportsbook)) {
+    throw new Error("Line Shopping provider and sportsbook are required");
+  }
+
+  const market = parseGameMarket(offer.market);
+  const side = parseGameSide(offer.side, market);
+  const line = finiteOrNull(offer.line);
+  if (market === "moneyline" && line !== null) {
+    throw new Error("Moneyline offers must not contain a line");
+  }
+  if (market !== "moneyline" && line === null) {
+    throw new Error(`${market} offers require a line`);
+  }
+
+  const referenceAmericanOdds = parseAmericanOdds(offer.american_odds);
+  if (referenceAmericanOdds == null) {
+    throw new Error("Line offer american_odds must be a nonzero integer");
+  }
+  const modelProbability = probabilityOrNull(offer.model_probability);
+  const modelValue = finiteOrNull(offer.model_value);
+  const evidenceIdentity = lineOfferEvidenceIdentity(offer);
+
+  return {
+    version: BET_LEG_VERSION,
+    kind: "game",
+    id: buildGameBetLegId({
+      gameId: game.game_id,
+      market,
+      side,
+      line,
+      sportsbook: offer.sportsbook,
+    }),
+    source,
+    addedAt,
+    gameId: game.game_id,
+    awayTeam: game.away_team,
+    homeTeam: game.home_team,
+    market,
+    side,
+    line,
+    persistedRecommendation: offer.recommendation ?? null,
+    edgeAnalytics: {
+      modelKey: evidenceIdentity,
+      referenceAmericanOdds,
+      referenceModelProbability: modelProbability,
+      referenceModelValue: modelValue,
+      referenceMarketValue: line,
+      referenceExpectedValue: finiteOrNull(offer.expected_value),
+      referenceEdgeStrength: null,
+      referenceProvider: offer.provider,
+      referenceProviderEventId: nullableString(offer.provider_event_id),
+      referenceSportsbook: offer.sportsbook,
+      referenceMarketFetchedAt: offer.market_fetched_at,
+      referenceSportsbookUpdatedAt: nullableString(offer.sportsbook_updated_at),
+      referenceCommenceTime:
+        nullableString(offer.commence_time) ?? nullableString(game.commence_time),
+      referenceIsLive: offer.is_live,
+    },
+    draft: {
+      currentAmericanOdds: referenceAmericanOdds,
+      proposedStake: null,
+      sportsbook: offer.sportsbook,
+      note: null,
+    },
+  };
+}
+
+function lineOfferEvidenceIdentity(offer: LineOfferApi): string {
+  if (isNonemptyString(offer.product_id)) return `Product ${offer.product_id}`;
+  if (isNonemptyString(offer.product_run_id)) return `Product run ${offer.product_run_id}`;
+  return "Weekly game product";
 }
 
 export function createPropBetLeg({

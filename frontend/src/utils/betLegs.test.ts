@@ -7,6 +7,7 @@ import {
   calculateBetMetrics,
   calculatePayout,
   createGameBetLeg,
+  createGameBetLegFromLineOffer,
   createPropBetLeg,
   isPriceAtLeastAsGood,
   modelBreakEvenAmericanOdds,
@@ -18,6 +19,8 @@ import {
   type PropBetLeg,
 } from "./betLegs";
 type EdgeApiRow = components["schemas"]["EdgeRow"];
+type LineOfferApi = components["schemas"]["LineOffer"];
+type LineShoppingGameApi = components["schemas"]["LineShoppingGame"];
 type PropSummaryApi = components["schemas"]["PropSummary"];
 
 const ADDED_AT = "2026-07-29T15:00:00.000Z";
@@ -45,6 +48,52 @@ function edge(overrides: Partial<EdgeApiRow> = {}): EdgeApiRow {
     model_value: 0.58,
     point_edge: null,
     side: "away",
+    ...overrides,
+  };
+}
+
+
+function lineGame(
+  overrides: Partial<LineShoppingGameApi> = {},
+): LineShoppingGameApi {
+  return {
+    game_id: "2026_01_KC_LAC",
+    season: "2026-2027",
+    week: 1,
+    game_date: "2026-09-05",
+    commence_time: "2026-09-06T00:20:00Z",
+    away_team: "KC",
+    home_team: "LAC",
+    offers: [],
+    guidance: [],
+    ...overrides,
+  };
+}
+
+function lineOffer(overrides: Partial<LineOfferApi> = {}): LineOfferApi {
+  return {
+    american_odds: -110,
+    is_best_line: true,
+    is_best_model_approved_offer: false,
+    is_best_price: true,
+    is_live: false,
+    is_model_approved: true,
+    is_model_recommended_offer: false,
+    is_model_recommended_side: false,
+    line: null,
+    market: "moneyline",
+    market_fetched_at: "2026-09-05T12:00:00Z",
+    model_probability: 0.58,
+    model_status: "available",
+    model_value: 0.58,
+    expected_value: 0.08,
+    product_id: "weekly-product",
+    product_run_id: "weekly-run",
+    provider: "the_odds_api",
+    provider_event_id: "event-1",
+    side: "away",
+    sportsbook: "draftkings",
+    sportsbook_updated_at: "2026-09-05T11:59:00Z",
     ...overrides,
   };
 }
@@ -262,6 +311,86 @@ describe("createGameBetLeg", () => {
   it("rejects zero or fractional American prices", () => {
     expect(() => create(edge({ american_odds: 0 }))).toThrow();
     expect(() => create(edge({ american_odds: -110.5 }))).toThrow();
+  });
+});
+
+
+describe("createGameBetLegFromLineOffer", () => {
+  const create = (
+    offer: LineOfferApi,
+    game: LineShoppingGameApi = lineGame(),
+  ) =>
+    createGameBetLegFromLineOffer({
+      game,
+      offer,
+      source: "games-card",
+      addedAt: ADDED_AT,
+    });
+
+  it("preserves exact Moneyline offer and weekly product evidence", () => {
+    const leg = create(lineOffer());
+    expect(leg.line).toBeNull();
+    expect(leg.id).toBe("game:2026_01_KC_LAC:moneyline:away:none:draftkings");
+    expect(leg.edgeAnalytics).toMatchObject({
+      modelKey: "Product weekly-product",
+      referenceAmericanOdds: -110,
+      referenceModelProbability: 0.58,
+      referenceModelValue: 0.58,
+      referenceMarketValue: null,
+      referenceExpectedValue: 0.08,
+      referenceProvider: "the_odds_api",
+      referenceProviderEventId: "event-1",
+      referenceSportsbook: "draftkings",
+      referenceMarketFetchedAt: "2026-09-05T12:00:00Z",
+      referenceSportsbookUpdatedAt: "2026-09-05T11:59:00Z",
+      referenceCommenceTime: "2026-09-06T00:20:00Z",
+      referenceIsLive: false,
+    });
+    expect(leg.draft).toMatchObject({
+      currentAmericanOdds: -110,
+      sportsbook: "draftkings",
+      proposedStake: null,
+    });
+    expect(parseBetLegV4(leg)).toEqual(leg);
+  });
+
+  it("preserves Spread and Total lines independently from prices", () => {
+    const spread = create(lineOffer({ market: "spread", side: "home", line: -3.5, model_value: -2.1, model_probability: 0.57 }));
+    expect(spread.line).toBe(-3.5);
+    expect(spread.edgeAnalytics.referenceModelValue).toBe(-2.1);
+    expect(spread.edgeAnalytics.referenceModelProbability).toBe(0.57);
+
+    const total = create(lineOffer({ market: "total", side: "over", line: 47.5, american_odds: 105, model_value: 49.2, model_probability: 0.61 }));
+    expect(total.line).toBe(47.5);
+    expect(total.edgeAnalytics.referenceAmericanOdds).toBe(105);
+  });
+
+  it("preserves exact persisted recommendation evidence without interpreting it", () => {
+    const recommendation = {
+      result_id: "result-1",
+      result_state: "recommended",
+      decision_state: "recommended",
+      recommendation_eligible: true,
+      decision_quote_age_seconds: 30,
+      issuance_quote_age_seconds: 45,
+      evaluated_at: "2026-09-05T12:00:00Z",
+      checks: [],
+      supporting_checks: [],
+      failed_checks: [],
+      unavailable_checks: [],
+      sizing: {},
+      offer_provenance: {},
+      forecast_provenance: {},
+      policy_provenance: {},
+    } as unknown as NonNullable<LineOfferApi["recommendation"]>;
+    expect(create(lineOffer({ recommendation })).persistedRecommendation).toBe(recommendation);
+  });
+
+  it("rejects invalid line and price boundaries", () => {
+    expect(() => create(lineOffer({ american_odds: 0 }))).toThrow();
+    expect(() => create(lineOffer({ market: "spread", side: "home", line: null }))).toThrow();
+    expect(() => create(lineOffer({ market: "moneyline", line: 1.5 }))).toThrow();
+    expect(() => create(lineOffer({ market: "total", side: "home", line: 47.5 } as never))).toThrow();
   });
 });
 
