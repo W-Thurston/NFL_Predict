@@ -77,7 +77,10 @@ export function useTeamRankings(params: { season?: string } = {}) {
 /**
  * Fetches detail for a single team.
  */
-export function useTeamProfile(abbr: string | null, params: { season?: string } = {}) {
+export function useTeamProfile(
+  abbr: string | null,
+  params: { season?: string; rating_range?: "season" | "recent" } = {},
+) {
   return useQuery({
     queryKey: ["team", abbr, params],
     queryFn: async () => {

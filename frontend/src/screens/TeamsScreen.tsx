@@ -34,7 +34,10 @@ export function TeamsScreen() {
   const defaultTeam = rankings[0]?.abbr ?? null;
   const selectedAbbr = teamParam ?? defaultTeam;
 
-  const profileResult = useTeamProfile(selectedAbbr);
+  const [ratingRange, setRatingRange] = useState<"season" | "recent">("season");
+  const profileResult = useTeamProfile(selectedAbbr, {
+    rating_range: ratingRange,
+  });
 
   return (
     <div>
@@ -64,6 +67,8 @@ export function TeamsScreen() {
         <ProfileColumn
           abbr={selectedAbbr}
           result={profileResult}
+          ratingRange={ratingRange}
+          onRatingRangeChange={setRatingRange}
         />
       </div>
   *</div>
@@ -446,9 +451,13 @@ function TrendBadge({ trend }: { trend: number | null | undefined }) {
 function ProfileColumn({
   abbr,
   result,
+  ratingRange,
+  onRatingRangeChange,
 }: {
   abbr: string | null;
   result: ReturnType<typeof useTeamProfile>;
+  ratingRange: "season" | "recent";
+  onRatingRangeChange: (range: "season" | "recent") => void;
 }) {
   if (!abbr) {
     return (
@@ -494,12 +503,15 @@ function ProfileColumn({
 
         {/* Rating chart */}
         <div className="hm-card" style={{ padding: 20 }}>
-        <div className="upper dim" style={{ fontSize: 10, marginBottom: 16 }}>
-            Power rating · season trend
+        <div className="upper dim" style={{ fontSize: 10, marginBottom: 12 }}>
+            Power rating · historical and projected
         </div>
         <RatingChart
-            history={data.rating_history}
-            recentResults={data.recent_results}
+          timeline={data.rating_timeline}
+          range={ratingRange}
+          onRangeChange={onRatingRangeChange}
+          teamName={data.name}
+          color={data.primary_color ?? "var(--pos)"}
         />
         </div>
 
