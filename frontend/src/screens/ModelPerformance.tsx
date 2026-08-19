@@ -99,7 +99,7 @@ function MetricGrid({ market, report }: { market: Exclude<Market, "spread">; rep
   const metrics = market === "moneyline"
     ? [
         ["Accuracy", percent(report.moneyline.accuracy)],
-        ["Record", `${report.moneyline.wins.toLocaleString()}-${report.moneyline.losses.toLocaleString()}`],
+        ["Record", `${report.moneyline.wins.toLocaleString()} W · ${report.moneyline.losses.toLocaleString()} L`],
         ["Net Correct", signed(report.moneyline.net_wins)],
         ["Brier", fixed(report.moneyline.brier, 4)],
         ["Log Loss", fixed(report.moneyline.log_loss, 4)],
@@ -107,7 +107,7 @@ function MetricGrid({ market, report }: { market: Exclude<Market, "spread">; rep
       ]
     : [
         ["Hit Rate", percent(report.total.hit_rate_excluding_pushes)],
-        ["Record", `${report.total.wins.toLocaleString()}-${report.total.losses.toLocaleString()}-${report.total.pushes.toLocaleString()}`],
+        ["Record", `${report.total.wins.toLocaleString()} W · ${report.total.losses.toLocaleString()} L · ${report.total.pushes.toLocaleString()} P`],
         ["Net Wins", signed(report.total.net_wins)],
         ["MAE", fixed(report.total.mae, 2)],
         ["RMSE", fixed(report.total.rmse, 2)],

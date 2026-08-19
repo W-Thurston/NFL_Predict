@@ -327,6 +327,8 @@ class TestSerializeTeamProfile:
         assert result.record.wins == 2
         assert result.rating_history is not None
         assert len(result.rating_history) == 3
+        assert result.rating_timeline is not None
+        assert result.rating_timeline.current_rating_week == 3
         assert result.recent_results is not None
         assert len(result.recent_results) == 2  # Only 2 games in fixture
 

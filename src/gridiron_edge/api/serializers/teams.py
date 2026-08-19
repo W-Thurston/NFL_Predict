@@ -19,6 +19,10 @@ from gridiron_edge.api.schemas.teams import (
     TeamProfile,
     TeamRankingRow,
     TeamRankingsList,
+    TeamRatingOffseasonTransition,
+    TeamRatingSeasonFinal,
+    TeamRatingTimeline,
+    TeamRatingTimelinePoint,
     TeamRecord,
 )
 
@@ -128,6 +132,234 @@ def _latest_ratings(elo: DataFrame, season: str, week: int) -> DataFrame:
         return scope
 
     return scope.sort_values(["NFL_TEAM", "NFL_WEEK"]).groupby("NFL_TEAM", as_index=False).tail(1)
+
+
+def _previous_season_label(season: str) -> str | None:
+    """Return the prior consecutive NFL season label."""
+    parts = season.split("-")
+    if len(parts) != 2:
+        return None
+    try:
+        start = int(parts[0])
+        end = int(parts[1])
+    except ValueError:
+        return None
+    if end != start + 1:
+        return None
+    return f"{start - 1}-{start}"
+
+
+def _team_game_by_week(
+    games: DataFrame,
+    team_long_name: str,
+    season: str,
+) -> dict[int, Series]:
+    """Index completed team games by calendar week for one season."""
+    if games.empty:
+        return {}
+    scoped = games.loc[
+        (games["YEAR"] == season)
+        & ((games["AWAY_TEAM"] == team_long_name) | (games["HOME_TEAM"] == team_long_name)),
+        :,
+    ].dropna(subset=["AWAY_SCORE", "HOME_SCORE"])
+    return {int(row["WEEK_NUM"]): row for _, row in scoped.iterrows()}
+
+
+def _timeline_point(
+    *,
+    season: str,
+    week: int,
+    rating: float | None,
+    current: bool,
+    game: Series | None,
+    team_long_name: str,
+    long_to_short: dict[str, str],
+) -> TeamRatingTimelinePoint:
+    """Serialize one explicit team-week Elo state."""
+    result = _serialize_result(game, team_long_name, long_to_short) if game is not None else None
+    if current:
+        state: Literal["observed", "carried_forward", "current", "unavailable"] = "current"
+    elif rating is None:
+        state = "unavailable"
+    elif result is None:
+        state = "carried_forward"
+    else:
+        state = "observed"
+    timeline_result: Literal["L", "T", "W"] | None = None
+    if result is not None and result.result in ("L", "T", "W"):
+        timeline_result = result.result
+
+    return TeamRatingTimelinePoint(
+        season=season,
+        week=week,
+        rating=rating,
+        state=state,
+        game_played=result is not None,
+        result=timeline_result,
+        opponent=result.opponent if result is not None else None,
+    )
+
+
+def build_team_rating_timeline(  # noqa: PLR0912
+    *,
+    elo: DataFrame,
+    games: DataFrame,
+    team_long_name: str,
+    long_to_short: dict[str, str],
+    season: str,
+    completed_through_week: int,
+    current_rating_week: int,
+    timeline_range: Literal["season", "recent"],
+) -> TeamRatingTimeline | None:
+    """Build a season-aware historical Elo timeline without forecasting."""
+    if elo.empty or not season:
+        return None
+
+    current_rows = elo.loc[
+        (elo["NFL_TEAM"] == team_long_name)
+        & (elo["NFL_YEAR"] == season)
+        & (elo["NFL_WEEK"].between(1, 22)),
+        ["NFL_WEEK", "ELO"],
+    ]
+    current_ratings = {
+        int(row["NFL_WEEK"]): float(row["ELO"]) for _, row in current_rows.iterrows()
+    }
+    if not current_ratings:
+        return None
+
+    current_games = _team_game_by_week(games, team_long_name, season)
+    points: list[TeamRatingTimelinePoint] = []
+    previous_season = _previous_season_label(season)
+    previous_ratings: dict[int, float] = {}
+    previous_games: dict[int, Series] = {}
+    prior_final: TeamRatingSeasonFinal | None = None
+    transition: TeamRatingOffseasonTransition | None = None
+
+    if previous_season is not None:
+        previous_rows = elo.loc[
+            (elo["NFL_TEAM"] == team_long_name) & (elo["NFL_YEAR"] == previous_season),
+            ["NFL_WEEK", "ELO"],
+        ]
+        previous_ratings = {
+            int(row["NFL_WEEK"]): float(row["ELO"]) for _, row in previous_rows.iterrows()
+        }
+        previous_games = _team_game_by_week(games, team_long_name, previous_season)
+        if 23 in previous_ratings:
+            final_result = previous_games.get(22)
+            serialized_final = (
+                _serialize_result(final_result, team_long_name, long_to_short)
+                if final_result is not None
+                else None
+            )
+            final_result_value: Literal["L", "T", "W"] | None = None
+            if serialized_final is not None and serialized_final.result in ("L", "T", "W"):
+                final_result_value = serialized_final.result
+            prior_final = TeamRatingSeasonFinal(
+                season=previous_season,
+                rating=previous_ratings[23],
+                result=final_result_value,
+                opponent=(serialized_final.opponent if serialized_final is not None else None),
+            )
+
+    show_bridge = (
+        current_rating_week <= 5 and previous_season is not None and bool(previous_ratings)
+    )
+    bridge_start = 17 + current_rating_week
+    if timeline_range == "season":
+        if show_bridge:
+            for week in range(bridge_start, 23):
+                points.append(
+                    _timeline_point(
+                        season=previous_season,
+                        week=week,
+                        rating=previous_ratings.get(week),
+                        current=False,
+                        game=previous_games.get(week),
+                        team_long_name=team_long_name,
+                        long_to_short=long_to_short,
+                    )
+                )
+        for week in range(1, 23):
+            points.append(
+                _timeline_point(
+                    season=season,
+                    week=week,
+                    rating=current_ratings.get(week) if week <= current_rating_week else None,
+                    current=week == current_rating_week,
+                    game=current_games.get(week) if week <= completed_through_week else None,
+                    team_long_name=team_long_name,
+                    long_to_short=long_to_short,
+                )
+            )
+    else:
+        historical: list[tuple[str, int, float]] = []
+        if previous_season is not None:
+            historical.extend(
+                (previous_season, week, rating)
+                for week, rating in previous_ratings.items()
+                if 1 <= week <= 22
+            )
+        historical.extend(
+            (season, week, rating)
+            for week, rating in current_ratings.items()
+            if 1 <= week < current_rating_week
+        )
+        historical = historical[-7:]
+        for point_season, week, rating in historical:
+            point_games = current_games if point_season == season else previous_games
+            points.append(
+                _timeline_point(
+                    season=point_season,
+                    week=week,
+                    rating=rating,
+                    current=False,
+                    game=point_games.get(week),
+                    team_long_name=team_long_name,
+                    long_to_short=long_to_short,
+                )
+            )
+        points.append(
+            _timeline_point(
+                season=season,
+                week=current_rating_week,
+                rating=current_ratings.get(current_rating_week),
+                current=True,
+                game=None,
+                team_long_name=team_long_name,
+                long_to_short=long_to_short,
+            )
+        )
+        for week in range(current_rating_week + 1, min(22, current_rating_week + 7) + 1):
+            points.append(
+                _timeline_point(
+                    season=season,
+                    week=week,
+                    rating=None,
+                    current=False,
+                    game=None,
+                    team_long_name=team_long_name,
+                    long_to_short=long_to_short,
+                )
+            )
+
+    if show_bridge and 1 in current_ratings:
+        source_rating = prior_final.rating if prior_final is not None else previous_ratings.get(22)
+        if source_rating is not None:
+            transition = TeamRatingOffseasonTransition(
+                from_season=previous_season,
+                from_rating=source_rating,
+                to_season=season,
+                to_rating=current_ratings[1],
+            )
+
+    return TeamRatingTimeline(
+        range=timeline_range,
+        completed_through_week=completed_through_week,
+        current_rating_week=current_rating_week,
+        points=points,
+        prior_season_final=prior_final if show_bridge else None,
+        offseason_transition=transition,
+    )
 
 
 def serialize_team_rankings(
@@ -257,6 +489,10 @@ def serialize_team_profile(
     trends: DataFrame,
     team_metadata: dict[str, dict],
     cohort_splits: dict[str, dict] | None = None,
+    *,
+    completed_through_week: int | None = None,
+    current_rating_week: int | None = None,
+    timeline_range: Literal["season", "recent"] = "season",
 ) -> TeamProfile:
     """Build the /teams/{abbr} response."""
     short_to_long: dict[str, str] = {v: k for k, v in long_to_short.items()}
@@ -316,6 +552,21 @@ def serialize_team_profile(
         ]
         if not hist.empty
         else None
+    )
+
+    resolved_completed_week = (
+        completed_through_week if completed_through_week is not None else max(0, as_of_week - 1)
+    )
+    resolved_rating_week = current_rating_week or as_of_week
+    rating_timeline = build_team_rating_timeline(
+        elo=elo,
+        games=games,
+        team_long_name=long_name,
+        long_to_short=long_to_short,
+        season=season,
+        completed_through_week=resolved_completed_week,
+        current_rating_week=resolved_rating_week,
+        timeline_range=timeline_range,
     )
 
     # ------------------------------------------------------------------
@@ -379,6 +630,7 @@ def serialize_team_profile(
         make_playoffs_pct=pcts["make_playoffs_pct"],
         win_sb_pct=pcts["win_sb_pct"],
         rating_history=history,
+        rating_timeline=rating_timeline,
         recent_results=recent,
         cohort_splits=cohort_splits,
         response_meta=meta,  # pyrefly: ignore[unexpected-keyword]

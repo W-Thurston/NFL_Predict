@@ -6818,6 +6818,16 @@
             "description": "Percentile rank of Elo rating within the league (0-1).",
             "title": "Rating Pct"
           },
+          "rating_timeline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamRatingTimeline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recent_results": {
             "anyOf": [
               {
@@ -7294,6 +7304,243 @@
           }
         },
         "title": "TeamRankingsList",
+        "type": "object"
+      },
+      "TeamRatingOffseasonTransition": {
+        "additionalProperties": false,
+        "description": "Deterministic regression from one season's final state to Week 1.",
+        "properties": {
+          "from_rating": {
+            "title": "From Rating",
+            "type": "number"
+          },
+          "from_season": {
+            "title": "From Season",
+            "type": "string"
+          },
+          "kind": {
+            "const": "offseason_adjustment",
+            "default": "offseason_adjustment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "to_rating": {
+            "title": "To Rating",
+            "type": "number"
+          },
+          "to_season": {
+            "title": "To Season",
+            "type": "string"
+          },
+          "to_week": {
+            "const": 1,
+            "default": 1,
+            "title": "To Week",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from_season",
+          "from_rating",
+          "to_season",
+          "to_rating"
+        ],
+        "title": "TeamRatingOffseasonTransition",
+        "type": "object"
+      },
+      "TeamRatingSeasonFinal": {
+        "additionalProperties": false,
+        "description": "Semantic final postgame Elo state after the Super Bowl.",
+        "properties": {
+          "game_played": {
+            "default": true,
+            "title": "Game Played",
+            "type": "boolean"
+          },
+          "opponent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opponent"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "number"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "enum": [
+                  "W",
+                  "L",
+                  "T"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "source_week": {
+            "const": 22,
+            "default": 22,
+            "title": "Source Week",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season",
+          "rating"
+        ],
+        "title": "TeamRatingSeasonFinal",
+        "type": "object"
+      },
+      "TeamRatingTimeline": {
+        "additionalProperties": false,
+        "description": "Historical team Elo timeline with explicit temporal semantics.",
+        "properties": {
+          "completed_through_week": {
+            "maximum": 22.0,
+            "minimum": 0.0,
+            "title": "Completed Through Week",
+            "type": "integer"
+          },
+          "current_rating_week": {
+            "maximum": 22.0,
+            "minimum": 1.0,
+            "title": "Current Rating Week",
+            "type": "integer"
+          },
+          "offseason_transition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamRatingOffseasonTransition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TeamRatingTimelinePoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "prior_season_final": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamRatingSeasonFinal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "range": {
+            "enum": [
+              "season",
+              "recent"
+            ],
+            "title": "Range",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range",
+          "completed_through_week",
+          "current_rating_week",
+          "points"
+        ],
+        "title": "TeamRatingTimeline",
+        "type": "object"
+      },
+      "TeamRatingTimelinePoint": {
+        "additionalProperties": false,
+        "description": "One season-aware entering-week Elo state on a team timeline.",
+        "properties": {
+          "game_played": {
+            "default": false,
+            "title": "Game Played",
+            "type": "boolean"
+          },
+          "opponent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opponent"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "enum": [
+                  "W",
+                  "L",
+                  "T"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "observed",
+              "carried_forward",
+              "current",
+              "unavailable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "week": {
+            "maximum": 22.0,
+            "minimum": 1.0,
+            "title": "Week",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season",
+          "week",
+          "state"
+        ],
+        "title": "TeamRatingTimelinePoint",
         "type": "object"
       },
       "TeamRecord": {
@@ -9380,6 +9627,22 @@
               ],
               "description": "Season to profile against, e.g. '2025-2026'. Defaults to current.",
               "title": "Season"
+            }
+          },
+          {
+            "description": "Historical power-rating timeline range.",
+            "in": "query",
+            "name": "rating_range",
+            "required": false,
+            "schema": {
+              "default": "season",
+              "description": "Historical power-rating timeline range.",
+              "enum": [
+                "season",
+                "recent"
+              ],
+              "title": "Rating Range",
+              "type": "string"
             }
           }
         ],

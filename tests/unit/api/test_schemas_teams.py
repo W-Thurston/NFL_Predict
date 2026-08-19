@@ -13,6 +13,9 @@ from gridiron_edge.api.schemas.teams import (
     TeamProfile,
     TeamRankingRow,
     TeamRankingsList,
+    TeamRatingOffseasonTransition,
+    TeamRatingTimeline,
+    TeamRatingTimelinePoint,
     TeamRecord,
 )
 
@@ -69,6 +72,7 @@ class TestTeamProfile:
         p = TeamProfile(abbr="BAL", name="Baltimore Ravens")
         assert p.rating is None
         assert p.rating_history is None
+        assert p.rating_timeline is None
 
     def test_populated(self) -> None:
         p = TeamProfile(
@@ -106,3 +110,37 @@ class TestRecentResult:
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
             RecentResult.model_validate({"week": 1, "foo": "bar"})
+
+
+class TestTeamRatingTimeline:
+    def test_populated(self) -> None:
+        timeline = TeamRatingTimeline(
+            range="season",
+            completed_through_week=0,
+            current_rating_week=1,
+            points=[
+                TeamRatingTimelinePoint(
+                    season="2026-2027",
+                    week=1,
+                    rating=1500.0,
+                    state="current",
+                )
+            ],
+            offseason_transition=TeamRatingOffseasonTransition(
+                from_season="2025-2026",
+                from_rating=1510.0,
+                to_season="2026-2027",
+                to_rating=1500.0,
+            ),
+        )
+        assert timeline.points[0].state == "current"
+        assert timeline.offseason_transition is not None
+
+    def test_rejects_week_twenty_three(self) -> None:
+        with pytest.raises(ValidationError):
+            TeamRatingTimelinePoint(
+                season="2025-2026",
+                week=23,
+                rating=1500.0,
+                state="observed",
+            )

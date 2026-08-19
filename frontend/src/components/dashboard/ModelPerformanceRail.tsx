@@ -39,13 +39,13 @@ export function ModelPerformanceRail() {
         <PerformanceBlock
           label="Moneyline"
           headline={`${(report.moneyline.accuracy * 100).toFixed(1)}% accuracy`}
-          record={`${report.moneyline.wins.toLocaleString()}-${report.moneyline.losses.toLocaleString()} · ${report.moneyline.evaluated_count.toLocaleString()} games`}
+          record={`${report.moneyline.wins.toLocaleString()} W · ${report.moneyline.losses.toLocaleString()} L · ${report.moneyline.evaluated_count.toLocaleString()} games`}
           evidence={`${report.moneyline.net_wins.toLocaleString()} more correct than incorrect`}
         />
         <PerformanceBlock
           label="Total"
           headline={`${(report.total.hit_rate_excluding_pushes * 100).toFixed(1)}% hit rate`}
-          record={`${report.total.wins.toLocaleString()}-${report.total.losses.toLocaleString()}-${report.total.pushes.toLocaleString()} · ${report.total.decision_count.toLocaleString()} decisions`}
+          record={`${report.total.wins.toLocaleString()} W · ${report.total.losses.toLocaleString()} L · ${report.total.pushes.toLocaleString()} P · ${report.total.decision_count.toLocaleString()} decisions`}
           evidence={`${report.total.net_wins.toLocaleString()} more wins than losses`}
         />
       </div>

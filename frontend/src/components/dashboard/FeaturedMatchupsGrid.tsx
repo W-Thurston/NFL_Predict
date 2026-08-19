@@ -126,6 +126,25 @@ export function FeaturedMatchupsGrid() {
   );
 }
 
+
+/** Keep a city only when the supplied team name does not already contain it. */
+export function teamCityForDisplay(
+  city: string | null | undefined,
+  teamName: string,
+): string | undefined {
+  const normalizedCity = city?.trim();
+  const normalizedName = teamName.trim();
+  if (!normalizedCity) return undefined;
+  if (
+    normalizedName.toLocaleLowerCase().startsWith(
+      `${normalizedCity.toLocaleLowerCase()} `,
+    )
+  ) {
+    return undefined;
+  }
+  return normalizedCity;
+}
+
 type FeaturedCardProps = {
   game: components["schemas"]["GameSummary"];
   edge: EdgeApiRow;
@@ -228,7 +247,7 @@ function FeaturedCard({
         <TeamHero
           team={{
             abbr: game.away_team,
-            city: awayTeam?.city ?? undefined,
+            city: teamCityForDisplay(awayTeam?.city, game.away_team),
             name: awayTeam?.name ?? undefined,
             primary_color: awayTeam?.primary_color ?? undefined,
           }}
@@ -238,7 +257,7 @@ function FeaturedCard({
         <TeamHero
           team={{
             abbr: game.home_team,
-            city: homeTeam?.city ?? undefined,
+            city: teamCityForDisplay(homeTeam?.city, game.home_team),
             name: homeTeam?.name ?? undefined,
             primary_color: homeTeam?.primary_color ?? undefined,
           }}

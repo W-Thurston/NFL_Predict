@@ -4,7 +4,10 @@ import type { components } from "../../api/schema";
 import { useEdges, useGamesList } from "../../api/hooks";
 import { useTeamByAbbr } from "../../api/team_metadata_hook";
 import { TestWrapper } from "../../test/testWrapper";
-import { FeaturedMatchupsGrid } from "./FeaturedMatchupsGrid";
+import {
+  FeaturedMatchupsGrid,
+  teamCityForDisplay,
+} from "./FeaturedMatchupsGrid";
 
 vi.mock("../../api/hooks", () => ({
   useEdges: vi.fn(),
@@ -405,4 +408,21 @@ describe("FeaturedMatchupsGrid", () => {
     expect(screen.queryByText(/FanDuel · -140/)).not.toBeInTheDocument();
   });
 
+});
+
+describe("teamCityForDisplay", () => {
+  it("removes a city already present in a full team name", () => {
+    expect(teamCityForDisplay("Miami", "Miami Dolphins")).toBeUndefined();
+    expect(
+      teamCityForDisplay("New Orleans", "New Orleans Saints"),
+    ).toBeUndefined();
+  });
+
+  it("retains a city when the team name is only a nickname", () => {
+    expect(teamCityForDisplay("Miami", "Dolphins")).toBe("Miami");
+  });
+
+  it("does not fabricate a missing city", () => {
+    expect(teamCityForDisplay(null, "Miami Dolphins")).toBeUndefined();
+  });
 });

@@ -134,6 +134,13 @@ class TestPreseasonEloScope:
         assert body["rank"] == 1
         assert body["record"] == {"wins": 0, "losses": 0, "ties": 0}
         assert body["rating_history"] == [{"week": 1, "rating": 1620.0}]
+        assert body["rating_timeline"]["completed_through_week"] == 0
+        assert body["rating_timeline"]["current_rating_week"] == 1
+        current = next(
+            point for point in body["rating_timeline"]["points"] if point["state"] == "current"
+        )
+        assert current["week"] == 1
+        assert current["rating"] == 1620.0
 
     def test_unknown_season_remains_blocked(
         self,
@@ -155,6 +162,52 @@ class TestPreseasonEloScope:
         assert body["as_of_week"] == 0
         assert body["items"] == []
         assert body["_meta"]["field_status"]["items"]["blocker"] == "no_evaluation_data"
+
+    def test_profile_uses_entering_next_week_rating_after_completed_game(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        elo = pd.concat(
+            [
+                _make_elo_df(),
+                pd.DataFrame(
+                    [
+                        {
+                            "NFL_TEAM": "Kansas City Chiefs",
+                            "NFL_YEAR": "2026-2027",
+                            "NFL_WEEK": 2,
+                            "ELO": 1640.0,
+                        },
+                        {
+                            "NFL_TEAM": "Los Angeles Chargers",
+                            "NFL_YEAR": "2026-2027",
+                            "NFL_WEEK": 2,
+                            "ELO": 1500.0,
+                        },
+                    ]
+                ),
+            ],
+            ignore_index=True,
+        )
+        (
+            MiniRepoBuilder(tmp_path)
+            .with_games(_make_games_df())
+            .with_elo_state(elo)
+            .with_teams_reference()
+        )
+
+        response = client.get("/teams/KAN?season=2026-2027")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["rating_timeline"]["completed_through_week"] == 1
+        assert body["rating_timeline"]["current_rating_week"] == 2
+        current = next(
+            point for point in body["rating_timeline"]["points"] if point["state"] == "current"
+        )
+        assert current["week"] == 2
+        assert current["rating"] == 1640.0
 
     def test_completed_game_week_takes_precedence_over_later_elo_state(
         self,

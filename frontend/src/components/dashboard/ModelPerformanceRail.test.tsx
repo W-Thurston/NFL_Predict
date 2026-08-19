@@ -51,10 +51,10 @@ describe("ModelPerformanceRail", () => {
     render(<TestWrapper><ModelPerformanceRail /></TestWrapper>);
 
     expect(screen.getByText("63.8% accuracy")).toBeInTheDocument();
-    expect(screen.getByText("4,134-2,349 · 6,483 games")).toBeInTheDocument();
+    expect(screen.getByText("4,134 W · 2,349 L · 6,483 games")).toBeInTheDocument();
     expect(screen.getByText("1,785 more correct than incorrect")).toBeInTheDocument();
     expect(screen.getByText("51.1% hit rate")).toBeInTheDocument();
-    expect(screen.getByText("3,274-3,129-95 · 6,498 decisions")).toBeInTheDocument();
+    expect(screen.getByText("3,274 W · 3,129 L · 95 P · 6,498 decisions")).toBeInTheDocument();
     expect(screen.getByText("145 more wins than losses")).toBeInTheDocument();
     expect(screen.getByText("Historical validation pending")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View full performance →" })).toBeInTheDocument();

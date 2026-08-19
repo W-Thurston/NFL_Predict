@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from gridiron_edge.api.schemas._base import BaseListResponse, BaseResponse
@@ -71,6 +73,59 @@ class RatingHistoryPoint(BaseModel):
     rating: float
 
 
+class TeamRatingTimelinePoint(BaseModel):
+    """One season-aware entering-week Elo state on a team timeline."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    season: str
+    week: int = Field(ge=1, le=22)
+    rating: float | None = None
+    state: Literal["observed", "carried_forward", "current", "unavailable"]
+    game_played: bool = False
+    result: Literal["W", "L", "T"] | None = None
+    opponent: str | None = None
+
+
+class TeamRatingSeasonFinal(BaseModel):
+    """Semantic final postgame Elo state after the Super Bowl."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    season: str
+    rating: float
+    source_week: Literal[22] = 22
+    game_played: bool = True
+    result: Literal["W", "L", "T"] | None = None
+    opponent: str | None = None
+
+
+class TeamRatingOffseasonTransition(BaseModel):
+    """Deterministic regression from one season's final state to Week 1."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: Literal["offseason_adjustment"] = "offseason_adjustment"
+    from_season: str
+    from_rating: float
+    to_season: str
+    to_week: Literal[1] = 1
+    to_rating: float
+
+
+class TeamRatingTimeline(BaseModel):
+    """Historical team Elo timeline with explicit temporal semantics."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    range: Literal["season", "recent"]
+    completed_through_week: int = Field(ge=0, le=22)
+    current_rating_week: int = Field(ge=1, le=22)
+    points: list[TeamRatingTimelinePoint]
+    prior_season_final: TeamRatingSeasonFinal | None = None
+    offseason_transition: TeamRatingOffseasonTransition | None = None
+
+
 class RecentResult(BaseModel):
     """A single completed game in the team's recent history."""
 
@@ -120,6 +175,7 @@ class TeamProfile(BaseResponse):
         description="Percentile rank of Super Bowl win probability (0-1).",
     )
     rating_history: list[RatingHistoryPoint] | None = None
+    rating_timeline: TeamRatingTimeline | None = None
     recent_results: list[RecentResult] | None = None
     schedule_difficulty: float | None = None
     playoff_probability: float | None = None

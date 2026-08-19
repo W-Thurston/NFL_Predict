@@ -24,12 +24,13 @@ describe("ModelPerformance", () => {
   it("renders Moneyline overview by default", () => {
     loaded(); render(<TestWrapper><ModelPerformance /></TestWrapper>);
     expect(screen.getByText("63.8%")).toBeInTheDocument();
-    expect(screen.getByText("4,134-2,349")).toBeInTheDocument();
+    expect(screen.getByText("4,134 W · 2,349 L")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Historical model-performance chart" })).toBeInTheDocument();
   });
   it("switches to Total hypothetical units", () => {
     loaded(); render(<TestWrapper><ModelPerformance /></TestWrapper>);
     fireEvent.click(screen.getByRole("button", { name: "Total" }));
+    expect(screen.getByText("3,274 W · 3,129 L · 95 P")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hypothetical Units" }));
     expect(screen.getAllByText("-152.64u").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/assumed -110 pricing/)).toHaveLength(2);

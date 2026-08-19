@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Query
 from pandas import DataFrame
 
@@ -52,6 +54,30 @@ def _resolve_scope(
     return (season, as_of_week)
 
 
+def _resolve_rating_timeline_scope(
+    *,
+    elo: DataFrame,
+    games: DataFrame,
+    season: str,
+    as_of_week: int,
+) -> tuple[int, int]:
+    """Return completed-through and entering-week rating boundaries."""
+    season_games = games.loc[games["YEAR"] == season, :]
+    completed = season_games.dropna(subset=["AWAY_SCORE", "HOME_SCORE"])
+    completed_through = min(22, int(completed["WEEK_NUM"].max())) if not completed.empty else 0
+    available = elo.loc[
+        (elo["NFL_YEAR"] == season) & (elo["NFL_WEEK"].between(1, 22)),
+        "NFL_WEEK",
+    ]
+    if available.empty:
+        return (completed_through, max(1, min(22, as_of_week)))
+    desired = min(22, completed_through + 1)
+    available_weeks = sorted(int(value) for value in available.unique())
+    eligible = [week for week in available_weeks if week <= desired]
+    current_rating_week = max(eligible) if eligible else min(available_weeks)
+    return (completed_through, current_rating_week)
+
+
 @router.get("", response_model=TeamRankingsList)
 def list_teams(
     settings: SettingsDep,
@@ -93,6 +119,10 @@ def get_team(
         default=None,
         description="Season to profile against, e.g. '2025-2026'. Defaults to current.",
     ),
+    rating_range: Literal["season", "recent"] = Query(
+        default="season",
+        description="Historical power-rating timeline range.",
+    ),
 ) -> TeamProfile:
     """Return per-team profile with ratings, record, and history."""
     long_to_short: dict[str, str] = load_team_name_map(settings)
@@ -116,6 +146,12 @@ def get_team(
         season,
         elo=elo,
     )
+    completed_through_week, current_rating_week = _resolve_rating_timeline_scope(
+        elo=elo,
+        games=games,
+        season=resolved_season,
+        as_of_week=as_of_week,
+    )
 
     return serialize_team_profile(
         abbr,
@@ -128,4 +164,7 @@ def get_team(
         trends,
         team_metadata,
         cohort_splits=cohort_splits,
+        completed_through_week=completed_through_week,
+        current_rating_week=current_rating_week,
+        timeline_range=rating_range,
     )
