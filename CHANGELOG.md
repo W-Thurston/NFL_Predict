@@ -1,5 +1,24 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-24 - Candidate reference exact over canonical observation identity
+
+### Changed
+- The cross-artifact candidate reference now hashes the complete canonical
+  observation identity, including `sportsbook_updated_at` and `is_live`, which were
+  previously omitted. The reference is now injective over the canonical observation
+  identity: two canonically-distinct observations can no longer collapse to the same
+  reference. The external `issuance_id:sha256` reference shape and issuance scope are
+  unchanged; recommendation policy, recommended-bet result, and market-closeout
+  consumers re-derive the reference from issuance rows that already carry both fields,
+  so no consumer required modification.
+
+### Verification
+- Ruff, Pyrefly, and the unit test suite pass. The candidate, policy, result, and
+  closeout suites exercise the cross-artifact re-derivation end to end.
+- Embedded prior references exist only in git-ignored development-state output
+  (`data/output/recommended_bet_results/`) and regenerate through the production-chain
+  commands. No committed artifact depends on the reference.
+
 ## 2026-08-24 - Point-in-time quote evidence retrieval
 
 ### Added

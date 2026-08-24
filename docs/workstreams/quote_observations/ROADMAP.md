@@ -7,7 +7,7 @@
 
 ## Quote Observation — remaining units (not yet active)
 
-### Unit 2 — Candidate-reference identity hardening
+### Unit 2 — Candidate-reference identity hardening [COMPLETE]
 Owns F41. The cross-artifact `candidate_issuance_row_id` (used by
 `recommendation_policy`, `recommended_bet_result`, `market_closeout`) omits
 `sportsbook_updated_at` and `is_live`, so it is not injective over the canonical
@@ -17,7 +17,7 @@ identity capability, then inspect the affected storage contracts — do **not**
 pre-decide whether the ID is physically owned by the store. Clean-sheet latitude
 applies (may replace the reference contract outright).
 
-### Unit 3 — Coverage diagnostic semantics
+### Unit 3 — Coverage diagnostic semantics [ACTIVE]
 Owns F33. `pregame_observation_count` currently computes `len(rows) - live_count`
 (a non-live count) and never compares `fetched_at` to `commence_time`. Either rename
 to `non_live_observation_count` or enforce genuine `fetched_at < commence_time`
@@ -25,7 +25,7 @@ pregame counting and separately report non-live post-kickoff rows. Clean-sheet
 latitude applies (may replace the field contract rather than preserve an inaccurate
 name).
 
-### Unit 4 — Collection claim & receipt robustness
+### Unit 4 — Collection claim & receipt robustness [PENDING]
 Owns F22, F26, F27 (one claim/receipt lifecycle boundary): the lost claim-creation
 race (uncaught `FileExistsError` → should return `CLAIMED`), create-only-but-not-
 crash-atomic receipt publication (adopt stage-and-rename), and unexpected post-claim

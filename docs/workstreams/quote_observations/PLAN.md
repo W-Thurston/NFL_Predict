@@ -12,81 +12,72 @@
 - Working tree at inspection: clean
 - Context package commit: identify through Git history for this file
 
-## Unit 1 — Point-in-time quote evidence retrieval
+### Unit — Candidate reference exact over canonical observation identity
 
-### Completed
+#### Completed
 
-A single owned cutoff-visible quote-evidence operation, `as_known_at(observations,
-cutoff)`, now returns the canonical quote observations whose system-known time
-(`fetched_at`) is at or before an inclusive, UTC-validated decision cutoff. It
-validates and normalizes input through the canonical quote contract
-(`validate_quote_rows`), never mutates the input, returns a fresh
-canonically-ordered frame, and returns the canonical empty quote frame when nothing
-is visible. Visibility (`fetched_at <= cutoff`) is kept strictly separate from
-downstream pregame eligibility (`is_live is False and fetched_at < commence_time`);
-the two are never fused. The production `issue-candidates` command now routes the
-loaded ledger through this operation before candidate issuance, so no observation
-learned after the declared evaluation time can enter an issuance. The observed
-history selector is reused by composition and is unchanged.
+The cross-artifact candidate reference (`candidate_issuance_row_id`) now hashes the
+complete canonical observation identity, including `sportsbook_updated_at` and
+`is_live`, which were previously omitted. The reference is therefore injective over
+the canonical observation identity represented by `CandidateIssuanceRow`: two
+canonically-distinct observations can no longer collapse to the same reference. The
+external reference shape (`issuance_id:sha256`) and issuance scope are unchanged, and
+every downstream consumer that re-derives the reference from an issuance row
+(recommendation policy resolution, recommended-bet result resolution and validation,
+and market closeout) remains consistent without modification because those rows
+already carry both fields.
 
-### Goal
+#### Goal
 
-Guarantee point-in-time correctness of quote evidence at the decision boundary: a
-backdated evaluation can only consider observations that were system-known by the
-declared cutoff, without weakening the canonical quote contract and without
-conflating system visibility with pregame eligibility.
+Guarantee that the immutable candidate reference used across recommendation policy,
+recommended-bet results, and market closeout uniquely identifies exactly one
+canonical observation, preserving the integrity of the exact evidence chain.
 
-### Files Added/Removed/Changed
+#### Files Added/Removed/Changed
 
 Added:
-- `src/gridiron_edge/ingest/odds/as_known.py` - Cutoff-visible quote-evidence
-  operation (`as_known_at`) and `CutoffError`; validates canonical rows, applies the
-  inclusive UTC `fetched_at` boundary, returns a fresh canonically-ordered frame or
-  the canonical empty quote frame.
-- `tests/unit/ingest/odds/test_as_known.py` - Focused coverage of the cutoff
-  operation: inclusive boundary, exclusion, canonical empty results, non-mutation,
-  schema preservation, deterministic ordering, UTC-cutoff rejection, incomplete-schema
-  rejection, and naive-observation-timestamp rejection.
-- `tests/unit/ingest/odds/test_as_known_composition.py` - Composition with the
-  observed history selector: post-cutoff observations cannot affect counts,
-  repeated-evidence flags, kickoff-conflict state, or latest-eligible selection;
-  inclusive visibility with strict pregame eligibility; visible live rows retained
-  but not selected.
+- None.
 
 Changed:
-- `src/gridiron_edge/cli/production_chain.py` - `issue_candidates_cmd` applies the
-  cutoff-visible operation to the loaded ledger before candidate issuance, closing the
-  point-in-time visibility gap at the production boundary.
-- `tests/unit/cli/test_production_chain_cli.py` - Replaced the prior assertion that
-  the raw ledger passed straight through with canonical-fixture coverage proving
-  post-cutoff observations are excluded and every visible observation is preserved;
-  added coverage for a fully-post-cutoff ledger yielding a valid zero-row issuance;
-  aligned the write-path fixture with the canonical empty quote frame the real loader
-  returns.
+- `src/gridiron_edge/market/candidate_issuance.py` - `candidate_issuance_row_id`
+  identity payload now includes `sportsbook_updated_at` (null-safe ISO-8601 or null)
+  and `is_live`, making the reference exact over the complete canonical observation
+  identity. Docstring updated to describe the complete-identity contract.
+- `tests/unit/market/test_candidate_issuance.py` - Added focused injectivity
+  coverage: references differ when two otherwise-identical rows differ only in
+  `sportsbook_updated_at`, only in `is_live`, or in the presence of
+  `sportsbook_updated_at`; added a shared canonical-row helper and clarified the
+  stable-and-exact test name.
 
 Removed:
 - None.
 
-### Tests
+#### Tests
 
 - `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
   passed; all tests green.
-- Focused suites: `tests/unit/ingest/odds/test_as_known.py`,
-  `tests/unit/ingest/odds/test_as_known_composition.py`, and
-  `tests/unit/cli/test_production_chain_cli.py` all pass.
-- Real-artifact verification (read-only, checksum-guarded) against
-  `data/odds/history/season=2026-2027/week=01/observations.parquet`:
-  cutoff `2026-08-18 14:30:00 UTC` reduced 1,680 input observations to 840 visible
-  observations, retaining only `fetched_at = 2026-08-18 14:23:18.347996 UTC`;
-  canonical schema and ordering verified; source parquet SHA-256 unchanged.
+- Focused suites exercising the cross-artifact re-derivation end to end:
+  `tests/unit/market/test_candidate_issuance.py`,
+  `test_candidate_issuance_evaluation.py`,
+  `test_recommendation_policy_evaluation.py`,
+  `test_recommended_bet_result.py`, and `test_market_closeout.py` all pass. The
+  result and closeout suites re-derive the reference from reconstructed rows, so a
+  green run confirms the four consumers agree under the new hash.
+- Persisted-artifact check (WoW #8): `rg` located embedded `candidate_reference_id`
+  values only under `data/output/recommended_bet_results/`. That directory is
+  git-ignored development-state evidence, not a committed artifact; it implements the
+  previous reference contract and regenerates through the production-chain commands.
+  No committed artifact embeds or is addressed by the reference (candidate issuance
+  files are addressed by `issuance_id`, which is unchanged). No repository artifact
+  required regeneration for this commit.
 
-### Acceptance
+#### Acceptance
 
-The cutoff-visible operation enforces the canonical quote contract, applies an
-inclusive UTC `fetched_at` boundary distinct from pregame eligibility, is read-only
-and deterministically ordered, and returns a first-class canonical empty result. The
-production issuance path is point-in-time correct for a backdated evaluation time.
-Real-ledger verification confirms correct filtering and source immutability. The
-observed history selector remains unchanged and is reused by composition. Quality
-gates and all tests pass. The unit is implemented, validated, documented, and ready
-for downstream use.
+The candidate reference is issuance-scoped and injective over the canonical
+observation identity; canonically-distinct rows differing only in
+`sportsbook_updated_at` or `is_live` now produce distinct references. Downstream
+resolution ("resolve to exactly one") and result validation remain valid because the
+reconstructed rows carry both fields. The external `issuance_id:sha256` format is
+preserved. Quality gates and all tests pass. No committed artifact depends on the
+prior reference. The unit is implemented, validated, documented, and ready for
+downstream use.

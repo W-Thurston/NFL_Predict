@@ -1,3 +1,5 @@
+# src/gridiron_edge/market/candidate_issuance.py
+
 """Pure immutable pregame candidate issuance."""
 
 from __future__ import annotations
@@ -131,7 +133,7 @@ def candidate_issuance_row_id(
     the market closeout boundary so peer consumers share one lasting identity.
     """
     normalized_issuance_id = _nonempty(issuance_id, label="issuance_id")
-    identity = {
+    identity: dict[str, bool | float | int | str | None] = {
         "issuance_id": normalized_issuance_id,
         "provider": row.provider,
         "provider_event_id": row.provider_event_id,
@@ -140,6 +142,10 @@ def candidate_issuance_row_id(
         "market": row.market,
         "side": row.side,
         "fetched_at": row.fetched_at.isoformat(),
+        "sportsbook_updated_at": (
+            None if row.sportsbook_updated_at is None else row.sportsbook_updated_at.isoformat()
+        ),
+        "is_live": row.is_live,
         "american_price": row.american_price,
         "line": row.line,
     }
@@ -195,7 +201,7 @@ def issue_pregame_candidates(
     ):
         raise ValueError("Candidate issuance quotes must match the selected product scope.")
 
-    known_kickoffs = cast(Series, quote_rows["commence_time"].dropna())
+    known_kickoffs = quote_rows["commence_time"].dropna()
     if known_kickoffs.le(pd.Timestamp(evaluated)).any():
         raise ValueError("Candidate issuance must occur strictly before kickoff.")
 
