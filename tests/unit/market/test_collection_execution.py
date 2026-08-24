@@ -93,13 +93,10 @@ def test_success_executes_provider_once(mock_ingest: MagicMock, tmp_path: Path) 
     assert result.status is CollectionExecutionStatus.COMPLETED
     assert result.quote_count == 10
     mock_ingest.assert_called_once()
-    assert (
-        evaluate_collection_due(
-            plan, evaluated_at=poll.scheduled_at, grace_period=timedelta(minutes=15), repo=tmp_path
-        ).status
-        is CollectionDueStatus.COMPLETED
-        or CollectionDueStatus.NOT_DUE
+    due = evaluate_collection_due(
+        plan, evaluated_at=poll.scheduled_at, grace_period=timedelta(minutes=15), repo=tmp_path
     )
+    assert due.status is CollectionDueStatus.NOT_DUE
 
 
 @patch("gridiron_edge.market.collection_execution.ingest_the_odds_api_current")
@@ -144,3 +141,55 @@ def test_existing_claim_blocks_retry(mock_ingest: MagicMock, tmp_path: Path) -> 
     )
     assert due.status is CollectionDueStatus.CLAIMED
     mock_ingest.assert_not_called()
+
+
+@patch("gridiron_edge.market.collection_execution.ingest_the_odds_api_current")
+@patch("gridiron_edge.market.collection_execution.write_claim")
+def test_claim_creation_race_returns_claimed(
+    mock_write_claim: MagicMock,
+    mock_ingest: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """A claim created by another writer between due-check and write_claim
+    resolves gracefully as CLAIMED, not a crash."""
+    mock_write_claim.side_effect = FileExistsError
+    plan = _plan()
+    poll = plan.polls[0]
+    result = execute_due_collection(
+        plan, schedule=DataFrame(), api_key="secret", evaluated_at=poll.scheduled_at, repo=tmp_path
+    )
+    assert result.status is CollectionDueStatus.CLAIMED
+    assert result.poll == poll
+    mock_write_claim.assert_called_once()
+    mock_ingest.assert_not_called()
+
+
+@patch("gridiron_edge.market.collection_execution.ingest_the_odds_api_current")
+def test_unexpected_ingest_failure_is_recorded_as_terminal(mock_ingest, tmp_path):
+    """An unexpected exception after the claim yields a terminal result, not a stranded claim."""
+    mock_ingest.side_effect = ValueError("unexpected")
+    plan = _plan()
+    poll = plan.polls[0]
+    result = execute_due_collection(
+        plan, schedule=DataFrame(), api_key="secret", evaluated_at=poll.scheduled_at, repo=tmp_path
+    )
+    assert result.status is CollectionExecutionStatus.UNEXPECTED_FAILURE
+    assert result.error_type == "ValueError"
+    assert result.error_message == "unexpected"
+
+    # The claim is resolved: a persisted terminal result exists for this exact poll
+    # (not a stranded claim), and re-checking due-state does not re-select poll[0].
+    from gridiron_edge.market.collection_receipt_store import load_results
+
+    persisted = load_results(season=plan.season, week=plan.week, repo=tmp_path)
+    assert len(persisted) == 1
+    assert persisted[0].scheduled_at == poll.scheduled_at
+    assert persisted[0].status is CollectionExecutionStatus.UNEXPECTED_FAILURE
+
+    # Re-invoking at the same evaluated_at does not retry the resolved poll or call
+    # the provider again; it evaluates the next planned poll's due window instead.
+    again = execute_due_collection(
+        plan, schedule=DataFrame(), api_key="secret", evaluated_at=poll.scheduled_at, repo=tmp_path
+    )
+    assert mock_ingest.call_count == 1
+    assert again.status is CollectionDueStatus.NOT_DUE

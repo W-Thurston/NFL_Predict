@@ -90,6 +90,21 @@ def evaluate_collection_due(
     return CollectionDueResult(CollectionDueStatus.COMPLETED, None)
 
 
+def _collection_failure_status(error: Exception) -> CollectionExecutionStatus:
+    """Map any post-claim ingestion failure to its terminal status.
+
+    Known odds failures map to their specific status; any other exception is an
+    unexpected failure recorded as a terminal result rather than a stranded claim.
+    """
+    if isinstance(error, OddsIngestPartialPersistenceError):
+        return CollectionExecutionStatus.PARTIAL_PERSISTENCE
+    if isinstance(error, OddsRequestError):
+        return CollectionExecutionStatus.REQUEST_FAILED
+    if isinstance(error, OddsIngestError):
+        return CollectionExecutionStatus.INGEST_FAILED
+    return CollectionExecutionStatus.UNEXPECTED_FAILURE
+
+
 def execute_due_collection(
     plan: WeeklyQuoteCollectionPlan,
     *,
@@ -154,7 +169,11 @@ def execute_due_collection(
         next_kickoff=poll.next_kickoff,
         reason=poll.reason,
     )
-    write_claim(claim, repo=repo)
+    try:
+        write_claim(claim, repo=repo)
+    except FileExistsError:
+        return CollectionDueResult(CollectionDueStatus.CLAIMED, poll)
+
     try:
         ingest = ingest_the_odds_api_current(
             api_key=api_key,
@@ -166,11 +185,7 @@ def execute_due_collection(
             timeout=timeout,
             fetched_at=evaluated_at,
         )
-    except (
-        OddsIngestPartialPersistenceError,
-        OddsRequestError,
-        OddsIngestError,
-    ) as exc:
+    except Exception as exc:
         return _failure_result(
             plan,
             poll,
@@ -178,7 +193,7 @@ def execute_due_collection(
             precheck=precheck,
             minimum_credit_reserve=minimum_credit_reserve,
             last_known_requests_remaining=last_known,
-            status=_failure_status(exc),
+            status=_collection_failure_status(exc),
             error=exc,
             repo=repo,
         )
@@ -249,19 +264,6 @@ def _write_terminal(
     return result
 
 
-OddsCollectionError = OddsIngestError | OddsIngestPartialPersistenceError | OddsRequestError
-
-
-def _failure_status(
-    error: OddsCollectionError,
-) -> CollectionExecutionStatus:
-    if isinstance(error, OddsIngestPartialPersistenceError):
-        return CollectionExecutionStatus.PARTIAL_PERSISTENCE
-    if isinstance(error, OddsRequestError):
-        return CollectionExecutionStatus.REQUEST_FAILED
-    return CollectionExecutionStatus.INGEST_FAILED
-
-
 def _failure_result(
     plan: WeeklyQuoteCollectionPlan,
     poll: PlannedQuoteCollection,
@@ -271,7 +273,7 @@ def _failure_result(
     minimum_credit_reserve: int,
     last_known_requests_remaining: int | None,
     status: CollectionExecutionStatus,
-    error: OddsCollectionError,
+    error: Exception,
     repo: Path,
 ) -> CollectionExecutionResult:
     result = CollectionExecutionResult(

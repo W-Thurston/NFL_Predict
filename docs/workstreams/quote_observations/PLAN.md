@@ -12,27 +12,28 @@
 - Working tree at inspection: clean
 - Context package commit: identify through Git history for this file
 
-### Unit — Truthful quote-history coverage counts
+### Unit — Collection claim and receipt lifecycle robustness
 
 #### Completed
 
-The quote-history coverage diagnostic now reports a genuine pregame count.
-`pregame_observation_count` was previously computed as `row_count - live_count` (a
-non-live count that never compared `fetched_at` to `commence_time`), so a non-live
-observation collected at or after kickoff was mis-reported as pregame. It now counts
-only non-live observations with a known kickoff whose `fetched_at` is strictly before
-`commence_time`. A new independent count,
-`non_live_at_or_after_kickoff_observation_count`, reports non-live observations with a
-known kickoff collected at or after it, so no evidence is hidden.
-`live_observation_count` and `missing_commence_time_count` retain their prior
-meanings; the four counts are independent diagnostics and may overlap (a live row with
-a missing kickoff increments both). They are not a partition of the rows.
+A lost claim-creation race between two collection processes now resolves
+gracefully: if `write_claim` loses the exclusive-create race, execution returns the
+existing `CLAIMED` outcome instead of crashing on an uncaught `FileExistsError`.
+Claim and result publication is now crash-atomic as well as create-only: both write
+to a uniquely named temporary file beside the destination, then publish through
+`os.link`, which raises `FileExistsError` on an existing destination and never
+exposes a partially serialized file. An unexpected exception during ingestion after
+a claim is created is now recorded as an explicit `UNEXPECTED_FAILURE` terminal
+result rather than leaving the claim unresolved with no record. No retry, reclaim,
+lease, or expiry of an already-stranded claim was introduced; the sole case that
+remains unresolved (the terminal write itself failing) continues to surface as a
+degraded verification state, unchanged.
 
 #### Goal
 
-Ensure the coverage diagnostic's reported counts mean exactly what their names claim,
-so genuine pregame temporal depth is not overstated by counting late or ambiguous
-observations as pregame.
+Harden the quote-collection claim/receipt lifecycle against a lost creation race,
+non-atomic partial writes, and unexpected post-claim failures, without altering the
+existing no-automatic-retry posture for an already-stranded claim.
 
 #### Files Added/Removed/Changed
 
@@ -40,17 +41,28 @@ Added:
 - None.
 
 Changed:
-- `src/gridiron_edge/market/history_coverage.py` - `pregame_observation_count` now
-  requires `is_live is False`, a known `commence_time`, and `fetched_at <
-  commence_time`. Added `non_live_at_or_after_kickoff_observation_count` for non-live
-  observations with a known kickoff collected at or after it. Class documentation
-  states that pregame and at-or-after-kickoff counts classify non-live rows with a
-  known kickoff, while `live_observation_count` and `missing_commence_time_count` are
-  independent diagnostics that may overlap and do not partition the rows.
-- `tests/unit/market/test_history_coverage.py` - Added coverage for genuine pregame
-  vs at-or-after-kickoff classification (strict kickoff boundary), the live/
-  missing-kickoff overlap diagnostic, and the empty-result value of the new field;
-  extended the multi-source test with the new count.
+- `src/gridiron_edge/market/collection_execution.py` - `write_claim` is now called
+  inside a `try/except FileExistsError` that returns the existing `CLAIMED`
+  outcome on a lost race. The odds-specific failure branch and the unrecorded
+  unexpected-failure gap are unified behind one `except Exception` and a new
+  `_collection_failure_status` helper, which maps known ingestion failures to their
+  existing statuses and any other exception to `UNEXPECTED_FAILURE`. The prior
+  narrow failure-status helper and exception-union alias were removed in favor of
+  this single, `Exception`-typed mapping.
+- `src/gridiron_edge/market/collection_receipt_store.py` - `write_claim` and
+  `write_result` now publish through a shared create-only, crash-atomic helper
+  (temporary file, then `os.link` into place) instead of serializing directly into
+  the final path. Added `CollectionExecutionStatus.UNEXPECTED_FAILURE`.
+- `tests/unit/market/test_collection_execution.py` - Replaced a race test that
+  pre-created the claim (and therefore never reached the new exception handler)
+  with one that makes `write_claim` itself raise `FileExistsError`, proving the
+  true lost-race path. Added coverage for an unexpected ingestion exception
+  producing a persisted `UNEXPECTED_FAILURE` result without a repeated provider
+  call. Corrected a pre-existing tautological assertion in the success-path test to
+  assert the exact subsequent due-state.
+- `tests/unit/market/test_collection_receipt_store.py` - Added coverage that an
+  interrupted serialization leaves no partial destination file and no leaked
+  temporary file.
 
 Removed:
 - None.
@@ -59,32 +71,26 @@ Removed:
 
 - `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
   passed; all tests green.
-- Focused `tests/unit/market/test_history_coverage.py` passes, including: before
-  kickoff is pregame; exactly at kickoff and after kickoff are non-live-at-or-after;
-  missing kickoff is in neither temporal count; live observations are excluded from
-  both temporal counts; and a live observation with a missing kickoff is reported by
-  both the live and missing-kickoff diagnostics (explicit overlap).
-- Consumer search (recorded per review): `rg -n
-  'QuoteHistoryCoverage|pregame_observation_count|live_observation_count|missing_commence_time_count'
-  src tests frontend` shows the field is referenced only within
-  `history_coverage.py` and its test; no API, serializer, generated contract, or
-  frontend consumes it, so no generated contract required regeneration (WoW #9).
-- Real-artifact verification (read-only, checksum-guarded) over
-  `data/odds/history/season=2026-2027/week=01/observations.parquet`:
-  `row_count=1680`, `pregame=1680`, `non_live_at_or_after_kickoff=0`, `live=0`,
-  `missing_commence=0`; source parquet SHA-256 unchanged. On this ledger every
-  observation is genuinely pregame because the ingest parser excludes started and
-  live events, so the corrected count equals `row_count` here (no regression). The
-  correction's effect on non-live-at-or-after-kickoff and missing-kickoff rows is
-  proven by the focused unit tests, since this real ledger contains no such rows.
+- Focused suites pass:
+  `tests/unit/market/test_collection_execution.py`,
+  `tests/unit/market/test_collection_receipt_store.py`, and
+  `tests/unit/deployment/test_quote_collection_worker.py` (unresolved-claim
+  degraded-verification behavior confirmed unchanged).
+- Confirmed no remaining references to the removed exception-union alias or the
+  prior narrow failure-status helper, and no type-suppression comment remains on
+  the broadened error parameter.
+- Confirmed the receipt-store integer deserialization conversions are unchanged
+  from their prior runtime behavior.
 
 #### Acceptance
 
-The coverage diagnostic reports truthful counts: a non-live observation at or after
-kickoff is no longer counted as pregame, and a row with an unknown kickoff is never
-classified as pregame or at-or-after kickoff. The new count surfaces non-live
-late observations explicitly. Independent live and missing-kickoff diagnostics retain
-their meaning and are documented as possibly overlapping. Quality gates and all tests
-pass; real-ledger counts verified with the source unchanged. No committed consumer
-depends on a prior meaning of the field. The unit is implemented, validated,
-documented, and ready for downstream use.
+A lost claim-creation race is proven to resolve as `CLAIMED` without invoking the
+provider a second time. Claim and result files are proven to leave no partial
+destination on an interrupted write and remain create-only. An unexpected
+ingestion exception is proven to produce a persisted, explicit terminal result
+rather than an unresolved claim, without repeating the provider call on
+re-evaluation. No stale-claim retry, reclaim, or recovery behavior was introduced;
+the one case that cannot be truthfully recorded (a failure in the terminal write
+itself) is left exactly as before: an unresolved claim surfaced as degraded. Quality
+gates and all tests pass. The unit is implemented, validated, documented, and ready
+for downstream use.

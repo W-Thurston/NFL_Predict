@@ -107,3 +107,27 @@ def test_latest_known_remaining_uses_latest_completed_result() -> None:
         error_message="failed",
     )
     assert latest_known_requests_remaining((first, second, failed)) == 80
+
+
+def test_receipt_write_is_crash_atomic(tmp_path, monkeypatch):
+    """An interrupted serialization leaves no partial destination file."""
+
+    from gridiron_edge.market import collection_receipt_store as store
+
+    def boom(*a, **k):
+        raise RuntimeError("interrupted")
+
+    monkeypatch.setattr(store.json, "dump", boom)
+    with pytest.raises(RuntimeError):
+        write_claim(_claim(), repo=tmp_path)
+    assert not claim_path(
+        season="2026-2027", week=1, scheduled_at=SCHEDULED, repo=tmp_path
+    ).exists()
+    assert (
+        list(
+            claim_path(
+                season="2026-2027", week=1, scheduled_at=SCHEDULED, repo=tmp_path
+            ).parent.glob(".*.tmp")
+        )
+        == []
+    )

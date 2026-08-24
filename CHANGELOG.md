@@ -1,5 +1,38 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-24 - Quote observation workstream complete
+
+All four planned units for the quote-observation workstream are complete:
+point-in-time cutoff-visible retrieval, exact candidate-reference identity,
+truthful coverage counts, and collection claim/receipt lifecycle robustness. The
+existing quote-observation substrate required no wholesale replacement; every
+verified gap the initial inspection found is closed. Store multi-writer safety,
+provider-label/event stability, and the descriptive/event-time trust boundary
+remain documented, deliberately deferred open items.
+
+## 2026-08-24 - Collection claim and receipt lifecycle robustness
+
+### Changed
+- A lost claim-creation race (two collection processes contending for the same
+  planned poll) now resolves as the existing CLAIMED outcome instead of an
+  uncaught FileExistsError crash.
+- Claim and result publication is now crash-atomic as well as create-only: both
+  write to a temporary file beside the destination, then publish through a hard
+  link, which raises on an existing destination and never exposes a partially
+  serialized file.
+- An unexpected exception during ingestion after a claim is created is now
+  recorded as an explicit UNEXPECTED_FAILURE terminal result rather than leaving
+  the claim unresolved with no record.
+
+### Verification
+- Ruff, Pyrefly, and the unit test suite pass, including new coverage for the true
+  lost-claim-creation race, an unexpected post-claim failure producing a persisted
+  terminal result, and an interrupted serialization leaving no partial or leaked
+  temporary file.
+- No automatic retry, reclaim, lease, or expiry of an already-unresolved claim was
+  introduced; the case that cannot be truthfully recorded (the terminal write
+  itself failing) remains a surfaced, degraded, unresolved claim, unchanged.
+
 ## 2026-08-24 - Truthful quote-history coverage counts
 
 ### Changed

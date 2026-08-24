@@ -6,8 +6,10 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 import json
+import os
 from pathlib import Path
 from typing import cast
+from uuid import uuid4
 
 from gridiron_edge.market.collection_plan import CollectionReason
 
@@ -31,6 +33,7 @@ class CollectionExecutionStatus(StrEnum):
     REQUEST_FAILED = "request_failed"
     INGEST_FAILED = "ingest_failed"
     PARTIAL_PERSISTENCE = "partial_persistence"
+    UNEXPECTED_FAILURE = "unexpected_failure"
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,15 +117,9 @@ def write_claim(claim: CollectionExecutionClaim, *, repo: Path) -> Path:
     """Create one claim atomically without replacing prior content."""
     validate_claim(claim)
     path = claim_path(
-        season=claim.season,
-        week=claim.week,
-        scheduled_at=claim.scheduled_at,
-        repo=repo,
+        season=claim.season, week=claim.week, scheduled_at=claim.scheduled_at, repo=repo
     )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8") as stream:
-        json.dump(_claim_payload(claim), stream, indent=2, sort_keys=True)
-        stream.write("\n")
+    _atomic_create_json(path, _claim_payload(claim))
     return path
 
 
@@ -130,15 +127,9 @@ def write_result(result: CollectionExecutionResult, *, repo: Path) -> Path:
     """Create one terminal result atomically without replacement."""
     validate_result(result)
     path = result_path(
-        season=result.season,
-        week=result.week,
-        scheduled_at=result.scheduled_at,
-        repo=repo,
+        season=result.season, week=result.week, scheduled_at=result.scheduled_at, repo=repo
     )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8") as stream:
-        json.dump(_result_payload(result), stream, indent=2, sort_keys=True)
-        stream.write("\n")
+    _atomic_create_json(path, _result_payload(result))
     return path
 
 
@@ -157,9 +148,9 @@ def read_claim(path: Path) -> CollectionExecutionClaim:
     if set(payload) != required:
         raise ValueError("Collection claim keys do not match the current schema.")
     claim = CollectionExecutionClaim(
-        schema_version=int(cast(int, payload["schema_version"])),
+        schema_version=cast(int, payload["schema_version"]),
         season=str(payload["season"]),
-        week=int(cast(int, payload["week"])),
+        week=cast(int, payload["week"]),
         scheduled_at=_datetime(payload["scheduled_at"]),
         claimed_at=_datetime(payload["claimed_at"]),
         next_kickoff=_datetime(payload["next_kickoff"]),
@@ -176,17 +167,17 @@ def read_result(path: Path) -> CollectionExecutionResult:
     if set(payload) != expected:
         raise ValueError("Collection result keys do not match the current schema.")
     result = CollectionExecutionResult(
-        schema_version=int(cast(int, payload["schema_version"])),
+        schema_version=cast(int, payload["schema_version"]),
         status=CollectionExecutionStatus(str(payload["status"])),
         season=str(payload["season"]),
-        week=int(cast(int, payload["week"])),
+        week=cast(int, payload["week"]),
         scheduled_at=_datetime(payload["scheduled_at"]),
         started_at=_datetime(payload["started_at"]),
         completed_at=_datetime(payload["completed_at"]),
         next_kickoff=_datetime(payload["next_kickoff"]),
         reason=CollectionReason(str(payload["reason"])),
         quota_precheck=QuotaPrecheckStatus(str(payload["quota_precheck"])),
-        minimum_credit_reserve=int(cast(int, payload["minimum_credit_reserve"])),
+        minimum_credit_reserve=cast(int, payload["minimum_credit_reserve"]),
         last_known_requests_remaining=_optional_int(payload["last_known_requests_remaining"]),
         quote_count=_optional_int(payload["quote_count"]),
         game_count=_optional_int(payload["game_count"]),
@@ -339,7 +330,7 @@ def _datetime(value: object) -> datetime:
 
 
 def _optional_int(value: object) -> int | None:
-    return None if value is None else int(cast(int, value))
+    return None if value is None else cast(int, value)
 
 
 def _optional_text(value: object) -> str | None:
@@ -348,3 +339,21 @@ def _optional_text(value: object) -> str | None:
 
 def _iso(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
+
+
+def _atomic_create_json(path: Path, payload: dict[str, object]) -> None:
+    """Publish JSON create-only and crash-atomically.
+
+    Writes to a temporary file, then atomically links it into place. An existing
+    destination is never overwritten (raises FileExistsError), and an interrupted
+    write leaves only the temporary file, never a partial destination.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+        os.link(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)

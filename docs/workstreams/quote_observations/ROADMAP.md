@@ -1,4 +1,4 @@
-# ROADMAP.md — addendum: Quote Observation (WS1) follow-on units
+# ROADMAP.md — addendum: Quote Observation (WS1) follow-on units [WORKSTREAM_COMPLETE]
 
 > Append under the relevant workstream section. These are the deferred WS1 units and
 > the writer-contract note from the locked Boundary 8 consolidation. The **active**
@@ -25,7 +25,7 @@ pregame counting and separately report non-live post-kickoff rows. Clean-sheet
 latitude applies (may replace the field contract rather than preserve an inaccurate
 name).
 
-### Unit 4 — Collection claim & receipt robustness [ACTIVE]
+### Unit 4 — Collection claim & receipt robustness [COMPLETE]
 Owns F22, F26, F27 (one claim/receipt lifecycle boundary): the lost claim-creation
 race (uncaught `FileExistsError` → should return `CLAIMED`), create-only-but-not-
 crash-atomic receipt publication (adopt stage-and-rename), and unexpected post-claim
