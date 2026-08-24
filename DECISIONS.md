@@ -7,6 +7,71 @@ Each entry documents *why* a choice was made, not just *what* changed
 Format: newest entry at top. Each entry self-contained.
 
 ---
+## D29. System-known visibility is governed by `fetched_at`
+Status: Accepted  Date: `<COMMIT_DATE>`  Workstream: Quote Observation (WS1)
+
+### Decision
+An observation is available to an "as-known-at-cutoff" view **only if** its local
+system-known timestamp `fetched_at` satisfies the declared cutoff contract. For the
+initial contract, visibility is **inclusive**: `fetched_at <= cutoff`.
+- `sportsbook_updated_at` remains **source-provided update metadata**, not the
+  system-known basis.
+- `commence_time` remains the **event-start (kickoff) boundary**, used for pregame
+  *eligibility*, which is a separate predicate from visibility.
+
+### Context
+WS1 inspection (FINDINGS rev 8) found the store carries three UTC world-times
+(`fetched_at`, `sportsbook_updated_at`, `commence_time`) but exposes no
+as-known-at-arbitrary-cutoff retrieval (F11/F29), and the production candidate path
+consumes the full ledger with no cutoff filter (F35/F40, verified reachable leak).
+A durable, unambiguous choice of *which timestamp defines system knowledge* is
+required before any point-in-time retrieval is built.
+
+### Consequences
+- Visibility and pregame eligibility are **separate, composed predicates** — never
+  fused as `min(cutoff, kickoff)`. Observed → Visible (`fetched_at <= cutoff`) →
+  Eligible (`is_live is False and fetched_at < commence_time`).
+- Cutoffs must be timezone-aware UTC; naïve/non-UTC values are rejected.
+- No `decision_cutoff` or additional `effective_time` field is added to stored
+  observation rows to satisfy this decision. Whether a further effective-time concept
+  is ever needed is a separate, still-open design question (F11).
+
+### References
+- `docs/workstreams/quote_observations/FINDINGS.md` (F11, F29, F35, F40)
+- root `PLAN.md` — Point-in-time quote evidence retrieval
+
+---
+
+## D28. Unresolved collection claims are not automatically retried
+Status: Accepted  Date: `<COMMIT_DATE>`  Workstream: Quote Observation (WS1)
+
+### Decision
+When a collection claim exists without a terminal result (e.g., a crash between
+`write_claim` and `write_result`), the system does **not** automatically retry or
+reclaim it. Such claims surface as an explicit DEGRADED verification state. **Any**
+future retry, lease, expiry, reconciliation, or manual-resolution mechanism requires
+a separate explicit decision that defines how ambiguous prior execution and
+provider-cost (duplicate-request) risk are handled.
+
+### Context
+WS1 inspection found unresolved-claim **detection** is implemented and tested (the
+verifier reports `unresolved_claims` → DEGRADED), but **recovery** is absent and the
+no-retry behavior is undocumented as policy (F23). Automatic retry under an ambiguous
+prior outcome could double-spend paid provider requests, so committing to "no
+automatic retry" locks safe present behavior without prematurely choosing the
+long-term recovery model.
+
+### Consequences
+- Unit 4 (collection claim & receipt robustness — F22/F26/F27) may harden the
+  claim/receipt lifecycle but must **not** introduce automatic retry/reclaim until
+  this decision is superseded by an explicit recovery-policy decision.
+- A stranded claim remains stranded (surfaced, not silently healed) until manually
+  resolved.
+
+### References
+- `docs/workstreams/quote_observations/FINDINGS.md` (F23; related F22/F26/F27)
+- `ROADMAP.md` — Unit 4
+
 ## D27. Production recommendation proof is an exact immutable evidence chain
 
 **Status:** Accepted

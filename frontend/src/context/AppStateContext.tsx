@@ -45,7 +45,7 @@ const STORAGE_KEY = "hm-app";
 
 const DEFAULT_STATE: AppState = {
   oddsFormat: "american",
-  bankroll: 12480.55,
+  bankroll: 100,
   onboarded: true,
   alerts: 4,
   sportsbookMode: "all",

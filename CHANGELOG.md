@@ -1,5 +1,29 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-24 - Point-in-time quote evidence retrieval
+
+### Added
+- Cutoff-visible quote-evidence retrieval (`as_known_at`) that returns canonical
+  quote observations whose system-known time (`fetched_at`) is at or before an
+  inclusive, UTC-validated decision cutoff. Validates input through the canonical
+  quote contract, never mutates the input, returns a fresh canonically-ordered frame,
+  and returns the canonical empty quote frame when nothing is visible.
+
+### Changed
+- `issue-candidates` now applies the cutoff-visible operation to the loaded quote
+  ledger before candidate issuance, so no observation learned after the declared
+  evaluation time can enter an issuance. System-known visibility (`fetched_at <=
+  cutoff`) is kept separate from pregame eligibility (`is_live is False and
+  fetched_at < commence_time`); the observed history selector is reused by
+  composition and is unchanged.
+
+### Verification
+- Ruff, Pyrefly, and the unit test suite pass.
+- Real Week 1 ledger (read-only, checksum-guarded): cutoff 2026-08-18 14:30:00 UTC
+  reduced 1,680 observations to 840 visible, retaining only fetched_at
+  2026-08-18 14:23:18.347996 UTC; canonical schema and ordering verified; source
+  parquet SHA-256 unchanged.
+
 ## 2026-08-18 - Production recommendation-chain rehearsal
 
 ### Added

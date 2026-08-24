@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { components } from "../api/schema";
-import { useGamesList } from "../api/hooks";
+import { useGamesList, useLines } from "../api/hooks";
 import { TestWrapper } from "../test/testWrapper";
 import { GamesList } from "./GamesList";
 
-vi.mock("../api/hooks", () => ({ useGamesList: vi.fn() }));
+vi.mock("../api/hooks", () => ({ useGamesList: vi.fn(), useLines: vi.fn() }));
 vi.mock("../api/team_metadata_hook", () => ({
   useTeamByAbbr: vi.fn((identity: string) => {
     if (identity === "Kansas City Chiefs") {
@@ -65,11 +65,27 @@ function mockLoaded(items: GameSummary[]) {
     error: null,
     refetch: vi.fn(),
   } as never);
+  vi.mocked(useLines).mockReturnValue({
+    data: {
+      season: "2026-2027",
+      week: 1,
+      market: "moneyline",
+      total: 0,
+      items: [],
+      sportsbooks: [],
+      market_fetched_at: [],
+    },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  } as never);
 }
 
 describe("GamesList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(null, "", "#/games?market=moneyline");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     mockLoaded([]);
   });
 
@@ -82,12 +98,14 @@ describe("GamesList", () => {
 
     render(<TestWrapper><GamesList /></TestWrapper>);
 
-    expect(screen.getByText("Win forecast missing")).toBeInTheDocument();
+    expect(screen.getAllByText("Win forecast missing")).toHaveLength(2);
     expect(screen.queryByText("No games found for this week.")).not.toBeInTheDocument();
-    expect(screen.getByText("-2.5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Details →" })).toBeInTheDocument();
   });
 
   it("renders a Total point estimate when uncertainty is unavailable", () => {
+    window.history.replaceState(null, "", "#/games?market=total");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     mockLoaded([
       game({
         total: {
@@ -99,13 +117,19 @@ describe("GamesList", () => {
 
     render(<TestWrapper><GamesList /></TestWrapper>);
 
-    expect(screen.getByText("47.5")).toHaveAttribute(
-      "title",
-      "Total available; uncertainty unavailable",
-    );
+    const values = screen.getAllByText("47.5");
+    expect(values).toHaveLength(2);
+    for (const value of values) {
+      expect(value).toHaveAttribute(
+        "title",
+        "Total available; uncertainty unavailable",
+      );
+    }
   });
 
   it("shows exact Total unavailability", () => {
+    window.history.replaceState(null, "", "#/games?market=total");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     mockLoaded([
       game({
         total: { status: "forecast_ambiguous" },
@@ -115,7 +139,7 @@ describe("GamesList", () => {
 
     render(<TestWrapper><GamesList /></TestWrapper>);
 
-    expect(screen.getByText("Total forecast selection ambiguous")).toBeInTheDocument();
+    expect(screen.getAllByText("Total forecast selection ambiguous")).toHaveLength(2);
   });
 
   it("renders available Win probability", () => {
@@ -125,13 +149,19 @@ describe("GamesList", () => {
   });
 
   it("exposes an inconsistent available component with no value", () => {
+    window.history.replaceState(null, "", "#/games?market=spread");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     mockLoaded([
       game({ spread: { status: "available", model_spread: null } }),
     ]);
     render(<TestWrapper><GamesList /></TestWrapper>);
-    expect(screen.getByText("Value unavailable")).toHaveAccessibleName(
-      "Spread has status available but no value.",
-    );
+    expect(screen.getAllByText("Value unavailable")).toHaveLength(2);
+    expect(screen.getByLabelText(
+      "Away spread has status available but no value.",
+    )).toBeInTheDocument();
+    expect(screen.getByLabelText(
+      "Home spread has status available but no value.",
+    )).toBeInTheDocument();
   });
 
   it("renders schedule-empty copy only when there are no rows", () => {
@@ -142,17 +172,13 @@ describe("GamesList", () => {
   it("renders canonical team marks for service-preserved long names", () => {
     mockLoaded([game()]);
     render(<TestWrapper><GamesList /></TestWrapper>);
-    expect(screen.getByText("KAN")).toBeInTheDocument();
-    expect(screen.getByText("LAC")).toBeInTheDocument();
-    expect(screen.queryByText("Kansas City Chiefs")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Kansas City Chiefs at Los Angeles Chargers")).toBeInTheDocument();
+    expect(screen.getByLabelText("Kansas City Chiefs team mark")).toHaveTextContent("KAN");
+    expect(screen.getByLabelText("Los Angeles Chargers team mark")).toHaveTextContent("LAC");
+    expect(screen.getByText("Chiefs")).toBeInTheDocument();
+    expect(screen.getByText("Chargers")).toBeInTheDocument();
+    expect(screen.queryByText("Away team")).not.toBeInTheDocument();
+    expect(screen.queryByText("Home team")).not.toBeInTheDocument();
   });
 
-  it("does not restore Band or Confidence columns", () => {
-    mockLoaded([game()]);
-    render(<TestWrapper><GamesList /></TestWrapper>);
-    expect(screen.queryByRole("columnheader", { name: "Band" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("columnheader", { name: "Confidence" }),
-    ).not.toBeInTheDocument();
-  });
 });

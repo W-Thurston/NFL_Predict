@@ -391,6 +391,7 @@ def issue_candidates_cmd(
     from gridiron_edge.core.settings import get_settings
     from gridiron_edge.datasets.loaders import load_current_weekly_product
     from gridiron_edge.evaluation.forecast_store import load_forecast_events
+    from gridiron_edge.ingest.odds.as_known import as_known_at
     from gridiron_edge.ingest.odds.store import load_odds_ledger
     from gridiron_edge.market.candidate_issuance import issue_pregame_candidates
     from gridiron_edge.market.candidate_issuance_store import write_candidate_issuance
@@ -417,12 +418,14 @@ def issue_candidates_cmd(
             week=week,
             repo=settings.repo_root,
         )
+        visible_quotes = as_known_at(quotes, timestamp)
         issuance = issue_pregame_candidates(
             product=product,
             forecast_events=events,
-            quotes=quotes,
+            quotes=visible_quotes,
             evaluated_at=timestamp,
         )
+
         _render_candidate_issuance(issuance)
         if write:
             path = write_candidate_issuance(issuance, repo=settings.repo_root)
