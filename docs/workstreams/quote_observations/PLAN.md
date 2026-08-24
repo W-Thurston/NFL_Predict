@@ -12,26 +12,27 @@
 - Working tree at inspection: clean
 - Context package commit: identify through Git history for this file
 
-### Unit — Candidate reference exact over canonical observation identity
+### Unit — Truthful quote-history coverage counts
 
 #### Completed
 
-The cross-artifact candidate reference (`candidate_issuance_row_id`) now hashes the
-complete canonical observation identity, including `sportsbook_updated_at` and
-`is_live`, which were previously omitted. The reference is therefore injective over
-the canonical observation identity represented by `CandidateIssuanceRow`: two
-canonically-distinct observations can no longer collapse to the same reference. The
-external reference shape (`issuance_id:sha256`) and issuance scope are unchanged, and
-every downstream consumer that re-derives the reference from an issuance row
-(recommendation policy resolution, recommended-bet result resolution and validation,
-and market closeout) remains consistent without modification because those rows
-already carry both fields.
+The quote-history coverage diagnostic now reports a genuine pregame count.
+`pregame_observation_count` was previously computed as `row_count - live_count` (a
+non-live count that never compared `fetched_at` to `commence_time`), so a non-live
+observation collected at or after kickoff was mis-reported as pregame. It now counts
+only non-live observations with a known kickoff whose `fetched_at` is strictly before
+`commence_time`. A new independent count,
+`non_live_at_or_after_kickoff_observation_count`, reports non-live observations with a
+known kickoff collected at or after it, so no evidence is hidden.
+`live_observation_count` and `missing_commence_time_count` retain their prior
+meanings; the four counts are independent diagnostics and may overlap (a live row with
+a missing kickoff increments both). They are not a partition of the rows.
 
 #### Goal
 
-Guarantee that the immutable candidate reference used across recommendation policy,
-recommended-bet results, and market closeout uniquely identifies exactly one
-canonical observation, preserving the integrity of the exact evidence chain.
+Ensure the coverage diagnostic's reported counts mean exactly what their names claim,
+so genuine pregame temporal depth is not overstated by counting late or ambiguous
+observations as pregame.
 
 #### Files Added/Removed/Changed
 
@@ -39,15 +40,17 @@ Added:
 - None.
 
 Changed:
-- `src/gridiron_edge/market/candidate_issuance.py` - `candidate_issuance_row_id`
-  identity payload now includes `sportsbook_updated_at` (null-safe ISO-8601 or null)
-  and `is_live`, making the reference exact over the complete canonical observation
-  identity. Docstring updated to describe the complete-identity contract.
-- `tests/unit/market/test_candidate_issuance.py` - Added focused injectivity
-  coverage: references differ when two otherwise-identical rows differ only in
-  `sportsbook_updated_at`, only in `is_live`, or in the presence of
-  `sportsbook_updated_at`; added a shared canonical-row helper and clarified the
-  stable-and-exact test name.
+- `src/gridiron_edge/market/history_coverage.py` - `pregame_observation_count` now
+  requires `is_live is False`, a known `commence_time`, and `fetched_at <
+  commence_time`. Added `non_live_at_or_after_kickoff_observation_count` for non-live
+  observations with a known kickoff collected at or after it. Class documentation
+  states that pregame and at-or-after-kickoff counts classify non-live rows with a
+  known kickoff, while `live_observation_count` and `missing_commence_time_count` are
+  independent diagnostics that may overlap and do not partition the rows.
+- `tests/unit/market/test_history_coverage.py` - Added coverage for genuine pregame
+  vs at-or-after-kickoff classification (strict kickoff boundary), the live/
+  missing-kickoff overlap diagnostic, and the empty-result value of the new field;
+  extended the multi-source test with the new count.
 
 Removed:
 - None.
@@ -56,28 +59,32 @@ Removed:
 
 - `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
   passed; all tests green.
-- Focused suites exercising the cross-artifact re-derivation end to end:
-  `tests/unit/market/test_candidate_issuance.py`,
-  `test_candidate_issuance_evaluation.py`,
-  `test_recommendation_policy_evaluation.py`,
-  `test_recommended_bet_result.py`, and `test_market_closeout.py` all pass. The
-  result and closeout suites re-derive the reference from reconstructed rows, so a
-  green run confirms the four consumers agree under the new hash.
-- Persisted-artifact check (WoW #8): `rg` located embedded `candidate_reference_id`
-  values only under `data/output/recommended_bet_results/`. That directory is
-  git-ignored development-state evidence, not a committed artifact; it implements the
-  previous reference contract and regenerates through the production-chain commands.
-  No committed artifact embeds or is addressed by the reference (candidate issuance
-  files are addressed by `issuance_id`, which is unchanged). No repository artifact
-  required regeneration for this commit.
+- Focused `tests/unit/market/test_history_coverage.py` passes, including: before
+  kickoff is pregame; exactly at kickoff and after kickoff are non-live-at-or-after;
+  missing kickoff is in neither temporal count; live observations are excluded from
+  both temporal counts; and a live observation with a missing kickoff is reported by
+  both the live and missing-kickoff diagnostics (explicit overlap).
+- Consumer search (recorded per review): `rg -n
+  'QuoteHistoryCoverage|pregame_observation_count|live_observation_count|missing_commence_time_count'
+  src tests frontend` shows the field is referenced only within
+  `history_coverage.py` and its test; no API, serializer, generated contract, or
+  frontend consumes it, so no generated contract required regeneration (WoW #9).
+- Real-artifact verification (read-only, checksum-guarded) over
+  `data/odds/history/season=2026-2027/week=01/observations.parquet`:
+  `row_count=1680`, `pregame=1680`, `non_live_at_or_after_kickoff=0`, `live=0`,
+  `missing_commence=0`; source parquet SHA-256 unchanged. On this ledger every
+  observation is genuinely pregame because the ingest parser excludes started and
+  live events, so the corrected count equals `row_count` here (no regression). The
+  correction's effect on non-live-at-or-after-kickoff and missing-kickoff rows is
+  proven by the focused unit tests, since this real ledger contains no such rows.
 
 #### Acceptance
 
-The candidate reference is issuance-scoped and injective over the canonical
-observation identity; canonically-distinct rows differing only in
-`sportsbook_updated_at` or `is_live` now produce distinct references. Downstream
-resolution ("resolve to exactly one") and result validation remain valid because the
-reconstructed rows carry both fields. The external `issuance_id:sha256` format is
-preserved. Quality gates and all tests pass. No committed artifact depends on the
-prior reference. The unit is implemented, validated, documented, and ready for
-downstream use.
+The coverage diagnostic reports truthful counts: a non-live observation at or after
+kickoff is no longer counted as pregame, and a row with an unknown kickoff is never
+classified as pregame or at-or-after kickoff. The new count surfaces non-live
+late observations explicitly. Independent live and missing-kickoff diagnostics retain
+their meaning and are documented as possibly overlapping. Quality gates and all tests
+pass; real-ledger counts verified with the source unchanged. No committed consumer
+depends on a prior meaning of the field. The unit is implemented, validated,
+documented, and ready for downstream use.

@@ -1,5 +1,29 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-24 - Truthful quote-history coverage counts
+
+### Changed
+- Quote-history coverage now reports a genuine pregame count. `pregame_observation_count`
+  previously equalled non-live rows and never compared `fetched_at` to `commence_time`,
+  so a non-live observation collected at or after kickoff was mis-reported as pregame.
+  It now counts only non-live observations with a known kickoff and
+  `fetched_at < commence_time`.
+
+### Added
+- `non_live_at_or_after_kickoff_observation_count` on the coverage contract: non-live
+  observations with a known kickoff collected at or after it, so late evidence is
+  surfaced rather than hidden. `live_observation_count` and `missing_commence_time_count`
+  retain their meaning and are independent diagnostics that may overlap (a live row
+  with a missing kickoff increments both); the counts do not partition the rows.
+
+### Verification
+- Ruff, Pyrefly, and the unit test suite pass.
+- Real Week 1 ledger (read-only, checksum-guarded): row_count 1680, pregame 1680,
+  non_live_at_or_after_kickoff 0, live 0, missing_commence 0; source parquet SHA-256
+  unchanged. Every observation is genuinely pregame there because ingest excludes
+  started and live events; the corrected count therefore equals row_count with no
+  regression, and the late/missing-kickoff behavior is proven by focused tests.
+
 ## 2026-08-24 - Candidate reference exact over canonical observation identity
 
 ### Changed

@@ -25,7 +25,12 @@ HISTORY_IDENTITY_COLUMNS: tuple[str, ...] = (
 
 @dataclass(frozen=True, slots=True)
 class QuoteHistoryCoverage:
-    """Coverage and temporal depth of canonical quote observations."""
+    """Pregame and non-live-at-or-after-kickoff counts classify non-live rows with known kickoff.
+
+    live_observation_count and missing_commence_time_count are independent diagnostics
+    and may overlap (a live row with missing kickoff increments both).
+    These counts do not partition the rows.
+    """
 
     row_count: int
     provider_count: int
@@ -40,6 +45,7 @@ class QuoteHistoryCoverage:
     maximum_observations_per_identity: int
     maximum_fetches_per_identity: int
     pregame_observation_count: int
+    non_live_at_or_after_kickoff_observation_count: int
     live_observation_count: int
     missing_commence_time_count: int
     repeated_observation_evidence_available: bool
@@ -65,6 +71,7 @@ def evaluate_quote_history_coverage(
             maximum_observations_per_identity=0,
             maximum_fetches_per_identity=0,
             pregame_observation_count=0,
+            non_live_at_or_after_kickoff_observation_count=0,
             live_observation_count=0,
             missing_commence_time_count=0,
             repeated_observation_evidence_available=False,
@@ -77,25 +84,31 @@ def evaluate_quote_history_coverage(
     )
     observation_counts = identities.size()
     fetch_counts = identities["fetched_at"].nunique()
-    repeated_fetches = int(fetch_counts.gt(1).sum())
+    repeated_fetches = fetch_counts.gt(1).sum()
     fetched = rows["fetched_at"]
-    live_count = int(rows["is_live"].sum())
+    is_live = rows["is_live"].astype(bool)
+    live_count = is_live.sum()
+    commence_time = rows["commence_time"]
+    known_kickoff = commence_time.notna()
+    pregame_mask = (~is_live) & known_kickoff & fetched.lt(commence_time)
+    non_live_at_or_after_kickoff_mask = (~is_live) & known_kickoff & fetched.ge(commence_time)
 
     return QuoteHistoryCoverage(
         row_count=len(rows),
-        provider_count=int(rows["provider"].nunique(dropna=True)),
-        sportsbook_count=int(rows["sportsbook"].nunique(dropna=True)),
-        game_count=int(rows["game_id"].nunique(dropna=True)),
+        provider_count=rows["provider"].nunique(dropna=True),
+        sportsbook_count=rows["sportsbook"].nunique(dropna=True),
+        game_count=rows["game_id"].nunique(dropna=True),
         market_identity_count=len(observation_counts),
-        fetch_count=int(fetched.nunique()),
+        fetch_count=fetched.nunique(),
         earliest_fetched_at=fetched.min().to_pydatetime(),
         latest_fetched_at=fetched.max().to_pydatetime(),
-        identities_with_multiple_observations=int(observation_counts.gt(1).sum()),
+        identities_with_multiple_observations=observation_counts.gt(1).sum(),
         identities_with_multiple_fetches=repeated_fetches,
-        maximum_observations_per_identity=int(observation_counts.max()),
-        maximum_fetches_per_identity=int(fetch_counts.max()),
-        pregame_observation_count=len(rows) - live_count,
+        maximum_observations_per_identity=observation_counts.max(),
+        maximum_fetches_per_identity=fetch_counts.max(),
+        pregame_observation_count=pregame_mask.sum(),
+        non_live_at_or_after_kickoff_observation_count=non_live_at_or_after_kickoff_mask.sum(),
         live_observation_count=live_count,
-        missing_commence_time_count=int(rows["commence_time"].isna().sum()),
+        missing_commence_time_count=commence_time.isna().sum(),
         repeated_observation_evidence_available=repeated_fetches > 0,
     )

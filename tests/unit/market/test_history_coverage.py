@@ -60,6 +60,7 @@ def test_empty_history_has_zero_coverage() -> None:
     assert result.earliest_fetched_at is None
     assert result.latest_fetched_at is None
     assert not result.repeated_observation_evidence_available
+    assert result.non_live_at_or_after_kickoff_observation_count == 0
 
 
 def test_single_observation_has_no_repeated_evidence() -> None:
@@ -105,8 +106,33 @@ def test_multi_source_live_and_missing_kickoff_coverage() -> None:
     assert result.sportsbook_count == 1
     assert result.market_identity_count == 2
     assert result.pregame_observation_count == 1
+    assert result.non_live_at_or_after_kickoff_observation_count == 0
     assert result.live_observation_count == 1
     assert result.missing_commence_time_count == 1
+
+
+def test_non_live_at_or_after_kickoff_is_not_counted_as_pregame() -> None:
+    """A non-live observation at or after kickoff is not pregame evidence."""
+    result = evaluate_quote_history_coverage(
+        _frame(
+            _row(fetched_at="2026-09-09T12:00:00Z"),  # before kickoff -> pregame
+            _row(fetched_at="2026-09-10T00:20:00Z"),  # exactly at kickoff -> at/after
+            _row(fetched_at="2026-09-10T05:00:00Z"),  # after kickoff -> at/after
+        )
+    )
+    assert result.pregame_observation_count == 1
+    assert result.non_live_at_or_after_kickoff_observation_count == 2
+    assert result.live_observation_count == 0
+
+
+def test_live_observation_with_missing_kickoff_is_reported_by_both_diagnostics() -> None:
+    """Live and missing-kickoff counts are independent and may overlap."""
+    result = evaluate_quote_history_coverage(_frame(_row(is_live=True, commence_time=None)))
+    assert result.row_count == 1
+    assert result.live_observation_count == 1
+    assert result.missing_commence_time_count == 1
+    assert result.pregame_observation_count == 0
+    assert result.non_live_at_or_after_kickoff_observation_count == 0
 
 
 def test_result_contract_is_frozen() -> None:

@@ -17,7 +17,7 @@ identity capability, then inspect the affected storage contracts — do **not**
 pre-decide whether the ID is physically owned by the store. Clean-sheet latitude
 applies (may replace the reference contract outright).
 
-### Unit 3 — Coverage diagnostic semantics [ACTIVE]
+### Unit 3 — Coverage diagnostic semantics [COMPLETE]
 Owns F33. `pregame_observation_count` currently computes `len(rows) - live_count`
 (a non-live count) and never compares `fetched_at` to `commence_time`. Either rename
 to `non_live_observation_count` or enforce genuine `fetched_at < commence_time`
@@ -25,7 +25,7 @@ pregame counting and separately report non-live post-kickoff rows. Clean-sheet
 latitude applies (may replace the field contract rather than preserve an inaccurate
 name).
 
-### Unit 4 — Collection claim & receipt robustness [PENDING]
+### Unit 4 — Collection claim & receipt robustness [ACTIVE]
 Owns F22, F26, F27 (one claim/receipt lifecycle boundary): the lost claim-creation
 race (uncaught `FileExistsError` → should return `CLAIMED`), create-only-but-not-
 crash-atomic receipt publication (adopt stage-and-rename), and unexpected post-claim
