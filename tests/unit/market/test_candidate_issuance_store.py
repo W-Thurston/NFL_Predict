@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -177,3 +178,88 @@ def test_duplicate_stored_row_identity_is_rejected(tmp_path: Path) -> None:
     duplicated = replace(issuance, rows=(issuance.rows[0], issuance.rows[0]))
     with pytest.raises(ValueError, match="duplicate row identities"):
         write_candidate_issuance(duplicated, repo=tmp_path)
+
+
+def test_publication_race_rejects_valid_conflicting_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    issuance = _issuance()
+    conflicting = replace(issuance, rows=(replace(issuance.rows[0], expected_value=0.20),))
+    competing_root = tmp_path / "competing"
+    competing_path = write_candidate_issuance(conflicting, repo=competing_root)
+    competing_bytes = competing_path.read_bytes()
+    path = candidate_issuance_path(issuance.issuance_id, repo=tmp_path)
+
+    def racing_link(src: Path, dst: Path) -> None:
+        destination = Path(dst)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(competing_bytes)
+        raise FileExistsError
+
+    monkeypatch.setattr("gridiron_edge.market.candidate_issuance_store.os.link", racing_link)
+    with pytest.raises(ValueError, match="different content"):
+        write_candidate_issuance(issuance, repo=tmp_path)
+    assert path.read_bytes() == competing_bytes
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_publication_race_accepts_identical_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    issuance = _issuance()
+    path = candidate_issuance_path(issuance.issuance_id, repo=tmp_path)
+
+    def racing_link(src: Path, dst: Path) -> None:
+        destination = Path(dst)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(Path(src).read_bytes())
+        raise FileExistsError
+
+    monkeypatch.setattr("gridiron_edge.market.candidate_issuance_store.os.link", racing_link)
+    result_path = write_candidate_issuance(issuance, repo=tmp_path)
+    assert result_path == path
+    assert read_candidate_issuance(path) == issuance
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_pre_publication_failure_leaves_no_destination_or_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    issuance = _issuance()
+    path = candidate_issuance_path(issuance.issuance_id, repo=tmp_path)
+
+    def failing_link(src: Path, dst: Path) -> None:
+        raise OSError("simulated pre-publication failure")
+
+    monkeypatch.setattr("gridiron_edge.market.candidate_issuance_store.os.link", failing_link)
+    with pytest.raises(OSError, match="simulated pre-publication failure"):
+        write_candidate_issuance(issuance, repo=tmp_path)
+    assert not path.exists()
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_temporary_serialization_failure_leaves_no_destination_or_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Distinct from pre-publication failure: this fails DURING serialization,
+    before the temporary file is even complete, and before os.link is ever called."""
+    issuance = _issuance()
+    path = candidate_issuance_path(issuance.issuance_id, repo=tmp_path)
+    link_called = False
+    real_link = os.link
+
+    def spying_link(src: Path, dst: Path) -> None:
+        nonlocal link_called
+        link_called = True
+        real_link(src, dst)
+
+    def failing_dump(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("simulated serialization failure")
+
+    monkeypatch.setattr("gridiron_edge.market.candidate_issuance_store.os.link", spying_link)
+    monkeypatch.setattr("gridiron_edge.market.candidate_issuance_store.json.dumps", failing_dump)
+    with pytest.raises(RuntimeError, match="simulated serialization failure"):
+        write_candidate_issuance(issuance, repo=tmp_path)
+    assert not link_called
+    assert not path.exists()
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []

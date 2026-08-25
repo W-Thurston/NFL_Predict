@@ -1,9 +1,12 @@
+# src/gridiron_edge/market/recommendation_governance_store.py
+
 """Immutable JSON persistence for recommendation-governance versions."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 import json
+import os
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
@@ -52,12 +55,12 @@ def write_recommendation_governance(
 ) -> Path:
     """Persist one immutable version or accept an exact replay."""
     validate_recommendation_governance(version)
-    path = recommendation_governance_path(
+    path: Path = recommendation_governance_path(
         version.schema_version,
         version.governance_id,
         repo=repo,
     )
-    encoded = json.dumps(_payload(version), indent=2, sort_keys=True) + "\n"
+    encoded: str = json.dumps(_payload(version), indent=2, sort_keys=True) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         if path.read_text(encoding="utf-8") != encoded:
@@ -65,16 +68,16 @@ def write_recommendation_governance(
                 "Recommendation-governance identity cannot be reused with different content."
             )
         return path
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temporary: Path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         temporary.write_text(encoded, encoding="utf-8")
-        if path.exists():
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
             if path.read_text(encoding="utf-8") != encoded:
                 raise ValueError(
                     "Recommendation-governance identity cannot be reused with different content."
-                )
-        else:
-            temporary.replace(path)
+                ) from None
     finally:
         temporary.unlink(missing_ok=True)
     return path

@@ -1,3 +1,5 @@
+# src/gridiron_edge/market/candidate_issuance_store.py
+
 """Immutable JSON persistence for pregame candidate issuance."""
 
 from __future__ import annotations
@@ -5,8 +7,10 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 from typing import cast
+from uuid import uuid4
 
 from gridiron_edge.core.settings import get_settings
 from gridiron_edge.market.candidate_issuance import (
@@ -42,20 +46,25 @@ def write_candidate_issuance(
 ) -> Path:
     """Create one issuance or accept an exact idempotent replay."""
     validate_candidate_issuance(issuance)
-    path = candidate_issuance_path(issuance.issuance_id, repo=repo)
+    path: Path = candidate_issuance_path(issuance.issuance_id, repo=repo)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = _payload(issuance)
+    payload: dict[str, object] = _payload(issuance)
+    encoded: str = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    temporary: Path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
-        with path.open("x", encoding="utf-8") as stream:
-            json.dump(payload, stream, indent=2, sort_keys=True)
-            stream.write("\n")
-    except FileExistsError:
-        existing = read_candidate_issuance(path)
-        if existing != issuance:
-            raise ValueError(
-                "Candidate issuance ID cannot be reused with different content: "
-                f"{issuance.issuance_id}"
-            ) from None
+        with temporary.open("x", encoding="utf-8") as stream:
+            stream.write(encoded)
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            existing: CandidateIssuance = read_candidate_issuance(path)
+            if existing != issuance:
+                raise ValueError(
+                    "Candidate issuance ID cannot be reused with different content: "
+                    f"{issuance.issuance_id}"
+                ) from None
+    finally:
+        temporary.unlink(missing_ok=True)
     return path
 
 
@@ -81,13 +90,13 @@ def read_candidate_issuance(path: Path) -> CandidateIssuance:
     if not isinstance(raw_rows, list):
         raise ValueError("Candidate issuance rows must be a list.")
     issuance = CandidateIssuance(
-        schema_version=int(cast(int, raw["schema_version"])),
+        schema_version=cast(int, raw["schema_version"]),
         issuance_id=str(raw["issuance_id"]),
         product_id=str(raw["product_id"]),
         product_run_id=str(raw["product_run_id"]),
         product_generated_at=_datetime(raw["product_generated_at"]),
         season=str(raw["season"]),
-        week=int(cast(int, raw["week"])),
+        week=cast(int, raw["week"]),
         evaluated_at=_datetime(raw["evaluated_at"]),
         rows=tuple(_row(item) for item in raw_rows),
     )
@@ -238,7 +247,7 @@ def _optional_float(value: object) -> float | None:
 
 
 def _optional_int(value: object) -> int | None:
-    return None if value is None else int(cast(int, value))
+    return None if value is None else cast(int, value)
 
 
 def _empty_row() -> CandidateIssuanceRow:

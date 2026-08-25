@@ -1,3 +1,5 @@
+# src/gridiron_edge/market/recommended_bet_result_store.py
+
 """Immutable JSON persistence for recommended-bet results and evaluations."""
 
 from __future__ import annotations
@@ -6,6 +8,7 @@ from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 import json
+import os
 from pathlib import Path
 from types import UnionType
 from typing import cast, get_args, get_origin, get_type_hints
@@ -163,7 +166,7 @@ def _validate_evaluation(evaluation: RecommendedBetEvaluation) -> None:
 
 
 def _immutable_write(path: Path, payload: object, *, label: str) -> None:
-    encoded = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    encoded: str = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         if path.read_text(encoding="utf-8") != encoded:
@@ -172,11 +175,13 @@ def _immutable_write(path: Path, payload: object, *, label: str) -> None:
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         temporary.write_text(encoded, encoding="utf-8")
-        if path.exists():
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
             if path.read_text(encoding="utf-8") != encoded:
-                raise ValueError(f"{label} identity cannot be reused with different content.")
-        else:
-            temporary.replace(path)
+                raise ValueError(
+                    f"{label} identity cannot be reused with different content."
+                ) from None
     finally:
         temporary.unlink(missing_ok=True)
 

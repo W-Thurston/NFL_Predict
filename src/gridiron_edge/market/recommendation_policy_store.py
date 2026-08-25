@@ -1,9 +1,12 @@
+# src/gridiron_edge/market/recommendation_policy_store.py
+
 """Immutable JSON persistence for versioned recommendation policies."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 import json
+import os
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
@@ -48,22 +51,22 @@ def write_recommendation_policy(
 ) -> Path:
     """Create one policy or accept an exact idempotent replay."""
     validate_recommendation_policy(policy)
-    path = recommendation_policy_path(policy.schema_version, policy.policy_id, repo=repo)
+    path: Path = recommendation_policy_path(policy.schema_version, policy.policy_id, repo=repo)
     path.parent.mkdir(parents=True, exist_ok=True)
-    encoded = json.dumps(_payload(policy), indent=2, sort_keys=True) + "\n"
+    encoded: str = json.dumps(_payload(policy), indent=2, sort_keys=True) + "\n"
     if path.exists():
-        existing = read_recommendation_policy(path)
+        existing: RecommendationPolicy = read_recommendation_policy(path)
         if existing != policy:
             raise ValueError(
                 "Recommendation policy ID cannot be reused with different content: "
                 f"{policy.policy_id}"
             )
         return path
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temporary: Path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         temporary.write_text(encoded, encoding="utf-8")
         try:
-            temporary.replace(path)
+            os.link(temporary, path)
         except FileExistsError:
             existing = read_recommendation_policy(path)
             if existing != policy:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -179,3 +180,78 @@ def test_store_has_no_current_selection_or_request_dependency() -> None:
         "gridiron_edge.betting.bankroll",
     ):
         assert forbidden not in source
+
+
+def test_result_publication_race_rejects_conflicting_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = evaluation().results[0]
+    path = recommended_bet_result_path(result.schema_version, result.result_id, repo=tmp_path)
+
+    def racing_link(src: Path, dst: Path) -> None:
+        destination = Path(dst)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text('{"conflicting": true}', encoding="utf-8")
+        raise FileExistsError
+
+    monkeypatch.setattr("gridiron_edge.market.recommended_bet_result_store.os.link", racing_link)
+    with pytest.raises(ValueError, match="Recommended-bet result identity cannot be reused"):
+        write_recommended_bet_result(result, repo=tmp_path)
+    assert path.read_text(encoding="utf-8") == '{"conflicting": true}'
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_result_publication_race_accepts_identical_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = evaluation().results[0]
+    path = recommended_bet_result_path(result.schema_version, result.result_id, repo=tmp_path)
+
+    def racing_link(src: Path, dst: Path) -> None:
+        destination = Path(dst)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(Path(src).read_text(encoding="utf-8"), encoding="utf-8")
+        raise FileExistsError
+
+    monkeypatch.setattr("gridiron_edge.market.recommended_bet_result_store.os.link", racing_link)
+    assert write_recommended_bet_result(result, repo=tmp_path) == path
+    assert read_recommended_bet_result(path) == result
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_evaluation_publication_race_rejects_conflicting_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    value = evaluation()
+    path = recommended_bet_evaluation_path(value.schema_version, value.evaluation_id, repo=tmp_path)
+    real_link = os.link
+
+    def racing_link(src: Path, dst: Path) -> None:
+        destination = Path(dst)
+        if destination.name == path.name:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text('{"conflicting": true}', encoding="utf-8")
+            raise FileExistsError
+        real_link(src, dst)  # let child result writes proceed normally
+
+    monkeypatch.setattr("gridiron_edge.market.recommended_bet_result_store.os.link", racing_link)
+    with pytest.raises(ValueError, match="Recommended-bet evaluation identity cannot be reused"):
+        write_recommended_bet_evaluation(value, repo=tmp_path)
+    assert path.read_text(encoding="utf-8") == '{"conflicting": true}'
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_pre_publication_failure_leaves_no_destination_or_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = evaluation().results[0]
+
+    def failing_link(src: Path, dst: Path) -> None:
+        raise OSError("simulated pre-publication failure")
+
+    monkeypatch.setattr("gridiron_edge.market.recommended_bet_result_store.os.link", failing_link)
+    with pytest.raises(OSError, match="simulated pre-publication failure"):
+        write_recommended_bet_result(result, repo=tmp_path)
+    path = recommended_bet_result_path(result.schema_version, result.result_id, repo=tmp_path)
+    assert not path.exists()
+    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []

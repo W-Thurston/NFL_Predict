@@ -1,157 +1,109 @@
-# PLAN.md — Active implementation unit (Workstream 2)
+# PLAN.md — Active implementation unit
 
 Exactly ONE active unit. Future units live in ROADMAP.md, not here.
 
 ### Unit — Immutable artifact publication hardening
 
+#### Completed
+
+Five immutable JSON persistence modules
+(`recommendation_policy_store.py`, `recommendation_governance_store.py`,
+`production_chain_preflight_store.py`, `recommended_bet_result_store.py`,
+`candidate_issuance_store.py`) now publish through the same create-only,
+atomically visible mechanism already proven in `collection_receipt_store.py`
+(WS1 Unit 4): serialize completely to a colocated temporary file, then
+attempt `os.link(temporary, destination)`. On success, publication is
+complete and race-safe. On `FileExistsError` — now the authoritative race
+signal rather than a best-effort pre-check — each store inspects the
+existing destination using its own pre-existing replay contract (byte
+equality for governance/preflight/recommended-result; reconstructed-object
+equality for policy/candidate issuance) and either accepts an identical
+replay or raises its own existing conflict error. No store's replay
+semantics, error messages, reader behavior, or return values changed —
+only the publish primitive did.
+
+`collection_plan_store.py` was investigated and excluded from this unit
+entirely. Source inspection of both its writers
+(`select_current_collection_plan` → `current.json`;
+`write_collection_plan` → `season=X/week=NN.json`), their CLI callers
+(`cli/ingest.py`), and their existing tests established that both are
+intentionally replaceable scoped state — a mutable current-selection
+pointer and a season/week-scoped artifact addressed by scope rather than
+content identity, with no test anywhere asserting create-once, exact-replay,
+or conflicting-replay semantics. This corrects a Boundary 8 inspection
+overclassification (both writers had been listed among the "overwrite-
+capable" defects); no runtime behavior in that module changed.
+
 #### Goal
+
 Eliminate overwrite-capable publication and partial-final-file exposure
-across the affected immutable JSON artifact writers by adopting the
-verified create-only, atomically visible publication pattern already used
-by `collection_receipt_store.py` (WS1 Unit 4), while preserving each store's
-existing path, schema, canonical serialization, replay-equality, and
-conflicting-replay behavior. **Mutable current pointers and the Parquet bet
-ledger are excluded from this unit and handled by their own persistence
-contracts (Unit 2, ROADMAP).**
+across the affected immutable JSON artifact writers, while preserving each
+store's existing path, schema, canonical serialization, replay-equality, and
+conflicting-replay behavior.
 
-#### Confirmed scope (from WS2 Boundary 8, no re-derivation needed)
+#### Files Added/Removed/Changed
 
-| Store | Confirmed defect | Fix class |
-|---|---|---|
-| `collection_plan_store.py` | `temporary.replace(path)` — overwrite-capable, unguarded | Adopt `os.link` pattern **only for write paths classified as immutable artifacts** — see design question 1 |
-| `production_chain_preflight_store.py` | exists-check → `temporary.replace(path)` — overwrite-capable | Adopt `os.link` pattern |
-| `recommendation_governance_store.py` | exists-check → `temporary.replace(path)` — overwrite-capable | Adopt `os.link` pattern |
-| `recommendation_policy_store.py` | `temporary.replace(path)` inside a dead `except FileExistsError` — overwrite-capable, plus dead code | Adopt `os.link` pattern; remove dead exception branch |
-| `recommended_bet_result_store.py` | exists-check → `temporary.replace(path)` — overwrite-capable | Adopt `os.link` pattern (preserve the existing reflection-based codec) |
-| `candidate_issuance_store.py` | `open("x")` direct-to-final-path — create-only but NOT atomic | Adopt `os.link` pattern (temp-file write, then link) |
-| `collection_receipt_store.py` | None — confirmed correct (WS1 Unit 4) | Reference template; **not modified** |
+Added: None.
 
-**Explicitly excluded from this unit** (separate ROADMAP unit): `betting/ledger.py`
-(mutable, whole-file-rewritten Parquet store — atomic rename alone does not
-solve its concurrent-writer data-loss problem; requires its own design and
-its own tested concurrency contract).
+Changed:
+- `src/gridiron_edge/market/recommendation_policy_store.py` — publish step
+  changed from `temporary.replace(path)` to `os.link(temporary, path)`; the
+  existing `except FileExistsError` handler (previously unreachable dead
+  code, since `.replace()` never raised it) is now the live, correct race
+  handler.
+- `src/gridiron_edge/market/recommendation_governance_store.py` — restructured
+  from an `if path.exists(): ... else: temporary.replace(path)` shape to
+  `try: os.link(...) except FileExistsError: ...`, preserving byte-comparison
+  replay equality.
+- `src/gridiron_edge/market/production_chain_preflight_store.py` — same
+  restructuring, same byte-comparison preservation.
+- `src/gridiron_edge/market/recommended_bet_result_store.py` — the shared
+  `_immutable_write` helper (serving both `write_recommended_bet_result` and
+  `write_recommended_bet_evaluation`) restructured identically; both public
+  write paths hardened through one change.
+- `src/gridiron_edge/market/candidate_issuance_store.py` — a new colocated
+  temporary-file stage was introduced (previously wrote directly into the
+  final path via `open("x")`, which was create-only but not atomic); now
+  serializes to a temp file first, then links, closing the
+  partial-final-file exposure gap.
+- `tests/unit/market/test_recommendation_policy_store.py`,
+  `test_recommendation_governance_store.py`,
+  `test_production_chain_preflight_store.py`,
+  `test_recommended_bet_result_store.py`,
+  `test_candidate_issuance_store.py` — each gained a destination-race
+  conflicting-content test, a destination-race identical-content test, and a
+  pre-publication-failure cleanup test; candidate issuance additionally
+  gained a temporary-serialization-failure test (the one store where
+  serialization and publication were previously combined); the
+  recommended-result module's tests separately exercise the race on both the
+  result and the evaluation-manifest write paths, since both flow through
+  the shared helper.
 
-#### Owning boundaries to read before editing (WoW #1)
-- `src/gridiron_edge/market/collection_receipt_store.py` — the exact,
-  already-shipped correct pattern and its own test suite (mirror its
-  verification approach per store).
-- Each of the six affected stores, in full, at time of implementation —
-  confirm current write function signatures and store-specific
-  replay-equality logic (byte-comparison vs. reconstructed-object
-  comparison) before changing the publish step.
-- `collection_plan_store.py` specifically: **read every write function in
-  this module before touching any of them** — do not assume "one file, one
-  fix."
+Removed: None (no store's dead code beyond the now-load-bearing exception
+handler in `recommendation_policy_store.py`, which is retained and now
+reachable, not removed).
 
-#### Design questions to resolve from source (not pre-decided)
+#### Tests
 
-1. **Classify every write path in `collection_plan_store.py` by persistence
-   semantics before modifying anything**, using this taxonomy:
-   - Immutable create-once artifact
-   - Mutable current pointer
-   - Idempotent replay artifact
-   - Composite manifest
-   - Operational state
-   **Only "immutable create-once artifact" write paths adopt create-only
-   linking in this unit.** A mutable current-selection pointer must retain
-   its intentional atomic-replacement semantics — converting it to
-   create-only would break the existing selection workflow, not fix a
-   defect. Apply this same per-write-path classification discipline to the
-   other five stores as a confirmation step, even though WS2's inspection
-   found them uniformly immutable — do not assume that finding without a
-   fresh look at the current source.
-2. Does `os.link` require the temp file and final path to share a
-   filesystem? Confirm the deployment target (single local filesystem) makes
-   this a non-issue; note explicitly if any store's paths could cross a
-   mount boundary.
-3. Does adopting `os.link` change any externally observable behavior beyond
-   crash-atomicity (file permissions, hardlink-count implications for any
-   code that stats the file)? Mirror whatever `collection_receipt_store.py`'s
-   own tests already verify.
-4. Does `recommendation_policy_store.py`'s dead `except FileExistsError`
-   branch have any test currently asserting on that (unreachable) path?
-   Confirm before deleting.
-5. Final `rg` sweep across `src/gridiron_edge/{market,betting}/*_store.py`
-   for any `temporary.replace(path)` instance not already named, to confirm
-   this unit's scope is complete.
+`uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
+passed; all tests green. Race-specific tests (destination-race,
+pre-publication-failure, and — for candidate issuance —
+temporary-serialization-failure) pass alongside every store's pre-existing
+round-trip, idempotent-replay, and conflicting-replay tests, unchanged in
+observable behavior.
 
-#### Acceptance criteria and verification checks
+#### Acceptance
 
-1. **Every write path in every scoped module is classified by persistence
-   semantics (per design question 1) before modification.** Create-only
-   publication is applied only to write paths classified as immutable
-   identity-addressed artifacts.
-2. Each immutable write path publishes via `os.link` (temp-file completion,
-   then create-only atomic link), matching `collection_receipt_store.py`'s
-   pattern exactly.
-3. Mutable current-pointer write paths (if any are found in
-   `collection_plan_store.py`) are left unchanged, unless separately proven
-   defective under their own intended replacement semantics (not in scope
-   here if so — route to a new item, do not silently fix in this unit).
-4. **Race-specific publication tests, not interruption-only tests**, prove
-   the defect is closed. For each hardened store, cover:
-   - Failure before temporary serialization completes.
-   - Failure after the temporary file is complete but before publication
-     (mid-write interruption — the original test class).
-   - **Destination created by another writer immediately before
-     publication** (the actual race regression test): a second writer's
-     conflicting content must not be overwritten, and the attempting writer
-     must raise the store's existing conflicting-replay error.
-   - Existing identical destination (idempotent replay).
-   - Existing conflicting destination (conflicting replay rejected).
-   - Temporary-file cleanup after any failure path above.
-5. **Replay-equality semantics preserved explicitly, per store, not
-   generically:**
-   - Byte-comparison stores (governance, recommended-result) retain
-     byte-based exact replay.
-   - Object-comparison stores (policy) retain domain-object replay
-     equivalence.
-   - Existing malformed-artifact rejection continues to fail through the
-     same reader boundaries.
-   - An existing-path replay does not rewrite the file.
-6. `recommendation_policy_store.py`'s dead exception-handling code is
-   removed, with a regression test confirming conflicting-replay rejection
-   via the live code path.
-7. `candidate_issuance_store.py` moves from create-only-but-not-atomic to
-   create-only-and-atomic; its existing behavioral tests (filename/
-   issuance-ID agreement, embedded-ID validation, deterministic row
-   ordering) continue to pass unchanged.
-8. `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
-   passes.
-9. The reflection-based codec in `recommended_bet_result_store.py` (WS2
-   finding B3-7b) is preserved as-is — only its publish mechanism changes.
-10. `collection_receipt_store.py` remains unchanged (verified reference).
-
-#### Non-regression guardrails
-Do not: touch `recorded_wager`'s cross-file compensating snapshot/restore
-mechanism (a distinct, already-working responsibility); touch
-`betting/ledger.py` (separate ROADMAP unit); change any store's replay-
-equality comparison mechanism (byte vs. object) — only the publish step
-changes; change `recommended_bet_result_store.py`'s codec; add any
-identity-evolution, claim-contract, or attribution-ownership logic (later
-units); convert a mutable current-pointer write path to create-only; add
-workstream/unit/finding identifiers to source or test names.
-
-#### Decision-entry policy
-No new `DECISIONS.md` entry is expected for this unit — it adapts an
-already-ratified local pattern (the receipt-store precedent) to additional
-immutable stores, not a new architectural choice.
-
-#### Commit boundary (locked now, not decided during implementation)
-One coherent commit per store (six candidate commits: collection_plan,
-preflight, governance, policy, recommended-result, candidate-issuance),
-followed by one unit-closing commit containing the condensed PLAN.md
-update, CHANGELOG entry, and any final cross-store cleanup. If a shared
-helper is extracted (e.g., a common `_atomic_create_json`-style function
-reused across stores), that extraction is its own preceding commit, before
-any store migrates to use it.
-
-#### Definition of done
-Six affected immutable-artifact write paths (the seventh surveyed owner,
-`collection_receipt_store.py`, remains unchanged as the verified reference)
-publish through a create-only, atomically visible mechanism, with mutable
-current-pointer write paths in `collection_plan_store.py` (if any) left
-correctly unconverted. Race-specific and interruption-specific tests both
-pass per store. Gates and all tests pass. PLAN.md condensed to the completed
-form (Completed · Goal · Files Added/Removed/Changed · Tests · Acceptance);
-CHANGELOG updated; committed per the locked commit boundary above.
+Every write path in every scoped module was classified by persistence
+semantics before modification, per the locked design question; only
+write paths confirmed immutable and identity-addressed were hardened.
+`collection_plan_store.py`'s two writers were confirmed, from real callers
+and tests, to be intentionally replaceable scoped state and were excluded
+without any behavior change. The five hardened stores now use
+`os.link`-based create-only, atomically visible publication, matching the
+proven WS1 Unit 4 template, with `FileExistsError` as the authoritative race
+signal rather than a `path.exists()` pre-check. Each store's own replay-
+equality contract (byte or object) is preserved and independently tested.
+`collection_receipt_store.py` remains unchanged as the verified reference.
+The unit is implemented, reviewed across two full ChatGPT ratification
+rounds, validated, and ready for downstream use.

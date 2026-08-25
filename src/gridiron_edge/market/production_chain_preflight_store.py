@@ -1,3 +1,5 @@
+# src/gridiron_edge/market/production_chain_preflight_store.py
+
 """Immutable JSON persistence for production-chain preflight assessments."""
 
 from __future__ import annotations
@@ -6,6 +8,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 from typing import Final, cast
 from uuid import uuid4
@@ -61,9 +64,11 @@ def write_production_chain_preflight(
 ) -> Path:
     """Persist one immutable assessment or accept an exact replay."""
     validate_production_chain_preflight(preflight)
-    identity = production_chain_preflight_id(preflight)
-    path = production_chain_preflight_path(PREFLIGHT_STORE_SCHEMA_VERSION, identity, repo=repo)
-    encoded = (
+    identity: str = production_chain_preflight_id(preflight)
+    path: Path = production_chain_preflight_path(
+        PREFLIGHT_STORE_SCHEMA_VERSION, identity, repo=repo
+    )
+    encoded: str = (
         json.dumps(
             {
                 "store_schema_version": PREFLIGHT_STORE_SCHEMA_VERSION,
@@ -81,14 +86,16 @@ def write_production_chain_preflight(
         if path.read_text(encoding="utf-8") != encoded:
             raise ValueError("Preflight identity cannot be reused with different content.")
         return path
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temporary: Path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         temporary.write_text(encoded, encoding="utf-8")
-        if path.exists():
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
             if path.read_text(encoding="utf-8") != encoded:
-                raise ValueError("Preflight identity cannot be reused with different content.")
-        else:
-            temporary.replace(path)
+                raise ValueError(
+                    "Preflight identity cannot be reused with different content."
+                ) from None
     finally:
         temporary.unlink(missing_ok=True)
     return path

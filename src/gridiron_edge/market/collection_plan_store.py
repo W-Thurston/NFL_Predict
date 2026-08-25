@@ -1,3 +1,5 @@
+# src/gridiron_edge/market/collection_plan_store.py
+
 """Atomic JSON persistence for weekly quote collection plans."""
 
 from __future__ import annotations
@@ -73,9 +75,9 @@ def read_current_collection_plan_selection(*, repo: Path) -> CurrentCollectionPl
     if set(payload) != {"schema_version", "season", "week", "selected_at"}:
         raise ValueError("Current collection-plan selection keys do not match the schema.")
     selection = CurrentCollectionPlanSelection(
-        int(cast(int, payload["schema_version"])),
+        cast(int, payload["schema_version"]),
         str(payload["season"]),
-        int(cast(int, payload["week"])),
+        cast(int, payload["week"]),
         _datetime(payload["selected_at"]),
     )
     _validate_current_selection(selection)
@@ -194,10 +196,10 @@ def _from_payload(payload: dict[str, object]) -> WeeklyQuoteCollectionPlan:
     groups_data = cast(list[dict[str, object]], payload["kickoff_groups"])
     polls_data = cast(list[dict[str, object]], payload["polls"])
     return WeeklyQuoteCollectionPlan(
-        schema_version=int(cast(int, payload["schema_version"])),
+        schema_version=cast(int, payload["schema_version"]),
         status=CollectionPlanStatus(str(payload["status"])),
         season=str(payload["season"]),
-        week=int(cast(int, payload["week"])),
+        week=cast(int, payload["week"]),
         created_at=_datetime(payload["created_at"]),
         plan_start=_datetime(payload["plan_start"]),
         policy=QuoteCollectionPolicy(**policy_data),
@@ -212,15 +214,15 @@ def _from_payload(payload: dict[str, object]) -> WeeklyQuoteCollectionPlan:
             PlannedQuoteCollection(
                 scheduled_at=_datetime(item["scheduled_at"]),
                 next_kickoff=_datetime(item["next_kickoff"]),
-                hours_to_next_kickoff=float(cast(float, item["hours_to_next_kickoff"])),
+                hours_to_next_kickoff=cast(float, item["hours_to_next_kickoff"]),
                 reason=CollectionReason(str(item["reason"])),
             )
             for item in polls_data
         ),
-        planned_poll_count=int(cast(int, payload["planned_poll_count"])),
-        planned_credit_cost=int(cast(int, payload["planned_credit_cost"])),
-        remaining_poll_capacity=int(cast(int, payload["remaining_poll_capacity"])),
-        omitted_candidate_count=int(cast(int, payload["omitted_candidate_count"])),
+        planned_poll_count=cast(int, payload["planned_poll_count"]),
+        planned_credit_cost=cast(int, payload["planned_credit_cost"]),
+        remaining_poll_capacity=cast(int, payload["remaining_poll_capacity"]),
+        omitted_candidate_count=cast(int, payload["omitted_candidate_count"]),
     )
 
 

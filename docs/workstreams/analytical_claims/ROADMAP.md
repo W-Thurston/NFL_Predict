@@ -38,8 +38,8 @@ explicitly outside this scope.
 
 ### Implementation units (in locked sequence — see PLAN.md for the active unit)
 
-**Unit 1 — Immutable artifact publication hardening.** Harden the six
-affected immutable JSON persistence modules
+**Unit 1 — Immutable artifact publication hardening.** [COMPLETE]
+Harden the six affected immutable JSON persistence modules
 (`collection_plan_store.py`, `production_chain_preflight_store.py`,
 `recommendation_governance_store.py`, `recommendation_policy_store.py`,
 `recommended_bet_result_store.py`, `candidate_issuance_store.py`) using the
@@ -50,8 +50,8 @@ mixed modules such as `collection_plan_store.py` by write path, not by
 file** — mutable current-selection pointers must not be converted to
 create-only artifacts.
 
-**Unit 2 — Bet-ledger durability and writer coordination.** Replace direct
-whole-file Parquet writes (`betting/ledger.py::_write_ledger`) with
+**Unit 2 — Bet-ledger durability and writer coordination.** [PENDING]
+Replace direct whole-file Parquet writes (`betting/ledger.py::_write_ledger`) with
 atomically published complete-file replacement, and define an explicit,
 tested writer-concurrency contract (locking, optimistic concurrency, or
 documented single-writer enforcement — chosen and proven in this unit, not
@@ -61,24 +61,24 @@ behavior, and `recorded_wager`'s compensation semantics. Separated from Unit
 a distinct correctness problem requiring its own design and its own test
 proof.
 
-**Unit 3 — Identity-evolution contract for candidate references.** Every
-persisted reference contract must gain an explicit evolution owner and
+**Unit 3 — Identity-evolution contract for candidate references.** [PENDING]
+Every persisted reference contract must gain an explicit evolution owner and
 incompatibility policy — starting with `candidate_issuance_row_id` and its
 consumers. The owner/mechanism is decided by this unit, not preselected by
 inspection.
 
-**Unit 4 — Common claim capability protocol.** Formalizes the eleven-
-capability profile as a documented protocol/conformance profile — not a base
+**Unit 4 — Common claim capability protocol.** [PENDING]
+Formalizes the eleven-capability profile as a documented protocol/conformance profile — not a base
 class. Generalizes from Unit 3's identity-evolution pattern.
 
-**Unit 5 — Attribution-operation ownership.** Separates and names the six
-confirmed reference operations as explicit, non-interchangeable capabilities
+**Unit 5 — Attribution-operation ownership.** [PENDING]
+Separates and names the six confirmed reference operations as explicit, non-interchangeable capabilities
 per Unit 4's contract. Corrects `_closeout_matches`'s current integrity
 ambiguity via one of three named options (validate-then-compare /
 attribution-only / expose both results separately).
 
-**Unit 6 — Small API and documentation cleanup.** Empty-`/portfolio/splits`
-serializer bypass (D18 violation, one-line fix); `api/serializers/portfolio.py`'s
+**Unit 6 — Small API and documentation cleanup.** [PENDING]
+Empty-`/portfolio/splits` serializer bypass (D18 violation, one-line fix); `api/serializers/portfolio.py`'s
 incorrect D19 citation (remove, do not re-cite D18); development-era phase-
 naming ("Unit 22"/"Unit 24," reviewed per-file, not blind substitution).
 

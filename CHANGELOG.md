@@ -1,5 +1,47 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-25 - Immutable artifact publication hardening (WS2 Unit 1)
+
+### Changed
+- Five immutable JSON persistence modules (recommendation policy,
+  recommendation governance, production-chain preflight, recommended-bet
+  result/evaluation, candidate issuance) now publish via create-only,
+  atomically visible linking (`os.link`), matching the proven pattern
+  already shipped in `collection_receipt_store.py` (WS1 Unit 4), instead of
+  `Path.replace()`, which unconditionally overwrites an existing
+  destination.
+- `FileExistsError` from the publish attempt is now the authoritative
+  concurrency signal (a competing writer's destination can appear at any
+  time up to the publish call), replacing a `path.exists()` pre-check that
+  left a race window between check and replace.
+- `candidate_issuance_store.py` gained a colocated temporary-file
+  serialization stage; it previously wrote directly into its final path,
+  which was create-only but not crash-atomic.
+- Each store's pre-existing replay-equality contract (byte-serialized
+  comparison for governance, preflight, and recommended-result; reconstructed
+  domain-object comparison for policy and candidate issuance) is unchanged —
+  only the publish mechanism was hardened.
+
+### Investigated, not changed
+- `collection_plan_store.py`'s two writers (`select_current_collection_plan`,
+  `write_collection_plan`) were classified against their real callers and
+  tests and confirmed to be intentionally replaceable scoped state, not
+  create-once identity-addressed artifacts. Excluded from this unit with no
+  runtime behavior change; corrects an earlier inspection overclassification.
+
+### Verification
+- Ruff, Pyrefly, and the full unit test suite pass.
+- New race-specific tests per hardened store prove the actual defect closed:
+  a competing writer's conflicting content is never overwritten and the
+  store's existing conflict error fires; identical concurrent content is
+  accepted as an idempotent replay; a pre-publication failure leaves neither
+  a partial destination nor a leaked temporary file. Candidate issuance
+  additionally has a temporary-serialization-failure test confirming
+  `os.link` is never reached if serialization itself fails.
+- No store's round-trip, idempotent-replay, or conflicting-replay tests
+  changed in observable behavior.
+
+
 ## 2026-08-24 - Quote observation workstream complete
 
 All four planned units for the quote-observation workstream are complete:
