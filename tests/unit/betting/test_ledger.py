@@ -815,3 +815,109 @@ class TestBetReferenceProvenance:
             ]
         )
         pd.testing.assert_series_equal(before, after)
+
+
+# ---------------------------------------------------------------------------
+# TestAtomicPublication
+# ---------------------------------------------------------------------------
+
+
+class TestAtomicPublication:
+    """Ledger writes are staged to a temporary file and published atomically."""
+
+    @staticmethod
+    def _ledger_path(repo: Path) -> Path:
+        return repo / "data" / "betting" / "bet_ledger.parquet"
+
+    def test_temporary_serialization_failure_preserves_existing_ledger(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A failure while serializing the temporary file leaves the prior
+        canonical ledger byte-identical and removes the temporary file."""
+        _log_one(tmp_path)
+        path = self._ledger_path(tmp_path)
+        prior_bytes = path.read_bytes()
+
+        real_to_parquet = pd.DataFrame.to_parquet
+
+        def failing_to_parquet(
+            self: pd.DataFrame, target: object, *args: object, **kwargs: object
+        ) -> None:
+            if str(target).endswith(".tmp"):
+                raise RuntimeError("simulated temporary serialization failure")
+            return real_to_parquet(self, target, *args, **kwargs)
+
+        monkeypatch.setattr(pd.DataFrame, "to_parquet", failing_to_parquet)
+
+        with pytest.raises(RuntimeError, match="simulated temporary serialization failure"):
+            _log_one(tmp_path, game_id="2026_02_BUF_MIA")
+
+        assert path.read_bytes() == prior_bytes
+        assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+    def test_pre_publication_failure_preserves_existing_ledger(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A failure after temporary serialization but before the atomic
+        rename leaves the prior canonical ledger byte-identical."""
+        _log_one(tmp_path)
+        path = self._ledger_path(tmp_path)
+        prior_bytes = path.read_bytes()
+
+        def failing_replace(src: object, dst: object) -> None:
+            raise OSError("simulated pre-publication failure")
+
+        monkeypatch.setattr("gridiron_edge.betting.ledger.os.replace", failing_replace)
+
+        with pytest.raises(OSError, match="simulated pre-publication failure"):
+            _log_one(tmp_path, game_id="2026_02_BUF_MIA")
+
+        assert path.read_bytes() == prior_bytes
+        assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+    def test_first_write_serialization_failure_leaves_no_ledger(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When no ledger exists yet, a serialization failure leaves the
+        canonical path absent rather than an empty or corrupt file."""
+        path = self._ledger_path(tmp_path)
+        assert not path.exists()
+
+        real_to_parquet = pd.DataFrame.to_parquet
+
+        def failing_to_parquet(
+            self: pd.DataFrame, target: object, *args: object, **kwargs: object
+        ) -> None:
+            if str(target).endswith(".tmp"):
+                raise RuntimeError("simulated temporary serialization failure")
+            return real_to_parquet(self, target, *args, **kwargs)
+
+        monkeypatch.setattr(pd.DataFrame, "to_parquet", failing_to_parquet)
+
+        with pytest.raises(RuntimeError, match="simulated temporary serialization failure"):
+            _log_one(tmp_path)
+
+        assert not path.exists()
+        assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+    def test_successful_write_replaces_destination_atomically(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """A successful write fully replaces the destination; the final
+        file loads with exact schema and no temporary file remains."""
+        first_id = _log_one(tmp_path)
+        second_id = _log_one(tmp_path, game_id="2026_02_BUF_MIA")
+
+        path = self._ledger_path(tmp_path)
+        loaded = pd.read_parquet(path)
+
+        assert loaded.columns.tolist() == _BET_COLUMNS
+        assert set(loaded["bet_id"]) == {first_id, second_id}
+        assert list(path.parent.glob(f".{path.name}.*.tmp")) == []

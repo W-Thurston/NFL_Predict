@@ -1,9 +1,15 @@
 # src/gridiron_edge/betting/ledger.py
-"""Append-only bet ledger with immutable reference-offer evidence.
+"""Mutable bet ledger with immutable recorded-offer evidence.
 
-Follows the same Parquet append-only pattern as ``evaluation/archive.py``.
 The ledger stores every bet placed, its model context at bet time, and
-settlement results including PnL.
+settlement results including PnL. Settlement mutates status and outcome
+fields on an existing row; the complete ledger is rewritten and published
+atomically on every write via a colocated temporary file and rename, so an
+interruption during serialization or publication leaves the prior ledger
+unchanged. This module does not serialize or conflict-detect overlapping
+writers: two calls that read the ledger at the same time can still publish
+in a way that silently discards one writer's update. Writer coordination is
+tracked as deferred work, not implemented here.
 
 Public API::
 
@@ -21,6 +27,7 @@ from datetime import UTC, datetime, timedelta
 import logging
 from logging import Logger
 from math import isfinite
+import os
 from pathlib import Path
 from typing import Final, Literal
 import uuid
@@ -297,6 +304,13 @@ def _read_ledger(repo: Path | None = None) -> pd.DataFrame:
 def _write_ledger(df: pd.DataFrame, repo: Path | None = None) -> Path:
     """Write the bet ledger to disk.
 
+    Serializes the complete ledger to a colocated temporary file, then
+    publishes it via an atomic rename. An interruption during serialization
+    or before the rename leaves the previously published ledger unchanged;
+    a reader never observes a partially written file. This provides
+    atomically visible publication only -- it does not coordinate two
+    overlapping writers (see the module docstring).
+
     Args:
         df: Full ledger DataFrame.
         repo: Repository root override.
@@ -310,7 +324,12 @@ def _write_ledger(df: pd.DataFrame, repo: Path | None = None) -> Path:
     )
 
     path: Path = _bet_ledger_path(repo)
-    df.to_parquet(path, index=False)
+    temporary: Path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        df.to_parquet(temporary, index=False)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return path
 
 

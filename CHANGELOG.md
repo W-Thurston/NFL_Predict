@@ -1,5 +1,46 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-25 - Bet-ledger atomic publication (WS2 Unit 2)
+
+### Changed
+- `betting/ledger.py::_write_ledger` now stages every complete ledger
+  rewrite to a colocated temporary file and publishes via `os.replace`,
+  instead of calling `to_parquet` directly on the canonical path.
+  Direct-path writing was confirmed (by tracing pandas' pyarrow write path
+  and reproducing empirically) to truncate the destination to zero bytes
+  synchronously before any row is serialized — so any interruption during
+  any write previously destroyed the entire prior ledger, not just the row
+  being added. An interruption at any point now leaves the prior valid
+  ledger completely unchanged, whether or not a ledger already existed.
+- Module docstring corrected from "append-only" to an accurate description
+  of the mutable-ledger contract (settlement mutates existing rows; the
+  complete file is rewritten and republished on every write), and now
+  explicitly discloses that this store does not coordinate overlapping
+  writers.
+
+### Explicitly deferred, not silently dropped
+- **Writer coordination ("Guarantee B")** — two overlapping `log_bet`/
+  `settle_bet` calls, or a `recording.py` compensating rollback racing a
+  concurrent write, can still silently lose an update. An earlier draft of
+  this unit incorrectly claimed this was solved by atomic publication alone
+  and was corrected before implementation. Tracing `recording.py::record_wager`
+  confirmed any future fix cannot be scoped to `_write_ledger` alone: its
+  rollback can discard a second writer's completed mutation regardless of
+  per-write atomicity. Recorded as an open item for a future unit, requiring
+  its own design (locking, optimistic concurrency, or an enforced
+  single-writer boundary) and its own `DECISIONS.md` entry.
+
+### Verification
+- Ruff, Pyrefly, and the full unit test suite pass.
+- New tests prove: an existing ledger survives a temporary-serialization
+  failure and a pre-publication failure byte-for-byte; a first-ever write
+  that fails during serialization leaves the canonical path absent (not
+  corrupt); a successful write fully replaces the destination with exact
+  schema and no leaked temporary file.
+- `recording.py`'s existing compensating-rollback tests and all pre-existing
+  ledger tests (schema, model identity, recommendation provenance,
+  reference-offer provenance, settlement, filtering) pass unchanged.
+
 ## 2026-08-25 - Immutable artifact publication hardening (WS2 Unit 1)
 
 ### Changed

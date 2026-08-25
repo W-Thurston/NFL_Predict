@@ -2,108 +2,85 @@
 
 Exactly ONE active unit. Future units live in ROADMAP.md, not here.
 
-### Unit — Immutable artifact publication hardening
+### Unit — Bet-ledger atomic publication
 
 #### Completed
 
-Five immutable JSON persistence modules
-(`recommendation_policy_store.py`, `recommendation_governance_store.py`,
-`production_chain_preflight_store.py`, `recommended_bet_result_store.py`,
-`candidate_issuance_store.py`) now publish through the same create-only,
-atomically visible mechanism already proven in `collection_receipt_store.py`
-(WS1 Unit 4): serialize completely to a colocated temporary file, then
-attempt `os.link(temporary, destination)`. On success, publication is
-complete and race-safe. On `FileExistsError` — now the authoritative race
-signal rather than a best-effort pre-check — each store inspects the
-existing destination using its own pre-existing replay contract (byte
-equality for governance/preflight/recommended-result; reconstructed-object
-equality for policy/candidate issuance) and either accepts an identical
-replay or raises its own existing conflict error. No store's replay
-semantics, error messages, reader behavior, or return values changed —
-only the publish primitive did.
+`betting/ledger.py`'s `_write_ledger` now stages every complete ledger
+rewrite to a colocated temporary file and publishes it via `os.replace`,
+instead of calling `df.to_parquet(path, ...)` directly on the canonical
+path. Direct-path writing was confirmed, by tracing pandas' pyarrow write
+path and reproducing it empirically, to truncate the destination to zero
+bytes synchronously before any row is serialized — meaning any interruption
+during any write (not just the row being added) previously destroyed the
+entire prior ledger, including every previously logged and settled bet.
+Under the fix, an interruption at any point — during temp-file
+serialization, or between serialization and the atomic rename — leaves the
+prior valid ledger completely unchanged, whether or not a ledger already
+existed. The module docstring was corrected from "append-only" (the physical
+mechanism rewrites the complete file, and settlement mutates existing rows)
+to an accurate description, which also explicitly discloses — rather than
+implies away — that this unit provides atomically visible publication only
+and does not coordinate overlapping writers.
 
-`collection_plan_store.py` was investigated and excluded from this unit
-entirely. Source inspection of both its writers
-(`select_current_collection_plan` → `current.json`;
-`write_collection_plan` → `season=X/week=NN.json`), their CLI callers
-(`cli/ingest.py`), and their existing tests established that both are
-intentionally replaceable scoped state — a mutable current-selection
-pointer and a season/week-scoped artifact addressed by scope rather than
-content identity, with no test anywhere asserting create-once, exact-replay,
-or conflicting-replay semantics. This corrects a Boundary 8 inspection
-overclassification (both writers had been listed among the "overwrite-
-capable" defects); no runtime behavior in that module changed.
+This unit deliberately implements only "Guarantee A" (atomic publication).
+"Guarantee B" (writer coordination — locking, optimistic concurrency, or an
+enforced single-writer boundary) was explicitly scoped out after review
+correction: an earlier draft of this unit claimed overlapping-writer safety
+that its design did not provide, since `os.replace` makes each individual
+publication atomic but does not make the full read-modify-write sequence
+atomic across two overlapping callers. Guarantee B is recorded as a
+distinct, unresolved open item for a future unit (see below), not silently
+dropped.
 
 #### Goal
 
-Eliminate overwrite-capable publication and partial-final-file exposure
-across the affected immutable JSON artifact writers, while preserving each
-store's existing path, schema, canonical serialization, replay-equality, and
-conflicting-replay behavior.
+Protect the canonical Parquet ledger from partial or destructive direct
+serialization by staging each complete ledger update to a colocated
+temporary file and atomically replacing the destination, so that process
+interruption during serialization or publication preserves the previously
+valid ledger. Preserve ledger schema, UUID bet identity, log/settlement
+behavior, and `recording.py`'s cross-call compensation semantics exactly as
+they are today.
 
 #### Files Added/Removed/Changed
 
 Added: None.
 
 Changed:
-- `src/gridiron_edge/market/recommendation_policy_store.py` — publish step
-  changed from `temporary.replace(path)` to `os.link(temporary, path)`; the
-  existing `except FileExistsError` handler (previously unreachable dead
-  code, since `.replace()` never raised it) is now the live, correct race
-  handler.
-- `src/gridiron_edge/market/recommendation_governance_store.py` — restructured
-  from an `if path.exists(): ... else: temporary.replace(path)` shape to
-  `try: os.link(...) except FileExistsError: ...`, preserving byte-comparison
-  replay equality.
-- `src/gridiron_edge/market/production_chain_preflight_store.py` — same
-  restructuring, same byte-comparison preservation.
-- `src/gridiron_edge/market/recommended_bet_result_store.py` — the shared
-  `_immutable_write` helper (serving both `write_recommended_bet_result` and
-  `write_recommended_bet_evaluation`) restructured identically; both public
-  write paths hardened through one change.
-- `src/gridiron_edge/market/candidate_issuance_store.py` — a new colocated
-  temporary-file stage was introduced (previously wrote directly into the
-  final path via `open("x")`, which was create-only but not atomic); now
-  serializes to a temp file first, then links, closing the
-  partial-final-file exposure gap.
-- `tests/unit/market/test_recommendation_policy_store.py`,
-  `test_recommendation_governance_store.py`,
-  `test_production_chain_preflight_store.py`,
-  `test_recommended_bet_result_store.py`,
-  `test_candidate_issuance_store.py` — each gained a destination-race
-  conflicting-content test, a destination-race identical-content test, and a
-  pre-publication-failure cleanup test; candidate issuance additionally
-  gained a temporary-serialization-failure test (the one store where
-  serialization and publication were previously combined); the
-  recommended-result module's tests separately exercise the race on both the
-  result and the evaluation-manifest write paths, since both flow through
-  the shared helper.
+- `src/gridiron_edge/betting/ledger.py` — `_write_ledger` now writes to a
+  colocated temporary file and publishes via `os.replace` instead of writing
+  directly to the final path. Module docstring corrected from "append-only"
+  to an accurate mutable-ledger description that explicitly discloses the
+  absence of writer coordination.
+- `tests/unit/betting/test_ledger.py` — added `TestAtomicPublication` with
+  four tests: temporary-serialization-failure preservation (existing
+  ledger), pre-publication-failure preservation (existing ledger),
+  first-write serialization-failure (no ledger yet — canonical path remains
+  absent, not corrupt), and successful-write atomic replacement.
 
-Removed: None (no store's dead code beyond the now-load-bearing exception
-handler in `recommendation_policy_store.py`, which is retained and now
-reachable, not removed).
+Removed: None.
 
 #### Tests
 
 `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
-passed; all tests green. Race-specific tests (destination-race,
-pre-publication-failure, and — for candidate issuance —
-temporary-serialization-failure) pass alongside every store's pre-existing
-round-trip, idempotent-replay, and conflicting-replay tests, unchanged in
-observable behavior.
+passed; all tests green. The four new tests prove the specific defect
+closed (interruption at any stage never destroys or corrupts the prior
+ledger); all pre-existing `log_bet`/`settle_bet`/`load_bets` and
+`TestPersistedLedgerSchema` tests, and all of `recording.py`'s existing
+compensating-rollback tests, pass unchanged in observable behavior.
 
 #### Acceptance
 
-Every write path in every scoped module was classified by persistence
-semantics before modification, per the locked design question; only
-write paths confirmed immutable and identity-addressed were hardened.
-`collection_plan_store.py`'s two writers were confirmed, from real callers
-and tests, to be intentionally replaceable scoped state and were excluded
-without any behavior change. The five hardened stores now use
-`os.link`-based create-only, atomically visible publication, matching the
-proven WS1 Unit 4 template, with `FileExistsError` as the authoritative race
-signal rather than a `path.exists()` pre-check. Each store's own replay-
-equality contract (byte or object) is preserved and independently tested.
-`collection_receipt_store.py` remains unchanged as the verified reference.
-The unit is implemented, reviewed across two full ChatGPT ratification
-rounds, validated, and ready for downstream use.
+Ledger writes are staged and published atomically; no reader can observe a
+partial or corrupt ledger file, and no interruption at any point during a
+write destroys previously valid ledger content, whether or not a ledger
+existed before the write. Ledger schema, `bet_id` UUID identity, and all
+existing behavioral contracts are unchanged. `recording.py` was not
+modified. Writer coordination (Guarantee B) remains explicitly unresolved
+and is recorded as future scope, not claimed by this unit's docstring, code,
+or tests. No `DECISIONS.md` entry was required for Guarantee A; Guarantee B
+will require its own design and decision entry when a future unit takes it
+up. The unit is implemented, reviewed across two ChatGPT ratification
+rounds (including a correction of a real Goal/design contradiction in the
+first draft), validated, and ready for downstream use.
