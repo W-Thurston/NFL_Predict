@@ -8,14 +8,17 @@ atomically on every write via a colocated temporary file and rename, so an
 interruption during serialization or publication leaves the prior ledger
 unchanged.
 
-Concurrent access within this process is coordinated by a module-level
-``threading.Lock`` covering the complete read-modify-write sequence in
-``log_bet`` and ``settle_bet``. This coordinates threads within one process
-only -- it provides no protection if this ledger is ever written by more
-than one process (e.g. a multi-worker API deployment, or a CLI invocation
-running alongside the API). That is an explicit, currently-true assumption
-based on the confirmed single-process deployment of this API, not a general
-guarantee; revisit this lock if the deployment model changes.
+Concurrent ledger mutation within this process is coordinated by a
+module-level ``threading.RLock`` covering each complete read-modify-write
+operation in ``log_bet`` and ``settle_bet``. ``record_wager`` holds the same
+reentrant lock across its ledger/bankroll snapshot, write, and restoration
+sequence (see ``betting/recording.py``). This coordinates threads within one
+process only -- it provides no protection if this ledger is ever written by
+more than one process (e.g. a multi-worker API deployment, or a CLI
+invocation running alongside the API). That is an explicit, currently-true
+assumption based on the confirmed single-process deployment of this API,
+not a general guarantee; see DECISIONS.md D27 and revisit this lock if the
+deployment model changes.
 
 Public API::
 

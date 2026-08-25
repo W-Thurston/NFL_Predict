@@ -6,7 +6,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 import threading
-import time
 from typing import ClassVar
 from uuid import UUID
 
@@ -931,7 +930,19 @@ class TestAtomicPublication:
 
 
 class TestWriterCoordination:
-    """Overlapping log_bet/settle_bet calls must not silently lose an update."""
+    """Overlapping log_bet/settle_bet calls must not silently lose an update.
+
+    Each test proves the lock's blocking behavior directly: a patched
+    _read_ledger lets the first thread signal it is inside the critical
+    section and hold there until released. The second thread's attempt is
+    then proven blocked -- via a bounded wait on an event it would set if
+    it reached the reader -- for as long as the first thread holds the
+    lock. This is deterministic because a held lock forcibly blocks a
+    second acquirer; it does not depend on scheduler timing to create an
+    interleaving.
+    """
+
+    _JOIN_TIMEOUT = 5.0
 
     def test_concurrent_log_bet_calls_preserve_both_bets(
         self,
@@ -942,23 +953,27 @@ class TestWriterCoordination:
         import gridiron_edge.betting.ledger as ledger_module
 
         real_read_ledger = ledger_module._read_ledger
+        first_inside = threading.Event()
+        release_first = threading.Event()
+        second_entered_reader = threading.Event()
 
-        def slow_read_ledger(repo: Path | None = None) -> pd.DataFrame:
-            result = real_read_ledger(repo)
-            time.sleep(0.05)  # widen the critical section to force a real race window
-            return result
+        def instrumented_read_ledger(repo: Path | None = None) -> pd.DataFrame:
+            if not first_inside.is_set():
+                first_inside.set()
+                assert release_first.wait(timeout=self._JOIN_TIMEOUT)
+            else:
+                second_entered_reader.set()
+            return real_read_ledger(repo)
 
-        monkeypatch.setattr(ledger_module, "_read_ledger", slow_read_ledger)
+        monkeypatch.setattr(ledger_module, "_read_ledger", instrumented_read_ledger)
 
-        start_barrier = threading.Barrier(2)
         results: dict[str, str] = {}
         errors: list[Exception] = []
 
-        def worker(name: str, game_id: str) -> None:
+        def first_worker() -> None:
             try:
-                start_barrier.wait()
-                results[name] = log_bet(
-                    game_id=game_id,
+                results["a"] = log_bet(
+                    game_id="2026_01_AAA_BBB",
                     market_type="moneyline",
                     side="home",
                     odds=-110,
@@ -969,14 +984,42 @@ class TestWriterCoordination:
             except Exception as exc:
                 errors.append(exc)
 
-        threads = [
-            threading.Thread(target=worker, args=("a", "2026_01_AAA_BBB")),
-            threading.Thread(target=worker, args=("b", "2026_01_CCC_DDD")),
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        def second_worker() -> None:
+            try:
+                results["b"] = log_bet(
+                    game_id="2026_01_CCC_DDD",
+                    market_type="moneyline",
+                    side="home",
+                    odds=-110,
+                    stake=50.0,
+                    book="draftkings",
+                    repo=tmp_path,
+                )
+            except Exception as exc:
+                errors.append(exc)
+
+        first_thread = threading.Thread(target=first_worker)
+        first_thread.start()
+        assert first_inside.wait(timeout=self._JOIN_TIMEOUT), (
+            "first worker did not reach the critical section"
+        )
+
+        second_thread = threading.Thread(target=second_worker)
+        second_thread.start()
+
+        # The second worker must be blocked acquiring _LEDGER_LOCK, so it
+        # cannot have reached the patched reader while the first worker
+        # still holds the lock.
+        assert not second_entered_reader.wait(timeout=0.2), (
+            "second worker entered the critical section while the first worker still held the lock"
+        )
+        assert second_thread.is_alive()
+
+        release_first.set()
+        first_thread.join(timeout=self._JOIN_TIMEOUT)
+        second_thread.join(timeout=self._JOIN_TIMEOUT)
+        assert not first_thread.is_alive()
+        assert not second_thread.is_alive()
 
         assert not errors
         df = load_bets(repo=tmp_path)
@@ -994,21 +1037,25 @@ class TestWriterCoordination:
         existing_id = _log_one(tmp_path, game_id="2026_01_AAA_BBB")
 
         real_read_ledger = ledger_module._read_ledger
+        first_inside = threading.Event()
+        release_first = threading.Event()
+        second_entered_reader = threading.Event()
 
-        def slow_read_ledger(repo: Path | None = None) -> pd.DataFrame:
-            result = real_read_ledger(repo)
-            time.sleep(0.05)
-            return result
+        def instrumented_read_ledger(repo: Path | None = None) -> pd.DataFrame:
+            if not first_inside.is_set():
+                first_inside.set()
+                assert release_first.wait(timeout=self._JOIN_TIMEOUT)
+            else:
+                second_entered_reader.set()
+            return real_read_ledger(repo)
 
-        monkeypatch.setattr(ledger_module, "_read_ledger", slow_read_ledger)
+        monkeypatch.setattr(ledger_module, "_read_ledger", instrumented_read_ledger)
 
-        start_barrier = threading.Barrier(2)
         errors: list[Exception] = []
         new_bet_id: dict[str, str] = {}
 
         def log_worker() -> None:
             try:
-                start_barrier.wait()
                 new_bet_id["id"] = log_bet(
                     game_id="2026_01_CCC_DDD",
                     market_type="moneyline",
@@ -1023,17 +1070,29 @@ class TestWriterCoordination:
 
         def settle_worker() -> None:
             try:
-                start_barrier.wait()
                 settle_bet(existing_id, "won", repo=tmp_path)
             except Exception as exc:
                 errors.append(exc)
 
-        t1 = threading.Thread(target=log_worker)
-        t2 = threading.Thread(target=settle_worker)
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+        first_thread = threading.Thread(target=log_worker)
+        first_thread.start()
+        assert first_inside.wait(timeout=self._JOIN_TIMEOUT), (
+            "first worker did not reach the critical section"
+        )
+
+        second_thread = threading.Thread(target=settle_worker)
+        second_thread.start()
+
+        assert not second_entered_reader.wait(timeout=0.2), (
+            "second worker entered the critical section while the first worker still held the lock"
+        )
+        assert second_thread.is_alive()
+
+        release_first.set()
+        first_thread.join(timeout=self._JOIN_TIMEOUT)
+        second_thread.join(timeout=self._JOIN_TIMEOUT)
+        assert not first_thread.is_alive()
+        assert not second_thread.is_alive()
 
         assert not errors
         df = load_bets(repo=tmp_path).set_index("bet_id")

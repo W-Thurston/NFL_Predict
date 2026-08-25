@@ -7,12 +7,11 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 import threading
-import time
 
 import pandas as pd
 import pytest
 
-from gridiron_edge.betting.ledger import load_bets
+from gridiron_edge.betting.ledger import load_bets, log_bet
 from gridiron_edge.betting.recording import (
     RecommendationRecordingEvidence,
     RecordWagerCommand,
@@ -101,14 +100,20 @@ def test_concurrent_write_survives_a_failed_recorded_wager_rollback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A record_wager rollback must not discard a concurrent completed write."""
-    from gridiron_edge.betting.ledger import log_bet
+    """A record_wager rollback must not discard a concurrent completed write.
 
-    entered_critical_section = threading.Event()
+    record_bet_placed is patched to signal that record_wager is holding the
+    ledger lock inside its critical section, then block until released.
+    The concurrent writer's log_bet call is proven blocked -- via a bounded
+    wait -- until record_wager's failure and restoration fully complete.
+    """
+    holding_lock = threading.Event()
+    release_failure = threading.Event()
+    writer_completed = threading.Event()
 
     def failing_record_bet_placed(*_args: object, **_kwargs: object) -> str:
-        entered_critical_section.set()
-        time.sleep(0.05)
+        holding_lock.set()
+        assert release_failure.wait(timeout=5.0), "test did not release in time"
         raise RuntimeError("simulated bankroll failure")
 
     monkeypatch.setattr(
@@ -116,11 +121,18 @@ def test_concurrent_write_survives_a_failed_recorded_wager_rollback(
         failing_record_bet_placed,
     )
 
-    errors: list[Exception] = []
+    record_errors: list[Exception] = []
+
+    def record_worker() -> None:
+        try:
+            record_wager(command(), repo=tmp_path)
+        except Exception as exc:
+            record_errors.append(exc)
+
     concurrent_bet_id: dict[str, str] = {}
+    writer_errors: list[Exception] = []
 
     def concurrent_writer() -> None:
-        entered_critical_section.wait()
         try:
             concurrent_bet_id["id"] = log_bet(
                 game_id="2026_02_EEE_FFF",
@@ -132,17 +144,35 @@ def test_concurrent_write_survives_a_failed_recorded_wager_rollback(
                 repo=tmp_path,
             )
         except Exception as exc:
-            errors.append(exc)
+            writer_errors.append(exc)
+        finally:
+            writer_completed.set()
+
+    record_thread = threading.Thread(target=record_worker)
+    record_thread.start()
+    assert holding_lock.wait(timeout=5.0), "record_wager did not reach its critical section"
 
     writer_thread = threading.Thread(target=concurrent_writer)
     writer_thread.start()
 
-    with pytest.raises(RuntimeError, match="simulated bankroll failure"):
-        record_wager(command(), repo=tmp_path)
+    # The concurrent writer must be blocked acquiring _LEDGER_LOCK -- it
+    # cannot complete while record_wager still holds the lock awaiting
+    # release.
+    assert not writer_completed.wait(timeout=0.2), (
+        "concurrent writer completed while record_wager still held the "
+        "lock -- the lock is not providing mutual exclusion"
+    )
+    assert writer_thread.is_alive()
 
-    writer_thread.join()
+    release_failure.set()
+    record_thread.join(timeout=5.0)
+    writer_thread.join(timeout=5.0)
+    assert not record_thread.is_alive()
+    assert not writer_thread.is_alive()
 
-    assert not errors
-    assert "id" in concurrent_bet_id
+    assert len(record_errors) == 1
+    assert "simulated bankroll failure" in str(record_errors[0])
+    assert not writer_errors
+
     df = load_bets(repo=tmp_path)
     assert list(df["bet_id"]) == [concurrent_bet_id["id"]]
