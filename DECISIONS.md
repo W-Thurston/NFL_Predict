@@ -7,6 +7,111 @@ Each entry documents *why* a choice was made, not just *what* changed
 Format: newest entry at top. Each entry self-contained.
 
 ---
+### D30. Bet-ledger writer coordination uses an intra-process thread lock, not cross-process locking
+
+**Status:** Accepted
+**Date:** 2026-08-25
+
+#### Decision
+
+`betting/ledger.py`'s writer-coordination mechanism is a module-level
+`threading.RLock`, held across the complete read-modify-write sequence in
+`log_bet` and `settle_bet`, and reused by `betting/recording.py::record_wager`
+across its full snapshot/write/restore sequence. This coordinates threads
+within one running process only. It does not use file-based locking,
+cross-process locking, or optimistic-concurrency/generation tracking.
+
+#### Context
+
+Unit 2 (bet-ledger atomic publication) made individual ledger writes
+atomically visible but left open a distinct problem: two overlapping callers
+that each read a valid ledger and each publish atomically can still silently
+discard one another's update, because per-write atomicity does not make the
+full read-modify-write transaction atomic across callers. Unit 2's own
+review process had already rejected, once, the reasoning "no existing
+coordination mechanism exists, therefore no coordination is needed" as
+insufficient evidence that concurrent access cannot occur. This decision
+resolves the question with direct evidence rather than repeating that error.
+
+Evidence gathered before choosing a mechanism:
+- No locking utility (file-based or otherwise) exists anywhere in this
+  codebase, confirmed by a repository-wide search. The only superficially
+  related match was a noisy-third-party-logger suppression entry
+  unrelated to locking.
+- No prior `DECISIONS.md` entry addresses ledger or writer concurrency.
+- The CLI bet-recording commands (`gridiron bet log`, `gridiron bet settle`)
+  are confirmed, directly by the project owner, to be unused in practice;
+  the frontend, via the API, is the sole real path for recording wagers.
+- The API is confirmed, directly by the project owner, to run as a single
+  process (`uv run gridiron api serve --reload`) — not a multi-worker
+  deployment. The only systemd-managed service in this repository (D26) is
+  the unrelated quote-collection worker, which the same decision explicitly
+  scopes as validated for that role only, not as a general API/frontend
+  appliance.
+- `api/routes/portfolio.py::record_portfolio_bet` is defined as a synchronous
+  `def`, not `async def`. FastAPI/Starlette route synchronous handlers
+  through a thread pool (`starlette.concurrency.run_in_threadpool` →
+  `anyio.to_thread.run_sync`), confirmed directly from a production
+  traceback encountered earlier in this project's own operation. Two
+  near-simultaneous requests to the same endpoint (a double-click, two
+  browser tabs, a frontend retry) therefore execute as two genuine threads
+  of the single running API process.
+
+This establishes the real, present risk as intra-process thread
+concurrency, not cross-process concurrency. No evidence supports a
+cross-process risk under the current, confirmed deployment and usage
+pattern.
+
+#### Alternatives considered and rejected
+
+- **File-based or cross-process locking (e.g., a `filelock`-style
+  dependency).** Rejected for now: no cross-process writer scenario is
+  evidenced. Introducing this would add a new dependency and complexity to
+  address a risk that does not currently exist, and would need to be
+  revisited (not necessarily replaced) if the deployment model changes.
+- **Optimistic concurrency (generation/fingerprint check, reject-and-retry
+  on conflict).** Rejected: this is a low-frequency, single-operator
+  personal betting ledger, not a high-throughput service; a blocking lock
+  is simpler and sufficient for the confirmed risk, and optimistic
+  concurrency's added retry/conflict-surfacing complexity is not justified
+  by the actual call volume or contention pattern.
+- **Documented-but-unenforced single-writer assumption.** Rejected outright:
+  this was the original, incorrect draft of this decision, corrected during
+  review. A documented assumption is not an enforced contract, and it does
+  not survive contact with the confirmed thread-pool routing behavior above.
+
+#### Consequences
+
+- `log_bet`, `settle_bet`, and `record_wager` are serialized against one
+  another within one process; two overlapping calls block rather than
+  silently losing one write.
+- This lock provides **no protection** if the API is ever run with multiple
+  worker processes (e.g., `--workers N`, gunicorn, or a production
+  multi-worker deployment), or if the CLI bet commands are ever used
+  alongside a running API instance. This boundary is stated explicitly in
+  the `ledger.py` module docstring.
+- `record_wager` reuses `ledger.py`'s lock as an `RLock` specifically
+  because it calls `log_bet` internally while already holding the lock; a
+  non-reentrant `Lock` would deadlock on that call.
+
+#### Revisit triggers
+- If the API deployment model changes to multiple worker processes.
+- If the CLI bet-recording commands are ever used in practice, especially
+  alongside a running API instance.
+- If ledger write volume or contention grows to a point where lock
+  contention itself becomes an observed problem (no evidence of this
+  today).
+
+#### References
+- `src/gridiron_edge/betting/ledger.py`
+- `src/gridiron_edge/betting/recording.py`
+- `tests/unit/betting/test_ledger.py::TestWriterCoordination`
+- `tests/unit/betting/test_recording.py::test_concurrent_write_survives_a_failed_recorded_wager_rollback`
+- `src/gridiron_edge/api/routes/portfolio.py::record_portfolio_bet`
+- DECISIONS.md D26 (quote-collector deployment scope, for contrast)
+- PLAN.md → Workstream 2, Unit 3 (persistence hardening — writer
+  coordination)
+
 ## D29. System-known visibility is governed by `fetched_at`
 Status: Accepted  Date: `<COMMIT_DATE>`  Workstream: Quote Observation (WS1)
 

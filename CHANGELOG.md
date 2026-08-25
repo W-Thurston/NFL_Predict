@@ -1,5 +1,48 @@
 # Gridiron Edge - Changelog
 
+## 2026-08-25 - Bet-ledger writer coordination (WS2 Unit 3)
+
+### Changed
+- `betting/ledger.py` gained a module-level `threading.RLock` (`_LEDGER_LOCK`),
+  held across the complete read-modify-write sequence in `log_bet` and
+  `settle_bet`.
+- `betting/recording.py::record_wager` holds the same lock across its full
+  snapshot/ledger-write/bankroll-write/restore sequence, so a rollback
+  cannot discard a concurrently-completed ledger mutation from another
+  thread. An `RLock` (not a plain `Lock`) was required because
+  `record_wager` calls `log_bet` internally while already holding the lock.
+- Module docstring states the coordination boundary explicitly: this lock
+  coordinates threads within one process only. It provides no protection
+  across multiple worker processes or a CLI invocation running alongside
+  the API.
+
+### Evidence basis (not assumed)
+- No existing locking utility or `DECISIONS.md` entry governs ledger
+  concurrency (confirmed via owner-run local `rg`/`grep`).
+- The CLI bet commands are never used; the API runs as a single process
+  (owner-confirmed).
+- `api/routes/portfolio.py::record_portfolio_bet` is a sync `def`, routed by
+  FastAPI/Starlette through a thread pool — confirmed by this project's own
+  earlier traceback showing `run_in_threadpool` → `anyio.to_thread.run_sync`.
+  Two near-simultaneous requests genuinely execute as two threads of one
+  process, which is the actual, evidenced risk this unit closes.
+
+### Verification
+- Ruff, Pyrefly, and the full unit test suite pass.
+- New tests: two overlapping `log_bet` calls both survive; a `log_bet`
+  overlapping a `settle_bet` both survive; a failed `record_wager` rollback
+  does not discard a concurrent, independently-completed ledger mutation.
+  Each test induces a real race window (a monkeypatched read-delay) that
+  would cause a lost update without the lock.
+- All Unit 1 (immutable-artifact publication) and Unit 2 (ledger atomic
+  publication) behavior, plus all pre-existing ledger/settlement/schema/
+  single-call-rollback tests, pass unchanged.
+
+### See also
+`DECISIONS.md` D27 — records the chosen intra-process locking mechanism,
+its evidence basis, and the explicit condition under which it must be
+revisited.
+
 ## 2026-08-25 - Bet-ledger atomic publication (WS2 Unit 2)
 
 ### Changed

@@ -6,10 +6,16 @@ settlement results including PnL. Settlement mutates status and outcome
 fields on an existing row; the complete ledger is rewritten and published
 atomically on every write via a colocated temporary file and rename, so an
 interruption during serialization or publication leaves the prior ledger
-unchanged. This module does not serialize or conflict-detect overlapping
-writers: two calls that read the ledger at the same time can still publish
-in a way that silently discards one writer's update. Writer coordination is
-tracked as deferred work, not implemented here.
+unchanged.
+
+Concurrent access within this process is coordinated by a module-level
+``threading.Lock`` covering the complete read-modify-write sequence in
+``log_bet`` and ``settle_bet``. This coordinates threads within one process
+only -- it provides no protection if this ledger is ever written by more
+than one process (e.g. a multi-worker API deployment, or a CLI invocation
+running alongside the API). That is an explicit, currently-true assumption
+based on the confirmed single-process deployment of this API, not a general
+guarantee; revisit this lock if the deployment model changes.
 
 Public API::
 
@@ -29,6 +35,7 @@ from logging import Logger
 from math import isfinite
 import os
 from pathlib import Path
+import threading
 from typing import Final, Literal
 import uuid
 
@@ -85,6 +92,12 @@ _BET_COLUMNS: Final[list[str]] = [
     "closing_odds",
     "clv",
 ]
+
+# ---------------------------------------------------------------------------
+# Writer coordination
+# ---------------------------------------------------------------------------
+
+_LEDGER_LOCK: Final[threading.RLock] = threading.RLock()
 
 # ---------------------------------------------------------------------------
 # I/O helpers
@@ -502,17 +515,19 @@ def log_bet(
     }
 
     new_row = pd.DataFrame([row], columns=_BET_COLUMNS)
-    existing: DataFrame = _read_ledger(repo)
 
-    if existing.empty:
-        combined: DataFrame = new_row
-    else:
-        combined = pd.concat(
-            [existing.dropna(axis=1, how="all"), new_row.dropna(axis=1, how="all")],
-            ignore_index=True,
-        ).reindex(columns=_BET_COLUMNS)
+    with _LEDGER_LOCK:
+        existing: DataFrame = _read_ledger(repo)
 
-    _write_ledger(combined, repo)
+        if existing.empty:
+            combined: DataFrame = new_row
+        else:
+            combined = pd.concat(
+                [existing.dropna(axis=1, how="all"), new_row.dropna(axis=1, how="all")],
+                ignore_index=True,
+            ).reindex(columns=_BET_COLUMNS)
+
+        _write_ledger(combined, repo)
 
     logger.info("Bet logged: %s  %s %s %s @ %s", bet_id, market_type, side, game_id, odds)
     return bet_id
@@ -539,36 +554,35 @@ def settle_bet(bet_id: str, result: BetStatus, *, repo: Path | None = None) -> p
         msg: str = f"Invalid result: {result!r}. Must be 'won', 'lost', or 'push'."
         raise ValueError(msg)
 
-    ledger: DataFrame = _read_ledger(repo)
-    mask: Series[bool] = ledger["bet_id"] == bet_id
-    if not mask.any():
-        msg = f"Bet not found: {bet_id}"
-        raise ValueError(msg)
+    with _LEDGER_LOCK:
+        ledger: DataFrame = _read_ledger(repo)
+        mask: Series[bool] = ledger["bet_id"] == bet_id
+        if not mask.any():
+            msg = f"Bet not found: {bet_id}"
+            raise ValueError(msg)
 
-    idx: int | str = mask.idxmax()
-    bet: DataFrame | Series = ledger.loc[idx]
+        idx: int | str = mask.idxmax()
+        bet: DataFrame | Series = ledger.loc[idx]
 
-    if bet["status"] != "open":
-        msg = f"Bet {bet_id} is already settled (status={bet['status']!r})."
-        raise ValueError(msg)
+        if bet["status"] != "open":
+            msg = f"Bet {bet_id} is already settled (status={bet['status']!r})."
+            raise ValueError(msg)
 
-    # Compute PnL
-    pnl: float = compute_pnl(bet["stake"], int(bet["odds"]), result)
+        pnl: float = compute_pnl(bet["stake"], int(bet["odds"]), result)
 
-    closing_line = None
-    closing_odds = None
-    clv = None
+        closing_line = None
+        closing_odds = None
+        clv = None
 
-    # Update ledger
-    ledger.loc[idx, "status"] = result
-    ledger["settled_at"] = pd.to_datetime(ledger["settled_at"], utc=True)
-    ledger.loc[idx, "settled_at"] = datetime.now(UTC)
-    ledger.loc[idx, "pnl"] = pnl
-    ledger.loc[idx, "closing_line"] = closing_line
-    ledger.loc[idx, "closing_odds"] = closing_odds
-    ledger.loc[idx, "clv"] = clv
+        ledger.loc[idx, "status"] = result
+        ledger["settled_at"] = pd.to_datetime(ledger["settled_at"], utc=True)
+        ledger.loc[idx, "settled_at"] = datetime.now(UTC)
+        ledger.loc[idx, "pnl"] = pnl
+        ledger.loc[idx, "closing_line"] = closing_line
+        ledger.loc[idx, "closing_odds"] = closing_odds
+        ledger.loc[idx, "clv"] = clv
 
-    _write_ledger(ledger, repo)
+        _write_ledger(ledger, repo)
 
     logger.info("Bet settled: %s -> %s (PnL=%.2f)", bet_id, result, pnl)
     return pd.Series(ledger.loc[idx])

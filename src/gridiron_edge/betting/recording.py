@@ -1,3 +1,4 @@
+# src/gridiron_edge/betting/recording.py
 """Rollback-safe orchestration for recording one wager locally."""
 
 from __future__ import annotations
@@ -8,7 +9,7 @@ from math import isfinite
 from pathlib import Path
 
 from gridiron_edge.betting.bankroll import _txn_path, record_bet_placed
-from gridiron_edge.betting.ledger import _bet_ledger_path, log_bet
+from gridiron_edge.betting.ledger import _LEDGER_LOCK, _bet_ledger_path, log_bet
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,52 +120,63 @@ def record_wager(
     repo: Path,
     placed_at: datetime | None = None,
 ) -> RecordedWager:
-    """Record ledger and bankroll artifacts as one compensating-atomic action."""
+    """Record ledger and bankroll artifacts as one compensating-atomic action.
+
+    The complete snapshot/write/restore sequence is held under the same lock
+    ``betting.ledger`` uses for its own read-modify-write operations, so a
+    rollback triggered here cannot discard a concurrent, already-completed
+    ledger mutation from another thread. See ``ledger.py`` for the exact
+    coordination boundary this lock provides (threads within one process
+    only).
+    """
     _validate(command)
     evidence = command.recommendation
-    ledger_snapshot = _snapshot(_bet_ledger_path(repo))
-    bankroll_snapshot = _snapshot(_txn_path(repo))
-    try:
-        bet_id = log_bet(
-            command.game_id,
-            market_type=command.market_type,
-            side=command.side,
-            odds=command.odds,
-            stake=command.stake,
-            book=command.book,
-            line=command.line,
-            model_name=evidence.model_name if evidence else command.model_name,
-            model_type=evidence.model_type if evidence else command.model_type,
-            model_prob=evidence.model_probability if evidence else command.model_probability,
-            model_ev=evidence.expected_value if evidence else command.expected_value,
-            edge_strength=command.edge_strength,
-            confidence_tier=command.confidence_tier,
-            reference_provider=evidence.provider if evidence else None,
-            reference_provider_event_id=evidence.provider_event_id if evidence else None,
-            reference_sportsbook=evidence.sportsbook if evidence else None,
-            reference_market_fetched_at=evidence.fetched_at if evidence else None,
-            reference_sportsbook_updated_at=evidence.sportsbook_updated_at if evidence else None,
-            reference_commence_time=evidence.commence_time if evidence else None,
-            reference_american_odds=evidence.american_odds if evidence else None,
-            reference_line=evidence.line if evidence else None,
-            recommended_bet_result_id=evidence.result_id if evidence else None,
-            recommendation_evaluation_id=evidence.evaluation_id if evidence else None,
-            candidate_reference_id=evidence.candidate_reference_id if evidence else None,
-            recommendation_policy_id=evidence.policy_id if evidence else None,
-            placed_at=placed_at,
-            repo=repo,
-        )
-        transaction_id = record_bet_placed(command.stake, bet_id=bet_id, repo=repo)
-    except Exception:
-        restoration_errors: list[Exception] = []
-        for snapshot in (ledger_snapshot, bankroll_snapshot):
-            try:
-                _restore(snapshot)
-            except Exception as error:
-                restoration_errors.append(error)
-        if restoration_errors:
-            raise RuntimeError(
-                "Recorded-wager write failed and artifact restoration was incomplete."
-            ) from restoration_errors[0]
-        raise
+    with _LEDGER_LOCK:
+        ledger_snapshot = _snapshot(_bet_ledger_path(repo))
+        bankroll_snapshot = _snapshot(_txn_path(repo))
+        try:
+            bet_id = log_bet(
+                command.game_id,
+                market_type=command.market_type,
+                side=command.side,
+                odds=command.odds,
+                stake=command.stake,
+                book=command.book,
+                line=command.line,
+                model_name=evidence.model_name if evidence else command.model_name,
+                model_type=evidence.model_type if evidence else command.model_type,
+                model_prob=evidence.model_probability if evidence else command.model_probability,
+                model_ev=evidence.expected_value if evidence else command.expected_value,
+                edge_strength=command.edge_strength,
+                confidence_tier=command.confidence_tier,
+                reference_provider=evidence.provider if evidence else None,
+                reference_provider_event_id=evidence.provider_event_id if evidence else None,
+                reference_sportsbook=evidence.sportsbook if evidence else None,
+                reference_market_fetched_at=evidence.fetched_at if evidence else None,
+                reference_sportsbook_updated_at=(
+                    evidence.sportsbook_updated_at if evidence else None
+                ),
+                reference_commence_time=evidence.commence_time if evidence else None,
+                reference_american_odds=evidence.american_odds if evidence else None,
+                reference_line=evidence.line if evidence else None,
+                recommended_bet_result_id=evidence.result_id if evidence else None,
+                recommendation_evaluation_id=evidence.evaluation_id if evidence else None,
+                candidate_reference_id=evidence.candidate_reference_id if evidence else None,
+                recommendation_policy_id=evidence.policy_id if evidence else None,
+                placed_at=placed_at,
+                repo=repo,
+            )
+            transaction_id = record_bet_placed(command.stake, bet_id=bet_id, repo=repo)
+        except Exception:
+            restoration_errors: list[Exception] = []
+            for snapshot in (ledger_snapshot, bankroll_snapshot):
+                try:
+                    _restore(snapshot)
+                except Exception as error:
+                    restoration_errors.append(error)
+            if restoration_errors:
+                raise RuntimeError(
+                    "Recorded-wager write failed and artifact restoration was incomplete."
+                ) from restoration_errors[0]
+            raise
     return RecordedWager(bet_id, transaction_id)

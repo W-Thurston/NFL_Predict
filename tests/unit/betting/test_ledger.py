@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+import threading
+import time
 from typing import ClassVar
 from uuid import UUID
 
@@ -921,3 +923,119 @@ class TestAtomicPublication:
         assert loaded.columns.tolist() == _BET_COLUMNS
         assert set(loaded["bet_id"]) == {first_id, second_id}
         assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+# ---------------------------------------------------------------------------
+# TestWriterCoordination
+# ---------------------------------------------------------------------------
+
+
+class TestWriterCoordination:
+    """Overlapping log_bet/settle_bet calls must not silently lose an update."""
+
+    def test_concurrent_log_bet_calls_preserve_both_bets(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Two threads logging bets at overlapping times must not lose either write."""
+        import gridiron_edge.betting.ledger as ledger_module
+
+        real_read_ledger = ledger_module._read_ledger
+
+        def slow_read_ledger(repo: Path | None = None) -> pd.DataFrame:
+            result = real_read_ledger(repo)
+            time.sleep(0.05)  # widen the critical section to force a real race window
+            return result
+
+        monkeypatch.setattr(ledger_module, "_read_ledger", slow_read_ledger)
+
+        start_barrier = threading.Barrier(2)
+        results: dict[str, str] = {}
+        errors: list[Exception] = []
+
+        def worker(name: str, game_id: str) -> None:
+            try:
+                start_barrier.wait()
+                results[name] = log_bet(
+                    game_id=game_id,
+                    market_type="moneyline",
+                    side="home",
+                    odds=-110,
+                    stake=50.0,
+                    book="draftkings",
+                    repo=tmp_path,
+                )
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [
+            threading.Thread(target=worker, args=("a", "2026_01_AAA_BBB")),
+            threading.Thread(target=worker, args=("b", "2026_01_CCC_DDD")),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert not errors
+        df = load_bets(repo=tmp_path)
+        assert len(df) == 2
+        assert set(df["bet_id"]) == {results["a"], results["b"]}
+
+    def test_concurrent_log_and_settle_preserve_both_mutations(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A new log_bet and a settle_bet on a different bet must both survive."""
+        import gridiron_edge.betting.ledger as ledger_module
+
+        existing_id = _log_one(tmp_path, game_id="2026_01_AAA_BBB")
+
+        real_read_ledger = ledger_module._read_ledger
+
+        def slow_read_ledger(repo: Path | None = None) -> pd.DataFrame:
+            result = real_read_ledger(repo)
+            time.sleep(0.05)
+            return result
+
+        monkeypatch.setattr(ledger_module, "_read_ledger", slow_read_ledger)
+
+        start_barrier = threading.Barrier(2)
+        errors: list[Exception] = []
+        new_bet_id: dict[str, str] = {}
+
+        def log_worker() -> None:
+            try:
+                start_barrier.wait()
+                new_bet_id["id"] = log_bet(
+                    game_id="2026_01_CCC_DDD",
+                    market_type="moneyline",
+                    side="home",
+                    odds=-110,
+                    stake=25.0,
+                    book="fanduel",
+                    repo=tmp_path,
+                )
+            except Exception as exc:
+                errors.append(exc)
+
+        def settle_worker() -> None:
+            try:
+                start_barrier.wait()
+                settle_bet(existing_id, "won", repo=tmp_path)
+            except Exception as exc:
+                errors.append(exc)
+
+        t1 = threading.Thread(target=log_worker)
+        t2 = threading.Thread(target=settle_worker)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not errors
+        df = load_bets(repo=tmp_path).set_index("bet_id")
+        assert new_bet_id["id"] in df.index
+        assert df.loc[existing_id, "status"] == "won"

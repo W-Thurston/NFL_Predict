@@ -1,3 +1,4 @@
+# tests/unit/betting/test_recording.py
 """Tests for rollback-safe recorded-wager orchestration."""
 
 from __future__ import annotations
@@ -5,6 +6,8 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+import threading
+import time
 
 import pandas as pd
 import pytest
@@ -92,3 +95,54 @@ def test_bankroll_failure_removes_new_ledger(
         record_wager(command(), repo=tmp_path)
     assert not (tmp_path / "data/betting/bet_ledger.parquet").exists()
     assert not (tmp_path / "data/betting/bankroll_txn.parquet").exists()
+
+
+def test_concurrent_write_survives_a_failed_recorded_wager_rollback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A record_wager rollback must not discard a concurrent completed write."""
+    from gridiron_edge.betting.ledger import log_bet
+
+    entered_critical_section = threading.Event()
+
+    def failing_record_bet_placed(*_args: object, **_kwargs: object) -> str:
+        entered_critical_section.set()
+        time.sleep(0.05)
+        raise RuntimeError("simulated bankroll failure")
+
+    monkeypatch.setattr(
+        "gridiron_edge.betting.recording.record_bet_placed",
+        failing_record_bet_placed,
+    )
+
+    errors: list[Exception] = []
+    concurrent_bet_id: dict[str, str] = {}
+
+    def concurrent_writer() -> None:
+        entered_critical_section.wait()
+        try:
+            concurrent_bet_id["id"] = log_bet(
+                game_id="2026_02_EEE_FFF",
+                market_type="moneyline",
+                side="home",
+                odds=-120,
+                stake=10.0,
+                book="draftkings",
+                repo=tmp_path,
+            )
+        except Exception as exc:
+            errors.append(exc)
+
+    writer_thread = threading.Thread(target=concurrent_writer)
+    writer_thread.start()
+
+    with pytest.raises(RuntimeError, match="simulated bankroll failure"):
+        record_wager(command(), repo=tmp_path)
+
+    writer_thread.join()
+
+    assert not errors
+    assert "id" in concurrent_bet_id
+    df = load_bets(repo=tmp_path)
+    assert list(df["bet_id"]) == [concurrent_bet_id["id"]]

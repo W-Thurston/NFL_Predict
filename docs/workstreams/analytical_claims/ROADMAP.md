@@ -13,17 +13,17 @@ any interruption — not merely failing to add the new row) with a
 temp-file-plus-`os.replace` publication sequence. Provides atomically
 visible publication only; does not coordinate overlapping writers.
 
-**Unit 3 — Bet-ledger writer coordination.** *(New — not started.)*
-Serialize or conflict-detect the complete `_read_ledger → mutate →
-_write_ledger` sequence, and — per source tracing during Unit 2 — the
-`recording.py` snapshot→ledger-write→bankroll-write→restore sequence, so
-overlapping callers cannot silently lose one another's updates. Requires an
-explicit design decision (locking, optimistic generation/conflict detection,
-or an enforced single-writer boundary), deterministic overlapping-writer
-tests proving whichever contract is chosen, and — since no existing decision
-governs this — a new `DECISIONS.md` entry. Not scoped further until a
-concrete future unit takes it up; no mechanism is implied or preferred by
-Unit 2's implementation.
+**Unit 3 — Bet-ledger writer coordination.** *(Completed.)* Added an
+intra-process `threading.RLock` covering `betting/ledger.py`'s complete
+read-modify-write sequence and `betting/recording.py::record_wager`'s
+snapshot/write/restore sequence, so overlapping callers within the running
+API process cannot silently lose one another's write. Mechanism selected
+from confirmed evidence (no existing coordination utility; API runs as a
+single process; CLI bet commands unused; sync route handlers execute via a
+thread pool) — not cross-process locking or optimistic concurrency, neither
+of which is justified by any evidenced risk. The lock's boundary (threads
+within one process only) is explicit in the module docstring and in
+`DECISIONS.md` D27. This closes the persistence-hardening arc (Units 1–3).
 
 **Unit 4 — Identity-evolution contract for candidate references.**
 *(Renumbered from Unit 3.)* Unchanged from prior ROADMAP text.
