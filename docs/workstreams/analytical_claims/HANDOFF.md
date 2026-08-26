@@ -56,17 +56,8 @@ remains the honest current distance to WS2's exit criterion.
 - **Unit 2** (bet-ledger atomic publication) — closed. Fixed a defect where
   any write interruption destroyed the *entire* prior ledger via
   temp-file + `os.replace`.
-- **Unit 3** (bet-ledger writer coordination) — closed. Added an
-  intra-process `threading.RLock` (`DECISIONS.md` D27) after a design
-  correction — an initial "documented but unenforced" approach was rejected
-  during review as insufficient (absence of a coordination mechanism is
-  not proof concurrency cannot occur).
-- **Unit 4** (identity-evolution contract for candidate references) —
-  closed. `candidate_issuance_row_id` gained an independently owned,
-  dispatched version (`DECISIONS.md` D28); `RecommendedBetResult` schema
-  incremented to 2; real production data (698 candidates, season
-  2026-2027 week 1) was regenerated end-to-end under the new schema, and
-  the old `schema=1/` tree deleted.
+- **Unit 3** (bet-ledger writer coordination) — closed. Added an intra-process threading.RLock (DECISIONS.md D30) after a design correction — an initial "documented but unenforced" approach was rejected during review as insufficient (absence of a coordination mechanism is not proof concurrency cannot occur).
+- **Unit 4** (identity-evolution contract for candidate references) — closed. candidate_issuance_row_id gained an independently owned, dispatched version (DECISIONS.md D31); RecommendedBetResult schema incremented to 2; real production data (698 candidates, season 2026-2027 week 1) was regenerated end-to-end under the new schema, and the old schema=1/ tree deleted.
 
 **Units 1–3 address none of the nine identification requirements** — they
 are prerequisite infrastructure (don't lose data, don't lose it under
@@ -96,20 +87,10 @@ each requirement, so none are silently left unaddressed by the unit
 sequence.
 
 ## Governing decisions relevant to this workstream
+- **D30**: bet-ledger writer coordination uses an intra-process thread lock, not cross-process locking. Scoped to the confirmed single-process deployment; explicit revisit triggers if that changes.
+- **D31**: candidate-reference derivation is independently versioned; RecommendedBetResult schema incremented to 2; schema-1 development artifacts regenerated and deleted. Full text in DECISIONS.md.
 
-- **D27**: bet-ledger writer coordination uses an intra-process thread
-  lock, not cross-process locking. Scoped to the confirmed single-process
-  deployment; explicit revisit triggers if that changes.
-- **D28**: candidate-reference derivation is independently versioned;
-  `RecommendedBetResult` schema incremented to 2; schema-1 development
-  artifacts regenerated and deleted. Full text in `DECISIONS.md`.
-
-**Action required, still open from before Unit 4:** confirm D27 and D28 are
-actually committed, verbatim, to the real repository-root `DECISIONS.md` —
-not only described in prior conversation output. This handoff assumes they
-are being committed as part of each unit's closing commit, per this
-project's own convention (PLAN.md closure lands in the same commit as the
-code); it does not independently re-verify the live file's contents.
+**Action required, resolved:** D30 and D31 are confirmed present, verbatim, in the real committed DECISIONS.md (directly verified by the project owner, not assumed). A pre-existing D27 ("Production recommendation proof is an exact immutable evidence chain," 2026-08-18) and D28 ("Unresolved collection claims are not automatically retried") already occupied those numbers from an earlier workstream — a real numbering collision caused during this workstream's drafting, caught and corrected by renumbering to D30/D31 during commit. No content was lost; only the two new entries' internal self-references needed correction to match.
 
 ## Two standing cautions for any future thread, earned this session
 

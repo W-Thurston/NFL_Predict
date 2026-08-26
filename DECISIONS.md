@@ -16,7 +16,7 @@ Format: newest entry at top. Each entry self-contained.
 
 Candidate-reference derivation (`candidate_issuance_row_id`) has an
 independently owned version, separate from `CandidateIssuance`'s own
-artifact schema version. Version 1 is the exact pre-D28 algorithm and
+artifact schema version. Version 1 is the exact pre-D31 algorithm and
 output — the version marker is not part of the v1 hash payload; it selects
 which derivation implementation runs, it is not an input to that
 implementation's digest. `RecommendedBetResult`'s schema increments from 1
@@ -72,7 +72,7 @@ dedicated tests, not an oversight.
 #### Alternatives considered and rejected
 - **Embedding the version marker inside the v1 hash payload.** Rejected:
   this would change the v1 digest itself, invalidating every reference
-  already computed under the current (pre-D28) definition.
+  already computed under the current (pre-D31) definition.
 - **Current-version-equality gating** (`if recorded != CURRENT: raise
   superseded`) instead of genuine dispatch. Rejected: not extensible — it
   provides no seam for a future, still-supported older version to be
@@ -169,7 +169,7 @@ dedicated tests, not an oversight.
 - `tests/unit/market/test_recommended_bet_result.py`
 - `docs/workstreams/analytical_claims/PLAN.md` → Workstream 2, Unit 4
   (closed)
-- DECISIONS.md D27 (bet-ledger writer coordination, for structural
+- DECISIONS.md D30 (bet-ledger writer coordination, for structural
   precedent)
 - VISION.md → the versioned analytical claim's lifecycle status and
   invalidation-contract capabilities (this decision implements those

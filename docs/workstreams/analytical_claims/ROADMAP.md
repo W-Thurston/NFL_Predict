@@ -33,27 +33,19 @@ API process cannot silently lose one another's write. Mechanism selected
 from confirmed evidence (no existing coordination utility; API runs as a
 single process; CLI bet commands unused; sync route handlers execute via a
 thread pool) — not cross-process locking or optimistic concurrency, neither
-of which is justified by any evidenced risk. The lock's boundary (threads
-within one process only) is explicit in the module docstring and in
-`DECISIONS.md` D27. This closes the persistence-hardening arc (Units 1–3).
+of which is justified by any evidenced risk. The lock's boundary (threads within one process only) is explicit in the module docstring and in DECISIONS.md D30. This closes the persistence-hardening arc (Units 1–3).
 
-**Unit 4 — Common claim capability protocol.** [PENDING]
-Formalizes the eleven-capability profile as a documented protocol/conformance profile — not a base
-class. Generalizes from Unit 3's identity-evolution pattern.
+**Unit 4 — Identity-evolution contract for candidate references.** *(Completed.)*
+candidate_issuance_row_id gained an independently owned, dispatched derivation version; RecommendedBetResult schema incremented to 2; schema-1 development artifacts regenerated and deleted. DECISIONS.md D31. Closes the persistence-hardening-plus-first-identity-evolution arc.
 
-**Unit 5 — Attribution-operation ownership.** [PENDING]
-Separates and names the six confirmed reference operations as explicit, non-interchangeable capabilities
-per Unit 4's contract. Corrects `_closeout_matches`'s current integrity
-ambiguity via one of three named options (validate-then-compare /
-attribution-only / expose both results separately).
+**Unit 5 — Common claim capability protocol.** *[PENDING — next]*
+Formalizes the eleven-capability profile as a documented protocol/ conformance profile — not a base class. Generalizes from Unit 4's identity-evolution pattern.
 
-**Unit 6 — Small API and documentation cleanup.** [PENDING]
-Empty-`/portfolio/splits` serializer bypass (D18 violation, one-line fix); `api/serializers/portfolio.py`'s
-incorrect D19 citation (remove, do not re-cite D18); development-era phase-
-naming ("Unit 22"/"Unit 24," reviewed per-file, not blind substitution).
+**Unit 6 — Attribution-operation ownership.** *[PENDING]*
+Separates and names the six confirmed reference operations as explicit, non-interchangeable capabilities per Unit 5's contract. Corrects _closeout_matches's integrity ambiguity via one of three named options.
 
-**Unit 7 — Small API and documentation cleanup.** *(Renumbered from Unit 6.)*
-Unchanged from prior ROADMAP text.
+**Unit 7 — Small API and documentation cleanup.** *[PENDING]*
+Empty-/portfolio/splits serializer bypass (D18 violation); api/serializers/portfolio.py's incorrect D19 citation; development-era phase-naming ("Unit 22"/"Unit 24," reviewed per-file, not blind substitution).
 
 ### Explicitly deferred (not resolved by WS2 inspection; do not silently answer in any unit above)
 `QualificationResult`'s disposition (Remove/Adapt/Retain); same-identity/
