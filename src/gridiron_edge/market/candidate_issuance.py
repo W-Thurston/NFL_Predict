@@ -32,6 +32,18 @@ _PRODUCT_STORAGE_COLUMNS: Final[tuple[str, ...]] = (
     "product_run_id",
     "product_generated_at",
 )
+CANDIDATE_REFERENCE_DERIVATION_VERSION_V1: Final[int] = 1
+CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION: Final[int] = (
+    CANDIDATE_REFERENCE_DERIVATION_VERSION_V1
+)
+
+
+class UnsupportedCandidateReferenceVersionError(ValueError):
+    """Raised when a candidate-reference derivation version is unsupported.
+
+    Covers both an invalid version value and a version with no known
+    implementation to derive or re-derive against.
+    """
 
 
 class CandidateIssuanceState(StrEnum):
@@ -126,11 +138,32 @@ def candidate_issuance_id(
 def candidate_issuance_row_id(
     issuance_id: str,
     row: CandidateIssuanceRow,
+    *,
+    version: int = CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION,
 ) -> str:
-    """Return the stable identity of one exact row within an issuance.
+    """Return one exact row identity under a selected derivation version.
 
-    The payload preserves the candidate-reference identity originally owned by
-    the market closeout boundary so peer consumers share one lasting identity.
+    The version selects an implementation and is not automatically
+    included in that implementation's payload. Explicit v1 derivation
+    therefore preserves the pre-versioning candidate-reference output
+    exactly.
+    """
+    if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+        raise UnsupportedCandidateReferenceVersionError(
+            f"Candidate reference derivation version {version!r} is invalid."
+        )
+    if version == CANDIDATE_REFERENCE_DERIVATION_VERSION_V1:
+        return _candidate_issuance_row_id_v1(issuance_id, row)
+    raise UnsupportedCandidateReferenceVersionError(
+        f"Candidate reference derivation version {version} is not supported."
+    )
+
+
+def _candidate_issuance_row_id_v1(issuance_id: str, row: CandidateIssuanceRow) -> str:
+    """Version 1 candidate-reference derivation, unchanged from the original.
+
+    The payload preserves the candidate-reference identity originally owned
+    by the market closeout boundary so peer consumers share one lasting
     """
     normalized_issuance_id = _nonempty(issuance_id, label="issuance_id")
     identity: dict[str, bool | float | int | str | None] = {

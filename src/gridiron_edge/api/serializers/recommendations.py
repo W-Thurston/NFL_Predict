@@ -78,6 +78,7 @@ def serialize_recommendation_result(
         offer_provenance=RecommendationOfferProvenanceResponse(
             issuance_id=result.issuance_id,
             candidate_reference_id=result.candidate_reference_id,
+            candidate_reference_derivation_version=result.candidate_reference_derivation_version,
             game_id=result.game_id,
             market=result.market,
             side=result.side,

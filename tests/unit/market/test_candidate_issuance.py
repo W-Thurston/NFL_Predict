@@ -8,9 +8,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from gridiron_edge.market.candidate_issuance import (
+    CANDIDATE_REFERENCE_DERIVATION_VERSION_V1,
     CandidateIssuanceReason,
     CandidateIssuanceRow,
     CandidateIssuanceState,
+    UnsupportedCandidateReferenceVersionError,
     candidate_issuance_id,
     candidate_issuance_row_id,
 )
@@ -156,3 +158,43 @@ def test_candidate_reference_distinguishes_missing_source_update_time() -> None:
     assert (
         candidate_issuance_row_id("a" * 64, replace(row, sportsbook_updated_at=None)) != reference
     )
+
+
+def test_default_version_matches_explicit_v1() -> None:
+    row = _canonical_row()
+    issuance_id = "a" * 64
+    assert candidate_issuance_row_id(issuance_id, row) == candidate_issuance_row_id(
+        issuance_id, row, version=CANDIDATE_REFERENCE_DERIVATION_VERSION_V1
+    )
+
+
+def test_v1_output_is_pinned_exactly() -> None:
+    """Regression-pin the exact v1 algorithm output for one fixed input,
+    proving preservation of the historical digest -- not merely
+    determinism or field-sensitivity, which the tests above already cover.
+    """
+    row = _canonical_row()
+    reference = candidate_issuance_row_id(
+        "a" * 64, row, version=CANDIDATE_REFERENCE_DERIVATION_VERSION_V1
+    )
+    assert reference == (
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:"
+        "c8d47252ecf1558be0a79c405b1d37b11a8424af3f86ebb45f326274c656cc7a"
+    )
+
+
+def test_unrecognized_version_raises_unsupported_error() -> None:
+    row = _canonical_row()
+    with pytest.raises(UnsupportedCandidateReferenceVersionError, match="not supported"):
+        candidate_issuance_row_id("a" * 64, row, version=2)
+
+
+@pytest.mark.parametrize("invalid_version", [True, 0, -1, 1.0, "1", None])
+def test_invalid_version_raises_unsupported_error(invalid_version: object) -> None:
+    row = _canonical_row()
+    with pytest.raises(UnsupportedCandidateReferenceVersionError, match="invalid"):
+        candidate_issuance_row_id(
+            "a" * 64,
+            row,
+            version=invalid_version,  # pyrefly: ignore [bad-argument-type]
+        )

@@ -7,6 +7,174 @@ Each entry documents *why* a choice was made, not just *what* changed
 Format: newest entry at top. Each entry self-contained.
 
 ---
+### D31. Candidate-reference derivation is independently versioned; recommended-result schema increments to 2
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+Candidate-reference derivation (`candidate_issuance_row_id`) has an
+independently owned version, separate from `CandidateIssuance`'s own
+artifact schema version. Version 1 is the exact pre-D28 algorithm and
+output — the version marker is not part of the v1 hash payload; it selects
+which derivation implementation runs, it is not an input to that
+implementation's digest. `RecommendedBetResult`'s schema increments from 1
+to 2 to add `candidate_reference_derivation_version`, recording the version
+used to derive each result's candidate reference. Readers dispatch
+validation through the recorded version, not through comparison against
+whatever version is currently default. A recorded version with no known
+implementation raises a dedicated `UnsupportedCandidateReferenceVersionError`
+(a `ValueError` subtype), which propagates directly and is not wrapped.
+A recorded version with a known implementation whose re-derived reference
+disagrees with stored evidence remains the existing content-corruption
+`ValueError`, unchanged. The recommendation API's offer provenance exposes
+`candidate_reference_derivation_version` alongside `issuance_id` and
+`candidate_reference_id`, copied mechanically by the serializer.
+
+#### Context
+
+Unit 2 and Unit 3 of this workstream's persistence-hardening arc closed the
+publication-atomicity and writer-coordination gaps in the betting ledger.
+This decision addresses a different, longstanding gap: the exact seed
+incident that motivated Workstream 2's opening (WS1 Unit 2 changed
+`candidate_issuance_row_id`'s hashed payload to close a non-injectivity
+gap; every previously-persisted `RecommendedBetResult` began failing its
+own self-validation on read, because that validation re-derives the
+candidate reference using whatever derivation logic is *currently*
+installed, with no way to know the reference was computed under a
+different, no-longer-current definition).
+
+Tracing every consumer of `candidate_issuance_row_id` by actual data
+lifecycle (not merely call graph) established that only one consumer is
+exposed to this risk: `validate_recommended_bet_result`, which re-derives a
+reference from a *persisted* result's own embedded fields, potentially long
+after the derivation logic that originally produced it may have changed.
+`market_closeout.py::_candidate_reference` and
+`recommendation_policy.py::_resolve_candidate` both operate on fresh,
+same-operation data and can never encounter this failure mode — confirmed
+during implementation: both required zero source changes and their
+existing test suites passed unmodified.
+
+`RecommendedBetResult.issuance_schema_version` already exists but versions
+`CandidateIssuance`'s own artifact schema (`CANDIDATE_ISSUANCE_SCHEMA_VERSION`),
+which remained `1` throughout the entire WS1 incident even as the
+row-reference payload changed — direct proof these are two independent
+versioning axes that must not be conflated.
+
+Because `recommended_bet_result_id` canonicalizes every dataclass field
+(blanking only `result_id` itself), adding this new field to
+`RecommendedBetResult` changes every newly computed result's identity,
+which in turn changes `RecommendedBetEvaluation.evaluation_id` (built from
+`result_ids`). This is an intentional, understood consequence, confirmed by
+dedicated tests, not an oversight.
+
+#### Alternatives considered and rejected
+- **Embedding the version marker inside the v1 hash payload.** Rejected:
+  this would change the v1 digest itself, invalidating every reference
+  already computed under the current (pre-D28) definition.
+- **Current-version-equality gating** (`if recorded != CURRENT: raise
+  superseded`) instead of genuine dispatch. Rejected: not extensible — it
+  provides no seam for a future, still-supported older version to be
+  re-derived correctly.
+- **Reusing `issuance_schema_version`** for this purpose. Rejected: proven
+  to be a distinct axis by the seed incident itself.
+- **Wrapping `UnsupportedCandidateReferenceVersionError` into a generic
+  `ValueError`.** Rejected: discards the structural benefit of a dedicated
+  exception type for no compatibility gain, since it already subclasses
+  `ValueError`.
+- **Keeping `RECOMMENDED_BET_RESULT_SCHEMA_VERSION` at 1** for the new
+  field set. Rejected: two different physical field sets cannot both
+  truthfully claim to be "schema 1."
+- **Explicit schema-version-aware backward-compatible decoding.** Rejected
+  as real migration machinery not justified here, consistent with the
+  project's clean-sheet, never-live status.
+- **Omitting the derivation version from the API.** Rejected: would
+  recreate, at the API boundary, the exact omission this decision closes at
+  the domain layer.
+- **Constructing a fully-implemented fake v2 solely to exercise the
+  unsupported-version test path.** Rejected: only one version has ever
+  existed; the dispatcher's terminal branch is exercised directly with an
+  unrecognized version number.
+
+#### Consequences
+- `RECOMMENDED_BET_RESULT_SCHEMA_VERSION` is 2. The store path is
+  `schema=2/`. No schema-1 reader remains; schema-1 artifacts are
+  unsupported, not migrated.
+- All existing schema-1 development artifacts were regenerated and the
+  `schema=1/` tree deleted, via the real, verified production-chain
+  sequence:
+  ```
+  gridiron production-chain issue-candidates \
+    --season <season> --week <week> --evaluated-at <ts> --write
+
+  gridiron production-chain create-governance \
+    --created-at <ts> [governance parameters...] --write
+
+  gridiron production-chain derive-policy \
+    --issuance-id <issuance_id> --governance-id <governance_id> \
+    --created-at <ts> --write
+
+  gridiron production-chain evaluate-recommendations \
+    --issuance-id <issuance_id> --policy-id <policy_id> \
+    --decision-at <ts> --write
+  ```
+  Executed against real production data (2026-2027 season, week 1; 1,680
+  quote observations; 698 issued candidates) on 2026-08-26. All 698
+  regenerated results passed `validate_recommended_bet_result` — the exact
+  function this decision modified — with zero errors, confirming the
+  schema-2 migration and version-dispatch machinery are mechanically sound
+  against real data volume. (All 698 results were `result_state=unavailable`
+  due to no historical outcome/closeout data being available to policy
+  derivation in this environment at the time — this exercises the schema
+  and dispatch machinery, not the reference-mismatch branches, which remain
+  covered by this unit's own unit tests.)
+- Every newly built `RecommendedBetResult` records
+  `CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION` (currently always `1`).
+- `result_id` and `evaluation_id` for newly built artifacts differ from
+  what identical inputs would have produced under schema 1 — expected and
+  intentional.
+- `market_closeout.py` and `recommendation_policy.py` required no source
+  changes.
+- The recommendation API's offer-provenance response includes the
+  derivation version as read-only, mechanically-projected provenance. The
+  checked-in `api-schema.json` OpenAPI snapshot and the frontend's
+  generated `schema.ts` were regenerated to match; one frontend test
+  fixture (`recommendationPresentation.test.ts`) required updating to
+  include the new required field — a real scope item not anticipated in
+  the original design, caught by the frontend's own TypeScript build gate.
+
+#### Revisit triggers
+- A genuine version 2 derivation is designed and needs to coexist with
+  version 1 for already-persisted results.
+- Old (schema-1 or v1-only) artifacts must become readable again without
+  regeneration.
+- Candidate references become interpreted by external (non-Gridiron-Edge)
+  consumers.
+- A caller needs to construct or evaluate a non-current but still-supported
+  reference version in memory (not just at the persisted-result validation
+  boundary) — no such path exists today.
+- A common claim capability protocol (ROADMAP Unit 5, this workstream)
+  supersedes this local per-artifact representation.
+
+#### References
+- `src/gridiron_edge/market/candidate_issuance.py`
+- `src/gridiron_edge/market/recommended_bet_result.py`
+- `src/gridiron_edge/market/recommended_bet_result_store.py` (unmodified —
+  its reflective codec absorbed the schema change automatically)
+- `src/gridiron_edge/api/schemas/recommendations.py`
+- `src/gridiron_edge/api/serializers/recommendations.py`
+- `frontend/src/components/recommendations/recommendationPresentation.test.ts`
+- `tests/unit/market/test_candidate_issuance.py`
+- `tests/unit/market/test_recommended_bet_result.py`
+- `docs/workstreams/analytical_claims/PLAN.md` → Workstream 2, Unit 4
+  (closed)
+- DECISIONS.md D27 (bet-ledger writer coordination, for structural
+  precedent)
+- VISION.md → the versioned analytical claim's lifecycle status and
+  invalidation-contract capabilities (this decision implements those
+  existing invariants for one artifact type; it does not amend VISION.md)
+
 ### D30. Bet-ledger writer coordination uses an intra-process thread lock, not cross-process locking
 
 **Status:** Accepted

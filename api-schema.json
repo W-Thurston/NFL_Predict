@@ -5797,6 +5797,10 @@
             ],
             "title": "American Price"
           },
+          "candidate_reference_derivation_version": {
+            "title": "Candidate Reference Derivation Version",
+            "type": "integer"
+          },
           "candidate_reference_id": {
             "title": "Candidate Reference Id",
             "type": "string"
@@ -5891,6 +5895,7 @@
         "required": [
           "issuance_id",
           "candidate_reference_id",
+          "candidate_reference_derivation_version",
           "game_id",
           "market",
           "side",

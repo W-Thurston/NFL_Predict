@@ -1,3 +1,5 @@
+# src/gridiron_edge/cli/production_chain.py
+
 """CLI reporting and immutable persistence for production-chain preflight."""
 
 from __future__ import annotations

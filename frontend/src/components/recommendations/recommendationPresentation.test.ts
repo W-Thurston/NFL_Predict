@@ -25,6 +25,7 @@ function recommendation(
     issuance_quote_age_seconds: 5,
     offer_provenance: {
       american_price: -110,
+      candidate_reference_derivation_version: 1,
       candidate_reference_id: "candidate-1",
       fetched_at: "2026-09-01T12:00:00Z",
       game_id: "2026_01_KC_LAC",

@@ -255,3 +255,54 @@ def test_pre_publication_failure_leaves_no_destination_or_temporary_file(
     path = recommended_bet_result_path(result.schema_version, result.result_id, repo=tmp_path)
     assert not path.exists()
     assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_schema_2_result_round_trip_preserves_derivation_version(tmp_path: Path) -> None:
+    result = evaluation().results[0]
+    assert result.schema_version == 2
+    path = write_recommended_bet_result(result, repo=tmp_path)
+    assert path.parent.parent.name == "schema=2"
+    assert path.parent.name == "results"
+    loaded = read_recommended_bet_result(path)
+    assert loaded.candidate_reference_derivation_version == 1
+    assert loaded == result
+
+
+def test_schema_2_evaluation_manifest_uses_schema_2_namespace(tmp_path: Path) -> None:
+    value = evaluation()
+    assert value.schema_version == 2
+    path = write_recommended_bet_evaluation(value, repo=tmp_path)
+    assert path.parent.parent.name == "schema=2"
+    assert path.parent.name == "evaluations"
+    loaded = read_recommended_bet_evaluation(path)
+    for result in loaded.results:
+        result_path = recommended_bet_result_path(
+            result.schema_version, result.result_id, repo=tmp_path
+        )
+        assert result_path.parent.parent.name == "schema=2"
+
+
+def test_result_missing_derivation_version_field_is_rejected(tmp_path: Path) -> None:
+    result = evaluation().results[0]
+    path = write_recommended_bet_result(result, repo=tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    del payload["candidate_reference_derivation_version"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="keys do not match"):
+        read_recommended_bet_result(path)
+
+
+def test_schema_1_shaped_result_is_rejected_as_unsupported(tmp_path: Path) -> None:
+    """A schema-1-shaped payload (missing the schema-2 field, tagged as
+    schema 1) is rejected -- confirming schema 1 is unsupported after this
+    unit, not silently accepted or migrated."""
+    result = evaluation().results[0]
+    path = write_recommended_bet_result(result, repo=tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    del payload["candidate_reference_derivation_version"]
+    payload["schema_version"] = 1
+    schema_1_path = path.parent.parent.parent / "schema=1" / "results" / path.name
+    schema_1_path.parent.mkdir(parents=True, exist_ok=True)
+    schema_1_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError):
+        read_recommended_bet_result(schema_1_path)

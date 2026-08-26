@@ -1,4 +1,63 @@
 # Gridiron Edge - Changelog
+## 2026-08-26 - Identity-evolution contract for candidate references (WS2 Unit 4)
+
+### Changed
+- `candidate_issuance_row_id` gained an independently owned derivation
+  version, separate from `CandidateIssuance`'s own artifact schema.
+  Version 1 is the exact pre-existing algorithm, extracted verbatim with no
+  version marker in its hashed payload — the version selects which
+  implementation runs, it is not an input to that implementation's digest,
+  so every reference explicitly derived under v1 remains stable.
+- Added `UnsupportedCandidateReferenceVersionError` (a `ValueError`
+  subtype), propagated directly and uncaught, so a recorded
+  reference-derivation version with no known implementation is
+  structurally distinct from ordinary evidence-content corruption.
+- `RECOMMENDED_BET_RESULT_SCHEMA_VERSION` incremented from 1 to 2.
+  `RecommendedBetResult` gains `candidate_reference_derivation_version`,
+  recorded at construction time. `validate_recommended_bet_result`
+  dispatches re-derivation through the recorded version, not a hardcoded
+  current-version comparison.
+- `recommended_bet_result_store.py`, `market_closeout.py`,
+  `recommendation_policy.py`, and `tests/fixtures/recommended_bet_results.py`
+  required no code changes — confirmed by direct repository search
+  (`rg -n 'RecommendedBetResult\(' src tests frontend`), not assumed.
+- Recommendation API offer provenance now exposes
+  `candidate_reference_derivation_version`, copied mechanically by the
+  serializer. `api-schema.json` and the frontend's generated `schema.ts`
+  regenerated to match; one frontend test fixture updated for the new
+  required field.
+
+### Verification (two full review rounds)
+- First round: confirmed core design; caught two docstring lint
+  violations, the stale OpenAPI snapshot, and a frontend fixture that
+  failed to compile against the regenerated contract.
+- Second round: found the initial closure diff incomplete —
+  `test_recommended_bet_result_store.py` (schema-2 round-trip, namespace,
+  missing-field rejection, and schema-1-shaped rejection tests) was
+  missing entirely; no direct proof existed that no test/fixture
+  constructs the dataclass positionally (resolved via repository search);
+  the Python serializer had no direct runtime assertion (added); one new
+  evaluation-identity test was found to duplicate existing coverage
+  without proving what its name claimed and was replaced with a correctly
+  narrow identity-function test; the dispatcher docstring was found too
+  broad and narrowed; invalid-version test coverage was expanded to
+  include non-integer runtime values; a missing trailing newline in the
+  regenerated `api-schema.json` was caught and corrected.
+- Ruff, Pyrefly, the full Python unit test suite, and the frontend
+  TypeScript build all pass after both rounds' corrections.
+- Real-data regeneration: all schema-1 development artifacts regenerated
+  under schema 2 via the production-chain CLI against real 2026-2027
+  season week 1 data (1,680 quote observations, 698 issued candidates, all
+  698 results passing validation with zero errors); old `schema=1/` tree
+  deleted. All 698 regenerated results were `result_state=unavailable` (no
+  historical outcome data available in this environment) — this exercises
+  the schema/dispatch machinery end-to-end but not the reference-mismatch
+  validation branches, which remain covered by dedicated unit tests.
+
+### See also
+`DECISIONS.md` D31 — records the independently-versioned reference
+derivation, the schema-2 increment, the replace-and-regenerate policy, and
+revisit triggers.
 
 ## 2026-08-25 - Bet-ledger writer coordination (WS2 Unit 3)
 

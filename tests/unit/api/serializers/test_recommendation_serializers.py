@@ -22,6 +22,10 @@ def test_serializer_preserves_persisted_result_without_recalculation() -> None:
     assert response.suggested_stake == result.sizing.actionable_stake
     assert response.sizing.actionable_stake == result.sizing.actionable_stake
     assert response.offer_provenance.candidate_reference_id == result.candidate_reference_id
+    assert (
+        response.offer_provenance.candidate_reference_derivation_version
+        == result.candidate_reference_derivation_version
+    )
     assert response.policy_provenance.policy_id == result.policy_id
     assert response.forecast_provenance.product_id == result.product_id
 

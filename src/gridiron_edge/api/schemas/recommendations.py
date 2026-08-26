@@ -57,6 +57,7 @@ class RecommendationOfferProvenanceResponse(BaseModel):
 
     issuance_id: str
     candidate_reference_id: str
+    candidate_reference_derivation_version: int
     game_id: str
     market: str
     side: str

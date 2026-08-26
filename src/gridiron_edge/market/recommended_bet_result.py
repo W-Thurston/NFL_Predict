@@ -11,6 +11,7 @@ import math
 from typing import Final
 
 from gridiron_edge.market.candidate_issuance import (
+    CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION,
     CandidateIssuance,
     CandidateIssuanceRow,
     CandidateIssuanceState,
@@ -30,7 +31,7 @@ from gridiron_edge.market.recommendation_policy import (
     validate_recommendation_policy,
 )
 
-RECOMMENDED_BET_RESULT_SCHEMA_VERSION: Final[int] = 1
+RECOMMENDED_BET_RESULT_SCHEMA_VERSION: Final[int] = 2
 
 
 class RecommendedBetResultState(StrEnum):
@@ -52,6 +53,7 @@ class RecommendedBetResult:
     issuance_schema_version: int
     issuance_id: str
     candidate_reference_id: str
+    candidate_reference_derivation_version: int
     product_id: str
     product_run_id: str
     product_generated_at: datetime
@@ -136,6 +138,7 @@ def build_recommended_bet_result(
         issuance.schema_version,
         issuance.issuance_id,
         decision.candidate_reference_id,
+        CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION,
         issuance.product_id,
         issuance.product_run_id,
         issuance.product_generated_at,
@@ -272,8 +275,11 @@ def validate_recommended_bet_result(result: RecommendedBetResult) -> None:
     ):
         if value is not None:
             _require_utc(value, "optional recommended-bet timestamp")
+
     if result.candidate_reference_id != candidate_issuance_row_id(
-        result.issuance_id, _result_row(result)
+        result.issuance_id,
+        _result_row(result),
+        version=result.candidate_reference_derivation_version,
     ):
         raise ValueError("Recommended-bet candidate identity does not match offer evidence.")
     if result.policy_id == "" or result.result_id != recommended_bet_result_id(result):

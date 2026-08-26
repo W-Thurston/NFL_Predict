@@ -10,10 +10,12 @@ import pytest
 
 from gridiron_edge.market.candidate_issuance import (
     CANDIDATE_ISSUANCE_SCHEMA_VERSION,
+    CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION,
     CandidateIssuance,
     CandidateIssuanceReason,
     CandidateIssuanceRow,
     CandidateIssuanceState,
+    UnsupportedCandidateReferenceVersionError,
     candidate_issuance_row_id,
 )
 from gridiron_edge.market.recommendation_policy import (
@@ -39,6 +41,8 @@ from gridiron_edge.market.recommended_bet_result import (
     RecommendedBetResultState,
     build_recommended_bet_result,
     evaluate_recommendation_issuance,
+    recommended_bet_result_id,
+    validate_recommended_bet_result,
 )
 
 
@@ -320,3 +324,88 @@ def test_batch_evaluation_does_not_mutate_inputs() -> None:
         decision_at=DECISION,
     )
     assert before == (issuance, policy)
+
+
+def test_new_result_records_current_derivation_version() -> None:
+    evaluation = evaluate_recommendation_issuance(
+        policy=_policy(),
+        issuance=_issuance(_row()),
+        decision_at=DECISION,
+        bankroll=_bankroll(),
+        portfolio=portfolio_exposure_snapshot(observed_at=EVALUATED, rows=()),
+    )
+    result = evaluation.results[0]
+    assert (
+        result.candidate_reference_derivation_version
+        == CURRENT_CANDIDATE_REFERENCE_DERIVATION_VERSION
+    )
+
+
+def test_derivation_version_participates_in_result_identity() -> None:
+    """Pure identity-function test: an unsupported version tag still changes
+    result_id, since identity canonicalization does not validate the field
+    -- this does NOT assert the tagged object is a valid result."""
+    evaluation = evaluate_recommendation_issuance(
+        policy=_policy(),
+        issuance=_issuance(_row()),
+        decision_at=DECISION,
+        bankroll=_bankroll(),
+        portfolio=portfolio_exposure_snapshot(observed_at=EVALUATED, rows=()),
+    )
+    result = evaluation.results[0]
+    retagged = replace(result, candidate_reference_derivation_version=2, result_id="0" * 64)
+    assert recommended_bet_result_id(retagged) != result.result_id
+
+
+def test_derivation_version_field_participates_in_result_identity_only() -> None:
+    """The derivation-version field is canonicalized into result_id (proven
+    directly, as a pure identity function). Evaluation identity's inclusion
+    of result_ids (proven separately by
+    test_result_identity_is_deterministic_and_changes_with_decision_time)
+    means any result_id change propagates -- this test isolates the first
+    link in that chain without re-testing the second."""
+    evaluation = evaluate_recommendation_issuance(
+        policy=_policy(),
+        issuance=_issuance(_row()),
+        decision_at=DECISION,
+        bankroll=_bankroll(),
+        portfolio=portfolio_exposure_snapshot(observed_at=EVALUATED, rows=()),
+    )
+    result = evaluation.results[0]
+    retagged = replace(result, candidate_reference_derivation_version=2, result_id="0" * 64)
+    assert recommended_bet_result_id(retagged) != result.result_id
+
+
+def test_unsupported_recorded_version_raises_distinct_from_corruption() -> None:
+    """A result whose recorded derivation version has no implementation
+    raises the propagated UnsupportedCandidateReferenceVersionError -- NOT
+    the ordinary content-corruption ValueError -- and this is not described
+    as a valid v2 result."""
+    evaluation = evaluate_recommendation_issuance(
+        policy=_policy(),
+        issuance=_issuance(_row()),
+        decision_at=DECISION,
+        bankroll=_bankroll(),
+        portfolio=portfolio_exposure_snapshot(observed_at=EVALUATED, rows=()),
+    )
+    result = evaluation.results[0]
+    tagged = replace(result, candidate_reference_derivation_version=2)
+    tagged = replace(tagged, result_id=recommended_bet_result_id(tagged))
+    with pytest.raises(UnsupportedCandidateReferenceVersionError):
+        validate_recommended_bet_result(tagged)
+
+
+def test_supported_version_with_altered_evidence_still_raises_corruption_message() -> None:
+    """A supported (v1) recorded version with tampered offer evidence still
+    raises today's exact existing corruption message, unchanged."""
+    evaluation = evaluate_recommendation_issuance(
+        policy=_policy(),
+        issuance=_issuance(_row()),
+        decision_at=DECISION,
+        bankroll=_bankroll(),
+        portfolio=portfolio_exposure_snapshot(observed_at=EVALUATED, rows=()),
+    )
+    result = evaluation.results[0]
+    tampered = replace(result, american_price=(result.american_price or 0) + 5)
+    with pytest.raises(ValueError, match="does not match offer evidence"):
+        validate_recommended_bet_result(tampered)
