@@ -7,6 +7,535 @@ Each entry documents *why* a choice was made, not just *what* changed
 Format: newest entry at top. Each entry self-contained.
 
 ---
+### D37. Attribution operations are formally named and separated by authentication strength; `_closeout_matches` is corrected to re-derive the canonical digest
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+Seven reference-attribution operations are formally named, confirmed from
+full current source, and classified into two families that must not be
+conflated:
+
+**Canonical authentication** (re-derives or matches an exact,
+digest-backed identity; a 1:1 relationship between one reference and one
+exact upstream artifact):
+1. **Canonical reference production** — `market_closeout.py::_candidate_reference`.
+   Adapts one `CandidateIssuanceRow` into a `MarketCloseoutReference`,
+   computing `reference_id` via `candidate_issuance_row_id`. Unconditional;
+   cannot fail.
+2. **Issuance-row resolution** — `recommendation_policy.py::_resolve_candidate`.
+   Re-derives `candidate_issuance_row_id` for each row in an issuance,
+   requires exactly one match against a supplied reference.
+3. **Persisted-result self-validation** — `recommended_bet_result.py::validate_recommended_bet_result`
+   (via `_resolve_row`). Re-derives the candidate reference from a
+   *persisted* result's own embedded fields, dispatched through the
+   recorded derivation version (Unit 4, D31).
+4. **Structural closeout attribution** — `market_family_evaluation.py::_closeout_matches`.
+   **Corrected in this unit** (see below).
+5. **Recorded-wager reference authentication** — `bet_reference_matching.py::match_bet_references`.
+   Newly formally named in this unit (previously uncounted among the six
+   operations Boundary 4 identified). Validates a recorded wager's
+   self-reported reference terms against real observed quote history by
+   exact field-by-field equality (provider, provider_event_id, sportsbook,
+   game_id, market, side, fetched_at, all required and exact), producing a
+   five-state diagnostic (`MATCHED`/`MANUAL_BET`/`OBSERVATION_NOT_FOUND`/
+   `AMBIGUOUS_OBSERVATION`/`REFERENCE_TERMS_CONFLICT`). Distinct from
+   operation 1: it is not an unconditional adapter — it has genuine failure
+   modes because it is validating a *claim* (what the bettor's own ledger
+   row says the reference was) against *ground truth* (actual quote
+   history), not merely transcribing already-known fields. Its own
+   `reference_id` (`bet_id`, a ledger UUID) carries no digest, so it has no
+   analogous suffix-authentication gap to close.
+
+**Structural attribution** (matches materialized evidence to a *group* or
+*aggregate* concept; not a 1:1 exact-reference relationship, and
+correctly has no digest to check):
+6. **Structural history-group attribution** — `market_family_evaluation.py::_history_matches`.
+   Matches a `QuoteHistoryBoundary` (a descriptive statistical summary of
+   observation depth/count for one market-side) to a candidate row via 6
+   identity fields. **Confirmed, from full current source, to have no
+   `reference_id` or digest field on `QuoteHistoryBoundary` at all** — this
+   is not an omission or a narrower version of operation 4; it answers a
+   structurally different question ("which group of historical
+   observations describes this market-side's quote depth" vs. "which exact
+   persisted result belongs to this exact row"). No digest-authentication
+   mechanism applies here, and none should be added by analogy to
+   operation 4's fix.
+7. **Structural wager attribution** — `market_family_evaluation.py::_wager_return_for_row`.
+   Attributes settled-wager return evidence (stake, PnL, realized return)
+   to a candidate row via exact materialized-field matching against ledger
+   columns (provider, provider_event_id, sportsbook, game_id, market_type,
+   side, and all four immutable reference timestamp/price/line fields).
+   Like operation 6, this is group/aggregate-style attribution over
+   ledger rows, not a digest-backed 1:1 reference resolution.
+
+**The `_closeout_matches` correction:** the function previously checked an
+issuance-ID **prefix** (`reference_id.startswith(f"{issuance_id}:")`) plus
+11 individually-compared materialized fields — every field the
+`candidate_issuance_row_id` v1 hash payload covers, checked redundantly,
+without ever re-deriving and comparing the digest **suffix** itself. This
+meant a reference whose suffix was not the row's true digest, but whose 11
+individual fields happened to equal the row's fields, would incorrectly be
+attributed. The function now re-derives the canonical reference directly
+(`reference.reference_id == candidate_issuance_row_id(issuance.issuance_id, row)`)
+and separately checks `reference_kickoff`, the one field
+`candidate_issuance_row_id`'s payload does not cover — kept as an explicit,
+separate check, not folded into the digest or silently dropped.
+
+#### Context
+
+Boundary 4 (Workstream 2 inspection) confirmed six reference-attribution
+operations and flagged operation 4's suffix-matching gap as a real
+integrity ambiguity, not yet fixed. This unit's own source re-reading
+(`market_closeout.py`, `bet_reference_matching.py`,
+`market_family_evaluation.py`, and their focused tests, all read in full
+this session) confirmed Boundary 4's finding exactly and surfaced a
+seventh operation (`match_bet_references`) that Boundary 4's original
+six-operation count did not include.
+
+The test suite (`test_market_family_evaluation.py`) independently confirmed
+the defect was live: its own `_closeout` fixture helper constructed every
+closeout reference with a deliberately fake, non-digest suffix
+(`f"{issuance.issuance_id}:test-{row.market}-{row.side}"`), and every
+existing test using that helper passed — proof the function's
+field-by-field checks alone were sufficient to satisfy every existing test,
+independent of whether the digest suffix was genuine.
+
+#### Alternatives considered and rejected
+- **Option B (attribution-only, remove the suffix check entirely, rename
+  the function to disclaim authentication).** Rejected: operation 4's
+  actual callers (`_evaluate_row`) treat its result as establishing a 1:1
+  relationship between one exact candidate row and one exact closeout
+  result — removing the authentication guarantee here would weaken an
+  existing real guarantee, not merely relabel it.
+- **Option C (expose both a structural-match result and a digest-
+  authenticated result separately, let the caller choose).** Rejected as
+  unnecessary complexity: nothing in `_evaluate_row` or any other caller
+  needs the weaker, structural-only guarantee — Option A's stronger
+  guarantee is strictly better for every current consumer, with no
+  observed need for the weaker variant to remain available.
+- **Adding a digest/reference_id field to `QuoteHistoryBoundary` so
+  `_history_matches` could adopt the same fix.** Rejected: `_history_matches`
+  answers a structurally different question (group/aggregate attribution,
+  not exact 1:1 reference resolution); it has no analogous gap, and adding
+  a field to manufacture one would be scope creep with no defect to
+  justify it.
+
+#### Consequences
+- `market_family_evaluation.py::_closeout_matches` now imports
+  `candidate_issuance_row_id` from `candidate_issuance.py` and re-derives
+  the canonical reference directly, rather than checking a prefix plus
+  redundant individual fields.
+- `test_market_family_evaluation.py`'s `_closeout` fixture helper now
+  constructs genuine digest-backed references
+  (`candidate_issuance_row_id(issuance.issuance_id, row)`), rather than a
+  fake test suffix. All pre-existing tests using this helper continue to
+  pass unchanged, since none of them asserted on the suffix's content —
+  only on downstream evaluation behavior.
+- One new test
+  (`test_closeout_with_mismatched_digest_but_matching_fields_does_not_match`)
+  proves the specific defect is closed: a forged reference with the
+  correct materialized fields but an incorrect digest suffix is no longer
+  attributed.
+- `bet_reference_matching.py::match_bet_references` is formally named as
+  the seventh attribution operation; no code changes were required —
+  it already has no suffix/digest gap, since its identity
+  (`bet_id`) is a ledger UUID, not a content digest.
+- `market_family_evaluation.py::_history_matches` and `_wager_return_for_row`
+  remain unchanged; their scope is confirmed correct as group/aggregate
+  attribution, not exact 1:1 reference authentication.
+
+#### Revisit triggers
+- A future consumer of `_closeout_matches`'s result needs the weaker
+  structural-only guarantee Option C would have provided (no such need
+  observed today).
+- `QuoteHistoryBoundary` or ledger wager rows ever gain their own
+  digest-backed identity, at which point `_history_matches`/
+  `_wager_return_for_row` should be re-evaluated against this same
+  authentication-vs-attribution distinction.
+
+#### References
+- `src/gridiron_edge/market/market_closeout.py`
+- `src/gridiron_edge/market/bet_reference_matching.py`
+- `src/gridiron_edge/market/market_family_evaluation.py`
+- `src/gridiron_edge/market/recommendation_policy.py`
+- `src/gridiron_edge/market/recommended_bet_result.py`
+- `tests/unit/market/test_market_family_evaluation.py`
+- `docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`
+  (Capability 8 — attribution, deferred to this unit by Unit 5)
+- `docs/workstreams/analytical_claims/FINDINGS.md` (Boundary 4)
+- `DECISIONS.md` D31 (candidate-reference derivation versioning — the
+  mechanism operation 3 dispatches through)
+
+### D36. Forward-impact discoverability is required but presently unimplemented
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+The architecture requires a way to discover or assess downstream consumers
+of a durable claim. Workstream 2's inspection found no current mechanism
+satisfying this requirement anywhere in the codebase, and this decision
+does not select one without a concrete use case. `production_chain_preflight.py`
+remains a readiness auditor; it is explicitly not repositioned as this
+capability's future implementation owner. A future mechanism, if and when
+built, requires its own separate owner and its own decision.
+
+#### Context
+
+Boundary 3's original inspection found `production_chain_preflight.py`
+resolves evidence *backward* (given a scope, find matching upstream
+artifacts) and does not answer "given this exact reference, what
+downstream artifacts consumed it." This unit's own full re-read of
+`production_chain_preflight.py::_exact_candidate_issuance` confirmed this
+directly: it scans persisted issuance files
+(`directory.glob("*.json")`) and matches on season/week/product/run — the
+same backward-resolution family as canonical reference authentication
+(`_resolve_candidate`, `_resolve_row`), not a forward index.
+`DECISIONS.md` D27 independently confirms this is intentional: preflight
+is "the composite chronological audit artifact," explicitly scoped to
+current-evidence readiness, not relationship discovery.
+
+No concrete, present pain point in this codebase requires answering "what
+consumed this reference" — the original seed incident (the motivation for
+this entire workstream) required the opposite query ("what does this
+reference depend on"), which backward lineage (Capability 5, strongly
+satisfied) already answers.
+
+#### Alternatives considered and rejected
+- **Extend `production_chain_preflight.py` into a forward-index owner.**
+  Rejected: preflight is scope- and chronology-oriented; extending it
+  risks conflating audit with relationship discovery, a distinct
+  responsibility.
+- **Build a reverse index, relationship manifest, or query service now,
+  speculatively.** Rejected: no concrete use case demonstrates the need;
+  building infrastructure ahead of evidence repeats a mistake this
+  workstream's own review process has caught and corrected twice already
+  (Units 2 and 3's initial drafts).
+- **Declare the capability satisfied by documentation alone.** Rejected:
+  the program-level exit criterion requires traceability to be followed
+  downstream in fact, not merely acknowledged as a gap. This decision
+  states plainly that the capability is unimplemented and that
+  Workstream 2's own downstream-traceability exit proof remains open.
+
+#### Consequences
+- No production code changes result from this decision.
+- Every durable claim in `CLAIM_CONFORMANCE_MATRIX.md` is marked
+  **Absent** for this capability — an honest, not hidden, gap.
+- **Workstream 2's exit criterion (traceability followed both upstream and
+  downstream) is not fully met by Unit 5's closure.** This must be carried
+  forward explicitly in `HANDOFF.md` and ROADMAP.md, not silently
+  implied as resolved.
+- Five candidate mechanisms are named for whichever future unit implements
+  this capability, none selected: embedded downstream references, a
+  reverse index, a relationship manifest, a repository-scanning query
+  service (reusing preflight's demonstrated technique without extending
+  preflight's own role), or an explicit no-new-mechanism-at-current-scale
+  deferral.
+
+#### Revisit triggers
+- A concrete use case demonstrates a real need to answer "what consumed
+  this reference" (e.g. a future evaluation or audit unit requires it).
+- Workstream scale or artifact count grows to a point where backward-only
+  traceability becomes a demonstrated operational problem.
+
+#### References
+- `src/gridiron_edge/market/production_chain_preflight.py`
+- `DECISIONS.md` D27 (production recommendation proof as an exact
+  immutable evidence chain — the decision this finding is consistent with
+  and does not contradict)
+- `docs/workstreams/analytical_claims/FINDINGS.md` (Boundary 3)
+- `docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`
+  (Capability 10)
+- `docs/workstreams/analytical_claims/HANDOFF.md` (must reflect this open
+  exit-criterion item)
+
+---
+
+### D35. Validity and invalidation are required capabilities with artifact-owned mechanisms
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+Durable claim specializations must state how readers distinguish
+supported, internally consistent evidence from unsupported contract
+semantics and from evidence corruption. Existing domain outcome/decision-
+state enums (`RecommendedBetResultState`, `RecommendationDecisionState`,
+`PolicyDerivationStatus`, etc.) are not replaced by a common lifecycle
+enum. Unit 4's candidate-reference derivation-version dispatch
+(`DECISIONS.md` D31) is one confirmed implementation precedent for one
+field on one artifact — it is not established, by this decision, as a
+universal mechanism other artifacts must adopt.
+
+#### Context
+
+Two independent artifacts — `RecommendationPolicyDecision`'s
+`RecommendationDecisionState` and `RecommendedBetResult`'s
+`RecommendedBetResultState` — were confirmed during this unit's review to
+be structurally the same *kind* of thing: decision-outcome enums
+answering "what did this evaluation conclude," not artifact-validity
+lifecycles answering "is this persisted artifact still the authoritative
+version of itself." This is a real, recurring gap, not an isolated
+oversight on one artifact.
+
+A hypothetical second test case for generalizing Unit 4's pattern — a
+revised `RecommendationPolicyGovernance` producing a changed
+`governance_fingerprint`, potentially invalidating prior policy
+derivations the way the original seed incident invalidated candidate
+references — was considered during this unit's pre-implementation review
+and explicitly rejected as a confirmed analog. Full-source review of
+`recommendation_governance.py` and `recommendation_policy.py` confirmed
+both validate identity/fingerprint agreement against *currently* governed
+content; no reader path exists that applies a *changed* derivation
+algorithm to an *old* persisted fingerprint the way the candidate-
+reference incident did. Generalizing Unit 4's specific mechanism from one
+confirmed case plus one unconfirmed hypothetical would be premature.
+
+#### Alternatives considered and rejected
+- **Generalize Unit 4's version-dispatch pattern into a shared mechanism
+  now**, using the governance-fingerprint scenario as a second proof case.
+  Rejected: the scenario is not a confirmed instance; generalizing from
+  one real case is not justified.
+- **Introduce a common lifecycle enum (current/superseded/invalidated/
+  corrupt) replacing existing domain states.** Rejected: existing domain
+  states (decision outcomes, evidence availability) answer different
+  questions than artifact validity; replacing them would lose real
+  information, not add a missing capability.
+- **Leave validity/invalidation entirely unaddressed as a capability.**
+  Rejected: the program-level exit criterion explicitly requires an
+  invalidation contract; documenting it as a required-but-mechanism-
+  deferred capability is the honest middle path.
+
+#### Consequences
+- No production code changes result from this decision.
+- `RecommendationPolicy` and `RecommendationGovernanceVersion` are marked
+  **Absent** for this capability in the conformance matrix — an honest gap,
+  not glossed over.
+- A future unit implementing a second real validity/invalidation mechanism
+  (for any artifact) does so against real evidence of need, choosing its
+  own mechanism — not by assuming Unit 4's dispatch pattern is
+  automatically correct for a different field or artifact.
+
+#### Revisit triggers
+- A real (not hypothetical) case of a method/governance/schema change
+  needing to distinguish "superseded" from "corrupt" for an artifact other
+  than the candidate reference.
+- A future unit needs to query validity state across multiple artifact
+  types, which would push toward a shared representation this decision
+  currently declines to build.
+
+#### References
+- `src/gridiron_edge/market/recommendation_policy.py`
+- `src/gridiron_edge/market/recommendation_governance.py`
+- `src/gridiron_edge/market/recommended_bet_result.py`
+- `DECISIONS.md` D31 (candidate-reference derivation versioning — the one
+  confirmed precedent)
+- `docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`
+  (Capability 9)
+
+---
+
+### D34. Claim kind may be nominal or explicit
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+Every durable claim specialization has a stable conceptual kind. Concrete
+Python contract (type) identity is sufficient to represent that kind for
+homogeneous internal paths. An explicit machine-readable discriminator
+field is required only at heterogeneous storage, transport, or dispatch
+boundaries — specifically when: heterogeneous claims share one envelope,
+store, stream, or API collection; a consumer must dispatch without
+importing concrete Python classes; forward relationships need typed
+endpoints; or a common audit interface queries multiple claim categories.
+
+#### Context
+
+No current consumer in this codebase requires dispatching across claim
+kinds without importing concrete types. Adding a `claim_kind` field to
+every dataclass "for consistency" would be exactly the kind of blanket
+production change this unit's own guardrails (and the pre-implementation
+review) rejected.
+
+#### Alternatives considered and rejected
+- **Add an explicit `claim_kind` enum field to every durable claim
+  dataclass now.** Rejected: no demonstrated consumer; would be a
+  speculative field addition.
+- **Rely solely on `isinstance`/type checks everywhere, forever.**
+  Rejected as a blanket rule: this decision explicitly anticipates that a
+  future heterogeneous boundary (a shared store, a common audit API) would
+  need an explicit discriminator, and names the trigger conditions rather
+  than ruling one out permanently.
+
+#### Consequences
+- No production code changes result from this decision.
+- The conformance matrix (`CLAIM_CONFORMANCE_MATRIX.md`) serves as the
+  documentation-level registry of currently-known claim kinds.
+- Any future unit introducing a heterogeneous claim collection (a shared
+  envelope, stream, or cross-kind query) must add an explicit
+  discriminator at that point, per the trigger conditions above — this
+  decision pre-authorizes that addition rather than requiring a fresh
+  decision each time, provided the trigger condition is real and stated.
+
+#### Revisit triggers
+- Any of the four listed trigger conditions becomes concretely true for a
+  real, implemented consumer (not a hypothetical one).
+
+#### References
+- `docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`
+  (Capability 1)
+
+---
+
+### D33. Evidence usability remains domain-owned
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+A claim or evidence representation must expose a machine-readable
+usability state and, where the state alone is insufficient, a stable
+reason explaining why it cannot be used for its declared purpose.
+Domain-specific status enums and fields remain local to their owning
+module. No shared uncertainty enum or Python `Protocol` is introduced
+without a concrete cross-domain consumer demonstrating the need.
+
+#### Context
+
+Full-source review during Unit 5 confirmed three independently-evolved,
+structurally distinct uncertainty/limitation shapes:
+`EvaluationEvidenceStatus`/`MetricEstimate` (evidence availability,
+`market_family_evaluation.py`), `PolicyCheckStatus`/`PolicyCheckResult`
+(policy-check outcome, `recommendation_policy.py`, additionally carrying
+`mandatory` and `required_value`), and
+`EdgeResultState`/`EdgeDiagnosticBlocker` (analytical-result diagnostics,
+`edge_diagnostics.py`). A fourth candidate, `CandidateOutcome`
+(`market_family_evaluation.py`), was considered and rejected — it grades a
+realized market-side result, not evidence usability, despite sharing
+`UNAVAILABLE`/`CONFLICT`-shaped members.
+
+These three shapes do not share a meaningfully common structural surface:
+`PolicyCheckResult.reason` is required text while `MetricEstimate.reason`
+is nullable; `MetricEstimate` carries `sample_size`/`value` fields
+`PolicyCheckResult` has no equivalent for. A structural `Protocol` would
+either be so weak as to add no value (requiring only `.status`) or would
+force adapters/field additions that no present runtime consumer needs.
+
+#### Alternatives considered and rejected
+- **A shared uncertainty dataclass or enum.** Rejected: would either lose
+  fields genuinely needed by one shape (e.g. `mandatory`) or force
+  unrelated shapes to carry fields they don't use.
+- **A Python `Protocol` for structural conformance.** Rejected: the three
+  shapes' actual surfaces do not overlap enough to make a protocol useful;
+  see Context above.
+- **Treating `CandidateOutcome` as a fourth uncertainty shape.** Rejected:
+  its primary semantic purpose is outcome grading, not usability
+  reporting.
+
+#### Consequences
+- No production code changes. `PolicyCheckResult`, `MetricEstimate`,
+  `EdgeDiagnostics`'s internal types, and `CandidateOutcome` remain
+  exactly as they are.
+- Any future artifact introducing a new usability/limitation
+  representation should be checked against this decision's governing
+  question ("can this be used for its declared purpose; if not, what
+  machine-readable state and reason explain why") rather than against a
+  shared type that does not exist.
+
+#### Revisit triggers
+- A concrete cross-domain consumer emerges that needs to inspect
+  usability state across two or more of the three shapes without
+  importing each shape's concrete type.
+
+#### References
+- `src/gridiron_edge/market/market_family_evaluation.py`
+- `src/gridiron_edge/market/recommendation_policy.py`
+- `src/gridiron_edge/market/edge_diagnostics.py`
+- `docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`
+  (Capability 7)
+
+---
+
+### D32. Analytical claims conform by capability profile, not inheritance
+
+**Status:** Accepted
+**Date:** 2026-08-26
+
+#### Decision
+
+Durable analytical claim specializations document conformance to a common
+eleven-capability profile (`docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`).
+They do not inherit from a universal base class and do not share one
+physical persistence schema. Conformance is demonstrated by a per-artifact
+mapping (`CLAIM_CONFORMANCE_MATRIX.md`), not by structural type identity.
+
+#### Context
+
+Workstream 2's inspection (Boundaries 1–8) found the analytical-evidence
+substrate substantially reusable but lacking any common claim, identity, or
+lineage primitive. Boundary 8's AD-1 established that nothing inspected
+justifies a universal `AnalyticalClaim` class, one physical schema, or one
+reference-resolution algorithm. This unit's own source re-reading
+(`recommendation_policy.py`, `recommendation_governance.py`,
+`market_family_evaluation.py`, `production_chain_preflight.py`,
+`edge_diagnostics.py`) confirmed the same conclusion from a different
+angle: the inspected artifacts have materially different architectural
+roles (root evidence artifact, method/governance artifact, transient
+decision, composite manifest, active evidence report, audit report), each
+with distinct required and inapplicable capabilities. Forcing them into
+one physical shape would misrepresent capabilities that are correctly Not
+Applicable as Absent, and would collapse distinctions the codebase itself
+maintains deliberately (e.g. `market_family_evaluation.py`'s AST-enforced
+separation from policy/API/betting modules, Boundary 4).
+
+#### Alternatives considered and rejected
+- **A universal `AnalyticalClaim` base class.** Rejected: no artifact
+  benefits from shared inheritance; the roles are too architecturally
+  distinct.
+- **One physical persistence schema across all claim-shaped artifacts.**
+  Rejected: would conflate durable claims, evidence reports, and
+  governance/method artifacts, which have different persistence
+  obligations (see D35 for the validity distinction specifically).
+- **Structural typing via Python `Protocol` at the whole-claim level.**
+  Rejected for the same reason a narrower `Protocol` was rejected for
+  uncertainty representation specifically (D33): the confirmed artifacts
+  do not share a meaningful common surface beyond a handful of
+  independently-typed fields.
+
+#### Consequences
+- No production code changes result from this decision. The profile and
+  matrix are documentation artifacts.
+- Future claim-shaped artifacts are expected to be checked against the
+  eleven-capability profile and added to the conformance matrix, not
+  forced to inherit from or match an existing artifact's physical shape.
+- `RecommendedBetResult` remains the closest-to-fully-conforming
+  specialization; it does not become a template class others inherit
+  from.
+
+#### Revisit triggers
+- A future unit finds two or more artifacts share enough real structural
+  surface (not just a name) that a shared type would eliminate genuine
+  duplication without forcing an artificial fit.
+- A common claim capability protocol (this decision) is itself superseded
+  by evidence that a physical schema is needed for a demonstrated
+  cross-artifact consumer.
+
+#### References
+- `docs/workstreams/analytical_claims/CLAIM_CAPABILITY_PROTOCOL.md`
+- `docs/workstreams/analytical_claims/CLAIM_CONFORMANCE_MATRIX.md`
+- `docs/workstreams/analytical_claims/FINDINGS.md` (Boundaries 1, 4, 8)
+- `docs/workstreams/analytical_claims/PLAN.md` → Workstream 2, Unit 5
+
+---
+
 ### D31. Candidate-reference derivation is independently versioned; recommended-result schema increments to 2
 
 **Status:** Accepted

@@ -23,6 +23,7 @@ from gridiron_edge.market.candidate_issuance import (
     CandidateIssuance,
     CandidateIssuanceRow,
     CandidateIssuanceState,
+    candidate_issuance_row_id,
 )
 from gridiron_edge.market.history_boundaries import QuoteHistoryBoundary
 from gridiron_edge.market.market_closeout import (
@@ -342,23 +343,10 @@ def _closeout_matches(
     result: MarketCloseoutResult,
 ) -> bool:
     reference = result.reference
-    return all(
-        (
-            reference.reference_kind is MarketCloseoutReferenceKind.CANDIDATE_ISSUANCE,
-            reference.reference_id.startswith(f"{issuance.issuance_id}:"),
-            reference.provider == row.provider,
-            reference.provider_event_id == row.provider_event_id,
-            reference.sportsbook == row.sportsbook,
-            reference.game_id == row.game_id,
-            reference.market == row.market,
-            reference.side == row.side,
-            reference.reference_fetched_at == row.fetched_at,
-            reference.reference_sportsbook_updated_at == row.sportsbook_updated_at,
-            reference.reference_kickoff == row.kickoff,
-            reference.reference_is_live == row.is_live,
-            reference.reference_american_price == row.american_price,
-            reference.reference_line == row.line,
-        )
+    return (
+        reference.reference_kind is MarketCloseoutReferenceKind.CANDIDATE_ISSUANCE
+        and reference.reference_id == candidate_issuance_row_id(issuance.issuance_id, row)
+        and reference.reference_kickoff == row.kickoff
     )
 
 

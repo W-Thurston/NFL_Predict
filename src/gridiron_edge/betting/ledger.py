@@ -190,7 +190,7 @@ def _validate_recommendation_provenance(
     candidate_reference_id: str | None,
     recommendation_policy_id: str | None,
 ) -> None:
-    """Require Unit 24 recommendation identities to be complete or absent."""
+    """Require recommendation identities to be complete or absent."""
     identities = {
         "recommended_bet_result_id": recommended_bet_result_id,
         "recommendation_evaluation_id": recommendation_evaluation_id,
@@ -442,9 +442,10 @@ def log_bet(
         reference_commence_time: Optional UTC kickoff evidence.
         reference_american_odds: Optional reference-offer American odds.
         reference_line: Optional reference-offer point value.
-        recommended_bet_result_id: Optional persisted Unit 24 result identity.
-        recommendation_evaluation_id: Optional persisted Unit 24 evaluation
+        recommended_bet_result_id: Optional persisted recommendation result
             identity.
+        recommendation_evaluation_id: Optional persisted recommendation
+            evaluation identity.
         candidate_reference_id: Optional persisted recommendation candidate
             identity.
         recommendation_policy_id: Optional persisted recommendation policy

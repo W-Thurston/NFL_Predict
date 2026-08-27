@@ -80,7 +80,7 @@ class BetRow(BaseModel):
 
 
 class RecordBetRequest(BaseModel):
-    """Recorded wager terms plus an optional complete Unit 24 identity chain."""
+    """Recorded wager terms plus an optional complete recommendation identity chain."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

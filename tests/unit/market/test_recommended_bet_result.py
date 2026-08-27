@@ -56,7 +56,7 @@ def test_result_state_enum_preserves_required_lifecycle_states() -> None:
     }
 
 
-def test_unit24_module_has_no_request_or_mutation_dependency() -> None:
+def test_market_module_has_no_request_or_mutation_dependency() -> None:
     source = Path("src/gridiron_edge/market/recommended_bet_result.py").read_text(encoding="utf-8")
     for forbidden in (
         "gridiron_edge.api",

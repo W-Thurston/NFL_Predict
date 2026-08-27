@@ -1,4 +1,100 @@
 # Gridiron Edge - Changelog
+
+## 2026-08-26 - Small API and documentation cleanup (WS2 Unit 7)
+
+### Fixed
+- `api/routes/portfolio.py::get_portfolio_splits`'s empty-ledger branch now
+  delegates to `serialize_splits(pd.DataFrame(), dimension)` instead of
+  directly constructing `PortfolioSplits(...)`, restoring the
+  `_meta.field_status`/`NO_SPLIT_DATA` metadata the direct-construction
+  path was silently omitting — a confirmed D18 violation (serializers, not
+  route handlers, own `_meta.field_status` construction).
+- `api/serializers/portfolio.py`'s module docstring no longer misattributes
+  its no-I/O, already-loaded-DataFrames behavior to D19, which actually
+  governs `api/loaders.py`'s settings-threading — a different concern. The
+  factual description is retained without an incorrect citation.
+
+### Changed
+- Removed development-era "Unit 22"/"Unit 24" phase-naming from seven
+  confirmed instances across `recommendation_policy.py`,
+  `betting/ledger.py` (three instances, not one — `log_bet`'s own `Args:`
+  block carried two previously-undercounted mentions),
+  `api/schemas/portfolio.py`, `api/schemas/recommendations.py`, and one
+  test function name in `test_recommended_bet_result.py`. Each instance
+  was reviewed individually and replaced with accurate domain language, not
+  a blind find-and-replace.
+- `api-schema.json` and `frontend/src/api/schema.ts` regenerated: item 1's
+  route-behavior fix changed the live OpenAPI contract for the empty-splits
+  response.
+
+### Process note
+Phase-naming cleanup (item 3) was deliberately held blocked mid-unit until
+fresh, current source for `recommendation_policy.py` and `betting/ledger.py`
+was supplied, rather than proceeding from a months-old Boundary 2
+characterization — consistent with the correction discipline this
+workstream established in Units 2 and 4. A stray copy/paste path-header
+comment, carried into the diff from how a file was pasted during design,
+was caught during review and removed before commit.
+
+### Verification
+- Ruff, Pyrefly, and the full unit test suite pass, including the OpenAPI
+  schema-parity test after regeneration.
+- Frontend `pnpm gen:api && pnpm build` passes.
+
+### Workstream 2 status
+This closes the seven-unit sequence originally planned in ROADMAP.md
+(persistence hardening: Units 1-3; identity-evolution: Unit 4; capability
+protocol: Unit 5; attribution ownership: Unit 6; this cleanup: Unit 7).
+Two items remain deliberately open per Unit 5's own closure (D35, D36):
+forward-impact discoverability and general validity/invalidation beyond
+Unit 4's single-field precedent. Workstream 2 does not close until those
+are addressed by a future, evidence-gated unit.
+
+## 2026-08-26 - Attribution-operation ownership (WS2 Unit 6)
+
+### Changed
+- `market_family_evaluation.py::_closeout_matches` now re-derives the
+  canonical candidate reference via `candidate_issuance_row_id(issuance.issuance_id, row)`
+  and compares it directly against the persisted reference's `reference_id`,
+  instead of checking an issuance-ID prefix plus 11 individually-compared
+  materialized fields (every field the v1 hash payload covers, checked
+  redundantly, without ever confirming the digest suffix itself matched).
+  `reference_kickoff` — the one field outside the hash payload — is
+  retained as a separate, explicit check.
+- `test_market_family_evaluation.py`'s `_closeout` fixture helper now
+  constructs genuine digest-backed references instead of a fake test
+  suffix (`f"{issuance.issuance_id}:test-{row.market}-{row.side}"`), which
+  the corrected function would otherwise (correctly) reject.
+
+### Added
+- `test_closeout_with_mismatched_digest_but_matching_fields_does_not_match`
+  — proves a reference with correct materialized fields but a forged
+  digest suffix is no longer attributed, closing the specific ambiguity
+  this unit fixes.
+- `DECISIONS.md` D37 — formally names and classifies seven
+  reference-attribution operations (previously six, per Boundary 4;
+  `bet_reference_matching.py::match_bet_references` confirmed this session
+  as a genuine seventh operation, not a duplicate). Splits them into
+  canonical authentication (digest-backed, 1:1) and structural attribution
+  (group/aggregate, no digest) families, and documents why
+  `_history_matches`/`_wager_return_for_row` correctly have no equivalent
+  gap to `_closeout_matches`'s — they answer structurally different
+  questions.
+
+### Verification
+- Full source of `market_closeout.py`, `bet_reference_matching.py`,
+  `market_family_evaluation.py`, and all three focused test files read in
+  full before any change (correcting an earlier reliance on a months-old
+  Boundary 4 characterization).
+- Ruff, Pyrefly, and the full unit test suite pass. All pre-existing
+  `test_market_family_evaluation.py` tests pass unchanged, confirming none
+  of them depended on the fake suffix's specific content — only on
+  downstream evaluation behavior.
+
+### See also
+`DECISIONS.md` D37 — full seven-operation taxonomy and the rationale for
+the `_closeout_matches` correction.
+
 ## 2026-08-26 - Identity-evolution contract for candidate references (WS2 Unit 4)
 
 ### Changed

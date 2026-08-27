@@ -18,6 +18,7 @@ from gridiron_edge.market.candidate_issuance import (
     CandidateIssuanceRow,
     CandidateIssuanceState,
     candidate_issuance_id,
+    candidate_issuance_row_id,
 )
 from gridiron_edge.market.history_boundaries import (
     QuoteBoundaryStatus,
@@ -98,7 +99,7 @@ def _closeout(
     issuance: CandidateIssuance, row: CandidateIssuanceRow, **overrides: object
 ) -> MarketCloseoutResult:
     reference = MarketCloseoutReference(
-        reference_id=f"{issuance.issuance_id}:test-{row.market}-{row.side}",
+        reference_id=candidate_issuance_row_id(issuance.issuance_id, row),
         reference_kind=MarketCloseoutReferenceKind.CANDIDATE_ISSUANCE,
         provider=row.provider,
         provider_event_id=row.provider_event_id,
@@ -714,3 +715,27 @@ def test_numeric_cohorts_do_not_substitute_ev_or_outcomes_for_return() -> None:
     assert cohorts.status is EvaluationEvidenceStatus.AVAILABLE
     assert all(cohort.mean_realized_return is None for cohort in cohorts.cohorts)
     assert all(cohort.aggregate_realized_return is None for cohort in cohorts.cohorts)
+
+
+def test_closeout_with_mismatched_digest_but_matching_fields_does_not_match() -> None:
+    """A reference whose suffix digest does not correspond to the row,
+    but whose individual materialized fields happen to equal the row's
+    fields, must not be attributed -- this is the exact ambiguity the
+    digest re-derivation closes."""
+    row = _row("spread", "away")
+    issuance = _issuance(row)
+    genuine = _closeout(issuance, row)
+    forged = replace(
+        genuine,
+        reference=replace(
+            genuine.reference,
+            reference_id=f"{issuance.issuance_id}:not-the-real-digest",
+        ),
+    )
+    family = evaluate_market_families(
+        issuance=issuance,
+        closeouts=[forged],
+        games=_games((row.game_id, 24, 20)),
+        history_boundaries=[],
+    ).spread
+    assert family.coverage.closeout_available_count == 0

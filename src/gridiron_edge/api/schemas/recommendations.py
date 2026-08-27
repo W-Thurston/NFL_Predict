@@ -103,7 +103,7 @@ class RecommendationPolicyProvenanceResponse(BaseModel):
 
 
 class RecommendationPresentation(BaseModel):
-    """Mechanical read-only presentation of one persisted Unit 24 result."""
+    """Mechanical read-only presentation of one persisted recommendation result."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

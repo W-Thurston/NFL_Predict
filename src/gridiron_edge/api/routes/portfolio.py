@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
+import pandas as pd
 
 from gridiron_edge.api.deps import SettingsDep
 from gridiron_edge.api.loaders import (
@@ -144,7 +145,7 @@ def get_portfolio_splits(
 
     bets = load_bets_df(settings)
     if bets.empty:
-        return PortfolioSplits(items=[], total=0, dimension=dimension)
+        return serialize_splits(pd.DataFrame(), dimension)
 
     record_df = record(bets, split_by=dimension)
     roi_df = roi(bets, split_by=dimension)

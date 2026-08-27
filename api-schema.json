@@ -5943,7 +5943,7 @@
       },
       "RecommendationPresentation": {
         "additionalProperties": false,
-        "description": "Mechanical read-only presentation of one persisted Unit 24 result.",
+        "description": "Mechanical read-only presentation of one persisted recommendation result.",
         "properties": {
           "bankroll_basis": {
             "anyOf": [
@@ -6176,7 +6176,7 @@
       },
       "RecordBetRequest": {
         "additionalProperties": false,
-        "description": "Recorded wager terms plus an optional complete Unit 24 identity chain.",
+        "description": "Recorded wager terms plus an optional complete recommendation identity chain.",
         "properties": {
           "book": {
             "minLength": 1,

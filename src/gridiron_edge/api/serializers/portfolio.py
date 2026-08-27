@@ -2,9 +2,9 @@
 
 """Serializers for /portfolio/* endpoints.
 
-Per D17, one hand-written function per endpoint. Per D18, serializers
-own construction of `_meta.field_status`. Per D19, serializers accept
-already-loaded DataFrames — they do not touch settings or the filesystem.
+Per D17, one hand-written function per endpoint. Per D18, serializers own
+construction of _meta.field_status. Serializers accept already-loaded
+DataFrames and do not touch settings or the filesystem.
 """
 
 from __future__ import annotations

@@ -1,8 +1,11 @@
+# src/gridiron_edge/market/recommendation_policy.py
+
 """Immutable versioned recommendation-policy contracts and derivation.
 
-This module is pure. It fingerprints Market Unit 22 evidence, records governed
-operational inputs, and derives independent market-family policy states. It does
-not load mutable storage, emit recommendations, or mutate betting state.
+This module is pure. It fingerprints empirical market-family evidence, records
+governed operational inputs, and derives independent market-family policy
+states. It does not load mutable storage, emit recommendations, or mutate
+betting state.
 """
 
 from __future__ import annotations
@@ -129,7 +132,7 @@ class RecommendationPolicy:
 def empirical_evidence_fingerprint(
     evaluation: EmpiricalMarketFamilyEvaluation,
 ) -> str:
-    """Return a canonical SHA-256 fingerprint of complete Unit 22 evidence."""
+    """Return a canonical SHA-256 fingerprint of complete empirical evidence."""
     return _digest(_canonical_value(evaluation))
 
 
