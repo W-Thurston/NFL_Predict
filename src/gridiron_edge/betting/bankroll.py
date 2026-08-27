@@ -12,14 +12,28 @@ Transaction types::
     bet_placed    Stake leaves the bankroll (placed a bet).
     bet_settled   Gross return enters the bankroll (won/push payout).
 
+The complete log is rewritten and published atomically on every write via
+a colocated temporary file and rename, so an interruption during
+serialization or publication leaves the prior log unchanged. This
+provides atomically visible publication only -- it does not coordinate
+concurrent writers. No same-process concurrent-writer risk has been
+confirmed for this module (contrast ``betting/ledger.py``, which required
+a ``threading.RLock`` for a confirmed thread-pool-routed API caller); if
+such a risk is later confirmed here, that coordination must be added as
+its own change, not assumed present.
+
 Storage lives at ``data/betting/bankroll_txn.parquet``.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from hashlib import sha256
+import json
 import logging
 from logging import Logger
+import os
 from pathlib import Path
 from typing import Final, Literal
 import uuid
@@ -50,6 +64,34 @@ _TXN_COLUMNS: Final[list[str]] = [
     "reference_id",
     "note",
 ]
+
+# ---------------------------------------------------------------------------
+# Bankroll evidence
+# ---------------------------------------------------------------------------
+
+_BANKROLL_SOURCE_KIND: Final[str] = "bankroll_transaction_ledger"
+
+
+@dataclass(frozen=True, slots=True)
+class BankrollSnapshot:
+    """Bankroll evidence derived from transaction rows visible at a cutoff.
+
+    Owned by this module, not by any consumer's domain. Callers adapt this
+    into their own evidence type at their own composition boundary; this
+    module does not know or depend on any consumer's shape.
+
+    ``source_id`` is a digest of every balance-material field on every
+    visible transaction (``txn_id``, ``timestamp``, ``txn_type``,
+    ``amount``, ``reference_id``) plus the cutoff. The free-text ``note``
+    field is intentionally excluded -- it does not contribute to the
+    signed balance or to transaction linkage, so it is not treated as
+    material to bankroll identity.
+    """
+
+    amount: float
+    observed_at: datetime
+    source_kind: str
+    source_id: str
 
 
 # ---------------------------------------------------------------------------
@@ -99,10 +141,46 @@ def _read_txn_log(repo: Path | None = None) -> pd.DataFrame:
 
 
 def _write_txn_log(df: pd.DataFrame, repo: Path | None = None) -> Path:
-    """Write the transaction log to disk."""
+    """Write the transaction log to disk.
+
+    Serializes the complete log to a colocated temporary file, then
+    publishes it via an atomic rename. An interruption during
+    serialization or before the rename leaves the previously published
+    log unchanged; a reader never observes a partially written file. This
+    provides atomically visible publication only -- it does not
+    coordinate two overlapping writers (see the module docstring).
+    """
     path: Path = _txn_path(repo)
-    df.to_parquet(path, index=False)
+    temporary: Path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        df.to_parquet(temporary, index=False)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return path
+
+
+# ---------------------------------------------------------------------------
+# Bankroll-evidence helpers
+# ---------------------------------------------------------------------------
+
+
+def _require_utc(value: datetime, *, label: str) -> datetime:
+    """Require one timestamp to be timezone-aware UTC."""
+    if value.tzinfo is None or value.utcoffset() != timedelta(0):
+        raise ValueError(f"{label} must be timezone-aware UTC.")
+    return value
+
+
+def _digest(value: object) -> str:
+    """Return a canonical SHA-256 digest of one JSON-serializable value."""
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    return sha256(encoded).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -377,3 +455,108 @@ def load_transactions(
     if txn_type is not None:
         df = df.loc[df["txn_type"] == txn_type, :]
     return df.reset_index(drop=True)
+
+
+def _require_valid_evidence(transactions: pd.DataFrame) -> None:
+    """Require the transaction log to satisfy the evidence contract.
+
+    Before promoting it into recommendation evidence. Several of these
+    properties are already enforced by ``_append_txn`` at write time, but
+    this function re-validates them at the read boundary, since the
+    persisted file itself is not otherwise proven immutable or free of
+    external modification (see module docstring).
+    """
+    if list(transactions.columns) != _TXN_COLUMNS:
+        raise ValueError("Bankroll transaction log does not match the canonical schema.")
+    if transactions["txn_id"].isna().any():
+        raise ValueError("Bankroll transaction log contains a null txn_id.")
+    if transactions["txn_id"].duplicated().any():
+        raise ValueError("Bankroll transaction log contains duplicate txn_id values.")
+    for value in transactions["timestamp"]:
+        _require_utc(pd.Timestamp(value).to_pydatetime(), label="transaction timestamp")
+    unknown_types = set(transactions["txn_type"]) - _INFLOWS - _OUTFLOWS
+    if unknown_types:
+        raise ValueError(
+            f"Bankroll transaction log contains unknown txn_type values: {sorted(unknown_types)}"
+        )
+    import numpy as np
+
+    amounts = transactions["amount"].to_numpy(dtype=float)
+    if not bool(np.isfinite(amounts).all()) or bool((amounts < 0).any()):
+        raise ValueError("Bankroll transaction log contains a non-finite or negative amount.")
+
+
+def bankroll_snapshot_as_of(
+    cutoff: datetime,
+    *,
+    repo: Path | None = None,
+) -> BankrollSnapshot | None:
+    """Derive deterministic, content-identified bankroll evidence.
+
+    From transactions visible at an inclusive cutoff. Filters the
+    transaction log to rows with ``timestamp <= cutoff``, then computes
+    the balance and a content-derived identity from exactly those rows.
+    Returns ``None`` when no transaction rows are visible at or before
+    the cutoff -- absence of history is not the same fact as a confirmed
+    zero balance, and this function does not conflate them.
+
+    This provides deterministic derivation from the transaction rows
+    currently recorded as visible at the cutoff, with an exact content-
+    derived source identity: post-cutoff transactions never affect the
+    result, and if the visible transaction set or any balance-material
+    field on a visible row later changes, the resulting amount and
+    source_id change accordingly, so a changed evidentiary basis is
+    always detectable as a different identity. This function does not,
+    by itself, establish immutable historical reproduction: it does not
+    enforce that the operational transaction log is append-only, does not
+    prevent existing rows from being altered or removed, and does not
+    provide any mechanism to reload the exact original transaction set
+    later purely from a source_id. Those properties would require either
+    hardened, validated append-only guarantees on the ledger itself, or a
+    separately persisted, independently reloadable immutable bankroll-
+    snapshot artifact -- neither is established by this unit.
+
+    Args:
+        cutoff: The exact UTC decision-time boundary.
+        repo: Repository root override.
+
+    Returns:
+        ``None`` if no transaction rows are visible at or before cutoff.
+        Otherwise a ``BankrollSnapshot`` whose amount reflects exactly the
+        visible rows, including a genuine ``amount == 0.0`` when those
+        rows net to zero.
+
+    Raises:
+        ValueError: If the transaction log fails evidence-boundary
+            validation (malformed schema, null or duplicate transaction
+            IDs, non-UTC timestamps, unknown transaction types, or
+            non-finite/negative amounts), or if ``cutoff`` is not
+            timezone-aware UTC.
+    """
+    cutoff_utc = _require_utc(cutoff, label="cutoff")
+    transactions = _read_txn_log(repo)
+    if transactions.empty:
+        return None
+
+    _require_valid_evidence(transactions)
+
+    visible = transactions.loc[transactions["timestamp"] <= cutoff_utc, :].copy()
+    if visible.empty:
+        return None
+
+    visible = visible.sort_values(["timestamp", "txn_id"], kind="stable").reset_index(drop=True)
+    amount = float(_signed_amount_series(visible["txn_type"], visible["amount"]).sum())
+
+    material_rows = [
+        {
+            "txn_id": str(row["txn_id"]),
+            "timestamp": pd.Timestamp(row["timestamp"]).to_pydatetime().isoformat(),
+            "txn_type": str(row["txn_type"]),
+            "amount": float(row["amount"]),
+            "reference_id": (None if pd.isna(row["reference_id"]) else str(row["reference_id"])),
+        }
+        for _, row in visible.iterrows()
+    ]
+    source_id = _digest({"cutoff": cutoff_utc.isoformat(), "transactions": material_rows})
+
+    return BankrollSnapshot(amount, cutoff_utc, _BANKROLL_SOURCE_KIND, source_id)

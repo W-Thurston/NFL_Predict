@@ -339,12 +339,17 @@ def evaluate_recommendations_cmd(
     write: bool = typer.Option(False, "--write/--no-write"),
 ) -> None:
     """Evaluate exact persisted candidates against one exact persisted policy."""
+    from gridiron_edge.betting.bankroll import bankroll_snapshot_as_of
     from gridiron_edge.core.settings import get_settings
     from gridiron_edge.market.candidate_issuance_store import (
         candidate_issuance_path,
         read_candidate_issuance,
     )
-    from gridiron_edge.market.recommendation_policy import portfolio_exposure_snapshot
+    from gridiron_edge.market.recommendation_policy import (
+        RECOMMENDATION_POLICY_SCHEMA_VERSION,
+        BankrollBasis,
+        portfolio_exposure_snapshot,
+    )
     from gridiron_edge.market.recommendation_policy_store import (
         read_recommendation_policy,
         recommendation_policy_path,
@@ -362,13 +367,27 @@ def evaluate_recommendations_cmd(
             candidate_issuance_path(issuance_id, repo=settings.repo_root)
         )
         policy = read_recommendation_policy(
-            recommendation_policy_path(1, policy_id, repo=settings.repo_root)
+            recommendation_policy_path(
+                RECOMMENDATION_POLICY_SCHEMA_VERSION, policy_id, repo=settings.repo_root
+            )
         )
         decision = _utc_option(decision_at, label="decision-at")
+        snapshot = bankroll_snapshot_as_of(decision, repo=settings.repo_root)
+        bankroll = (
+            None
+            if snapshot is None
+            else BankrollBasis(
+                amount=snapshot.amount,
+                observed_at=snapshot.observed_at,
+                source_kind=snapshot.source_kind,
+                source_id=snapshot.source_id,
+            )
+        )
         evaluation = evaluate_recommendation_issuance(
             policy=policy,
             issuance=issuance,
             decision_at=decision,
+            bankroll=bankroll,
             portfolio=portfolio_exposure_snapshot(observed_at=decision, rows=()),
         )
         _render_recommendation_evaluation(evaluation)
