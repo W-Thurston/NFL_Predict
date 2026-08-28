@@ -20,6 +20,7 @@ from gridiron_edge.market.candidate_issuance import (
     candidate_issuance_id,
     candidate_issuance_row_id,
 )
+from gridiron_edge.market.candidate_outcome import CandidateOutcome
 from gridiron_edge.market.history_boundaries import (
     QuoteBoundaryStatus,
     QuoteHistoryBoundary,
@@ -33,7 +34,6 @@ from gridiron_edge.market.market_closeout import (
     MarketClvKind,
 )
 from gridiron_edge.market.market_family_evaluation import (
-    CandidateOutcome,
     EmpiricalMarketFamilyEvaluation,
     EvaluationEvidenceStatus,
     evaluate_market_families,

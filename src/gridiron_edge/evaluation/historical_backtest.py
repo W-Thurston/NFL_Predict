@@ -13,7 +13,7 @@ from gridiron_edge.evaluation.backtest_run_selection import (
     BacktestRunSelection,
     validate_backtest_run_selection,
 )
-from gridiron_edge.market.market_family_evaluation import CandidateOutcome
+from gridiron_edge.market.candidate_outcome import CandidateOutcome
 
 ASSUMED_STANDARD_AMERICAN_PRICE: Final[int] = -110
 _STANDARD_PRICE_WIN_RETURN: Final[float] = 100.0 / 110.0
@@ -162,7 +162,7 @@ def _selected_events(events: DataFrame, component: BacktestRunComponent) -> Data
 
 
 def _derive_evidence(rows: DataFrame, selection_id: str) -> DataFrame:
-    records = [_derive_row(cast(Series, row), selection_id) for _, row in rows.iterrows()]
+    records = [_derive_row(row, selection_id) for _, row in rows.iterrows()]
     result = DataFrame.from_records(records)
     return result.sort_values(["season", "week", "game_id"], kind="stable").reset_index(drop=True)
 
@@ -179,8 +179,8 @@ def _derive_row(row: Series, selection_id: str) -> dict[str, object]:
     home_probability = _finite_or_none(row.get("home_win_prob"))
     if home_probability is not None and not 0.0 <= home_probability <= 1.0:
         raise ValueError("Historical home_win_prob must be between 0 and 1.")
-    tied = bool(outcome_available and away_score == home_score)
-    moneyline_evaluable = bool(home_probability is not None and outcome_available and not tied)
+    tied = outcome_available and away_score == home_score
+    moneyline_evaluable = home_probability is not None and outcome_available and not tied
     actual_home_win: bool | None = None
     predicted_home_win: bool | None = None
     moneyline_correct: bool | None = None
@@ -198,7 +198,7 @@ def _derive_row(row: Series, selection_id: str) -> dict[str, object]:
 
     model_total = _finite_or_none(row.get("model_total"))
     market_total = _finite_or_none(row.get("OVER_UNDER"))
-    total_evaluable = bool(
+    total_evaluable = (
         model_total is not None and market_total is not None and actual_total is not None
     )
     total_error: float | None = None
@@ -314,7 +314,7 @@ def _one_unit_return(outcome: CandidateOutcome | None) -> float | None:
 def _log_loss(probability: float, actual_home_win: bool) -> float:
     clipped = min(max(probability, 1e-7), 1 - 1e-7)
     outcome = float(actual_home_win)
-    return float(-(outcome * math.log(clipped) + (1 - outcome) * math.log(1 - clipped)))
+    return -(outcome * math.log(clipped) + (1 - outcome) * math.log(1 - clipped))
 
 
 def _is_scalar_null(value: object) -> bool:

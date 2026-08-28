@@ -16,9 +16,9 @@ from uuid import uuid4
 
 from gridiron_edge.core.settings import get_settings
 from gridiron_edge.market.recommended_bet_result import (
-    RECOMMENDED_BET_RESULT_SCHEMA_VERSION,
     RecommendedBetEvaluation,
     RecommendedBetResult,
+    validate_recommended_bet_evaluation,
     validate_recommended_bet_result,
 )
 
@@ -80,7 +80,7 @@ def write_recommended_bet_evaluation(
     evaluation: RecommendedBetEvaluation, *, repo: Path | None = None
 ) -> Path:
     """Persist one evaluation manifest and all referenced results."""
-    _validate_evaluation(evaluation)
+    validate_recommended_bet_evaluation(evaluation)
     for result in evaluation.results:
         write_recommended_bet_result(result, repo=repo)
     path = recommended_bet_evaluation_path(
@@ -131,38 +131,11 @@ def read_recommended_bet_evaluation(path: Path) -> RecommendedBetEvaluation:
         _strict_datetime(raw["evaluated_at"], "evaluated_at"),
         results,
     )
-    _validate_evaluation(evaluation)
+    validate_recommended_bet_evaluation(evaluation)
     expected = recommended_bet_evaluation_path(schema_version, evaluation_id, repo=repo)
     if path.resolve() != expected.resolve():
         raise ValueError("Recommended-bet evaluation path and identity disagree.")
     return evaluation
-
-
-def _validate_evaluation(evaluation: RecommendedBetEvaluation) -> None:
-    if evaluation.schema_version != RECOMMENDED_BET_RESULT_SCHEMA_VERSION:
-        raise ValueError("Unsupported recommended-bet evaluation schema version.")
-    _digest(evaluation.evaluation_id, "evaluation_id")
-    if len({result.result_id for result in evaluation.results}) != len(evaluation.results):
-        raise ValueError("Recommended-bet evaluation contains duplicate results.")
-    if any(
-        result.issuance_id != evaluation.issuance_id
-        or result.policy_id != evaluation.policy_id
-        or result.evaluated_at != evaluation.evaluated_at
-        for result in evaluation.results
-    ):
-        raise ValueError("Recommended-bet evaluation result provenance disagrees.")
-    identity = {
-        "schema_version": evaluation.schema_version,
-        "issuance_id": evaluation.issuance_id,
-        "policy_id": evaluation.policy_id,
-        "evaluated_at": evaluation.evaluated_at.isoformat(),
-        "result_ids": [result.result_id for result in evaluation.results],
-    }
-    from hashlib import sha256
-
-    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
-    if evaluation.evaluation_id != sha256(encoded).hexdigest():
-        raise ValueError("Recommended-bet evaluation ID does not match canonical content.")
 
 
 def _immutable_write(path: Path, payload: object, *, label: str) -> None:

@@ -25,6 +25,7 @@ from gridiron_edge.market.candidate_issuance import (
     CandidateIssuanceState,
     candidate_issuance_row_id,
 )
+from gridiron_edge.market.candidate_outcome import CandidateOutcome, grade_candidate_outcome
 from gridiron_edge.market.history_boundaries import QuoteHistoryBoundary
 from gridiron_edge.market.market_closeout import (
     MarketCloseoutReferenceKind,
@@ -43,16 +44,6 @@ class EvaluationEvidenceStatus(StrEnum):
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
     UNAVAILABLE = "unavailable"
     CONFLICTING_EVIDENCE = "conflicting_evidence"
-
-
-class CandidateOutcome(StrEnum):
-    """Realized result of one exact issued market side."""
-
-    WIN = "win"
-    LOSS = "loss"
-    PUSH = "push"
-    UNAVAILABLE = "unavailable"
-    CONFLICT = "conflict"
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,7 +314,7 @@ def _evaluate_row(
     return_stake, return_pnl, realized_return, return_conflict = _wager_return_for_row(row, wagers)
     return _EvaluatedCandidate(
         row=row,
-        outcome=_grade_outcome(row, outcomes.get(row.game_id)),
+        outcome=grade_candidate_outcome(row, outcomes.get(row.game_id)),
         closeout=closeout_matches[0] if len(closeout_matches) == 1 else None,
         closeout_join_conflict=len(closeout_matches) > 1,
         history=history_matches[0] if len(history_matches) == 1 else None,
@@ -361,31 +352,6 @@ def _history_matches(row: CandidateIssuanceRow, boundary: QuoteHistoryBoundary) 
             boundary.side == row.side,
         )
     )
-
-
-def _grade_outcome(
-    row: CandidateIssuanceRow,
-    scores: tuple[float, float] | None,
-) -> CandidateOutcome:
-    if scores is None:
-        return CandidateOutcome.UNAVAILABLE
-    away, home = scores
-    if not math.isfinite(away) or not math.isfinite(home):
-        return CandidateOutcome.CONFLICT
-    if row.market == "moneyline":
-        selected, other = (home, away) if row.side == "home" else (away, home)
-    elif row.market == "spread":
-        if row.line is None:
-            return CandidateOutcome.UNAVAILABLE
-        selected, other = (home + row.line, away) if row.side == "home" else (away + row.line, home)
-    else:
-        if row.line is None:
-            return CandidateOutcome.UNAVAILABLE
-        total = home + away
-        selected, other = (total, row.line) if row.side == "over" else (row.line, total)
-    if selected == other:
-        return CandidateOutcome.PUSH
-    return CandidateOutcome.WIN if selected > other else CandidateOutcome.LOSS
 
 
 def _evaluate_family(

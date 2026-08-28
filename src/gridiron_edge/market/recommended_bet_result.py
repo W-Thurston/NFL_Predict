@@ -261,6 +261,13 @@ def recommended_bet_result_id(result: RecommendedBetResult) -> str:
     return _digest(payload)
 
 
+def _require_digest(value: str, label: str) -> str:
+    """Require one value to be a lowercase SHA-256 digest string."""
+    if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise ValueError(f"{label} must be a lowercase SHA-256 digest.")
+    return value
+
+
 def _validate_allocation_consistency(result: RecommendedBetResult) -> None:
     """Require allocation state, reason, and amount to mutually agree.
 
@@ -335,6 +342,43 @@ def validate_recommended_bet_result(result: RecommendedBetResult) -> None:
     _validate_allocation_consistency(result)
     if result.portfolio_snapshot_id is None and result.portfolio_observed_at is not None:
         raise ValueError("Portfolio observation requires a snapshot identity.")
+
+
+def validate_recommended_bet_evaluation(evaluation: RecommendedBetEvaluation) -> None:
+    """Validate one RecommendedBetEvaluation's schema and identity.
+
+    Confirms provenance agreement across its results and canonical
+    identity. This is the single public owner of recommendation-
+    evaluation semantic validation -- both recommended_bet_result_store.py
+    and decision_quality.py must call this, neither should reimplement it.
+    """
+    if evaluation.schema_version != RECOMMENDED_BET_RESULT_SCHEMA_VERSION:
+        raise ValueError("Unsupported recommended-bet evaluation schema version.")
+    _require_digest(evaluation.evaluation_id, "evaluation_id")
+    _require_digest(evaluation.issuance_id, "issuance_id")
+    _require_digest(evaluation.policy_id, "policy_id")
+    _require_utc(evaluation.evaluated_at, label="evaluated_at")
+    if len({result.result_id for result in evaluation.results}) != len(evaluation.results):
+        raise ValueError("Recommended-bet evaluation contains duplicate results.")
+    for result in evaluation.results:
+        validate_recommended_bet_result(result)
+    if any(
+        result.issuance_id != evaluation.issuance_id
+        or result.policy_id != evaluation.policy_id
+        or result.evaluated_at != evaluation.evaluated_at
+        for result in evaluation.results
+    ):
+        raise ValueError("Recommended-bet evaluation result provenance disagrees.")
+    identity = {
+        "schema_version": evaluation.schema_version,
+        "issuance_id": evaluation.issuance_id,
+        "policy_id": evaluation.policy_id,
+        "evaluated_at": evaluation.evaluated_at.isoformat(),
+        "result_ids": [result.result_id for result in evaluation.results],
+    }
+    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+    if evaluation.evaluation_id != sha256(encoded).hexdigest():
+        raise ValueError("Recommended-bet evaluation ID does not match canonical content.")
 
 
 def _result_state(decision: RecommendationPolicyDecision) -> RecommendedBetResultState:

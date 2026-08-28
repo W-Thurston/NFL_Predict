@@ -2,100 +2,85 @@
 
 Exactly ONE active unit. Future units live in ROADMAP.md, not here.
 
-### Unit — Governed recommendation presentation and action separation
+### Unit — Decision-quality evaluation contract and first spread evaluation
 
 #### Completed
-
-Corrected `recommendationPresentation.ts` to consume `decision_state` and
-`allocation` alongside `result_state`, distinguishing persisted-result
-presence, recommendation eligibility, and positive completed allocation
-as three separate facts. Wired the correction through every confirmed-
-scope surface (`GameDetail.tsx`'s `RecCell`/`ModelLeanCallout`/`WhyLink`
-selection, `EdgesTable.tsx`'s Policy State column, `BetLegCard.tsx`'s
-persisted-policy section and `ModelSection` addition). The action
-boundary in `GameDetail.tsx` gates the add-to-slip label and the
-`BetLegCard.tsx` `ModelSection` sub-heading on positive completed
-allocation specifically (`hasPositiveAllocation`), not on mere persisted-
-result presence.
-
-The unit primarily owns presentation and action separation. During
-verification, it corrected one directly related Unit 2 backend
-allocation-classification defect required to make the presented
-duplicate and opposing-position reasons reachable and truthful:
-`evaluate_recommendation_candidate`'s Stage 2 evidence-gate had grouped
-`exact_duplicate`/`opposing_position` (real, completed policy rejections)
-together with genuine evidence-unavailability checks, making
-`PortfolioAllocationReason.EXACT_DUPLICATE_FOUND`/`OPPOSING_POSITION_FOUND`
-unreachable dead enum values. Corrected the evidence-gate to test only
-genuine evidence availability; a real duplicate or opposing-position
-rejection now produces a completed `ZERO_ALLOCATION` with its specific
-reason.
-
-Scope decision: manual-wager execution mode is presentation-only in this
-unit. A leg staged via "Add as manual wager" retains
-`persistedRecommendation` as reference evidence identically to a leg
-staged via "Add recommendation to bet slip" — no new field distinguishes
-follow-versus-override at the data layer. This unit closes correct
-labeling and gating at the point of staging; it does not persist whether
-the user followed or overrode a governed allocation. A follow-up unit is
-required to close that distinction if the program requires it recorded.
+- Extracted one shared realized-outcome grader
+  (`market/candidate_outcome.py`) and migrated all consumers, including
+  one discovered only by a pre-edit repository search
+  (`evaluation/historical_backtest.py`). The grader now explicitly
+  rejects an unsupported market rather than silently defaulting to total
+  grading.
+- Added immutable decision-quality evaluation and persistence contracts
+  (`market/decision_quality.py`, `market/decision_quality_store.py`).
+- Added canonical parent-manifest validation
+  (`validate_recommended_bet_evaluation`) shared by both
+  `recommended_bet_result_store.py` and `decision_quality.py` — the
+  store's prior private duplicate is removed; both the write and read
+  paths now call the single public owner, which itself validates every
+  child result and all parent identity-bearing fields.
+- Added policy, candidate, and optional allocation-replay consistency
+  checks, each resolving and validating its referenced artifact directly
+  rather than trusting a claimed identifier.
+- Preserved realized outcome as an identity-bearing but
+  decision-status-independent field; a locked design choice
+  (`evaluated_at` is included in decision-quality identity, since each
+  evaluation call is a distinct event) is stated explicitly rather than
+  left implicit.
+- Added a canonical game-spread proof (real computed parent-manifest
+  identity, not a placeholder) and strict store tests, including
+  temporary-write and hard-link failure paths.
+- Corrected `grade_candidate_outcome` to validate the market/side
+  contract before inspecting scores, so an invalid row is rejected
+  regardless of whether outcome evidence happens to be available yet.
+  `historical_backtest.py`'s incidental lint-driven simplifications
+  (redundant cast/wrapper removal) were retained alongside its import
+  update, without behavioral change.
 
 #### Goal
-Update the composed decision surface to explicitly distinguish analytical
-candidate, qualified opportunity, failed qualification, insufficient/
-conflicting evidence, governed recommendation, manual wager, and
-wager-based-on-governed-recommendation — at every presentation surface
-confirmed to participate in the path.
+Define the minimum persisted evaluation needed to assess one
+recommendation decision separately from model correctness and realized
+wager outcome, for one canonical game-spread case.
 
 #### Files Changed
-- `frontend/src/components/recommendations/recommendationPresentation.ts` —
-  corrected state logic; added `isRecommendationEligible`,
-  `hasPositiveAllocation`, `formatAllocationReason`,
-  `recommendationToneColor`, exported `assertNever`; exhaustiveness guards
-  on both switches.
-- `frontend/src/screens/GameDetail.tsx` — `RecCell`, `ModelLeanCallout`,
-  `WhyLink` subject selection.
-- `frontend/src/components/betslip/EdgesTable.tsx` — Policy State column.
-- `frontend/src/components/betslip/BetLegCard.tsx` — persisted-policy
-  section; `ModelSection` governed-recommendation sub-section with
-  eligibility-gated heading.
-- `frontend/src/utils/betLegs.ts` — `parsePersistedRecommendation`
-  validates `allocation`'s presence (shallow structural guard; state/
-  reason/amount content validation remains backend-authoritative, not
-  independently re-validated client-side).
-- `frontend/src/components/recommendations/recommendationPresentation.test.ts`,
-  `frontend/src/screens/GameDetail.test.tsx` — corrected and expanded.
-- `src/gridiron_edge/market/recommendation_policy.py` —
-  `PortfolioAllocationReason` gains `EXACT_DUPLICATE_FOUND`/
-  `OPPOSING_POSITION_FOUND`; `evaluate_recommendation_candidate`'s Stage 2
-  evidence-gate corrected.
-- `tests/unit/market/test_recommendation_policy_evaluation.py` — one
-  consolidated test each for the duplicate and opposing-position cases,
-  replacing the prior pair of overlapping/stale tests.
-- `api-schema.json`, `frontend/src/api/schema.ts` — regenerated.
+- `src/gridiron_edge/market/candidate_outcome.py` — new.
+- `src/gridiron_edge/market/market_family_evaluation.py`,
+  `src/gridiron_edge/evaluation/historical_backtest.py` — consume the
+  shared grader.
+- `src/gridiron_edge/market/recommended_bet_result.py` — new
+  `validate_recommended_bet_evaluation`, new `_require_digest`.
+- `src/gridiron_edge/market/recommended_bet_result_store.py` — write and
+  read paths migrated to the public parent-evaluation validator; private
+  duplicate removed.
+- `src/gridiron_edge/market/decision_quality.py` — new; canonical
+  identity ownership consolidated into `decision_quality_evaluation_id`,
+  which accepts the evaluation object directly (no caller independently
+  constructs the identity payload).
+- `src/gridiron_edge/market/decision_quality_store.py` — new.
+- `tests/unit/market/test_candidate_outcome.py`,
+  `tests/unit/market/test_decision_quality.py`,
+  `tests/unit/market/test_decision_quality_store.py` — new.
+- `tests/unit/market/test_market_family_evaluation.py` — import updated.
 
 #### Tests
-Backend: `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
-— green. Frontend: `pnpm lint && pnpm build && pnpm test:run` — green,
-487 tests, including 5 new `GameDetail` component tests covering
-candidate/ineligible/pending/zero/positive-allocation states and the
-action-label gating for each, plus expanded `recommendationPresentation`
-helper tests for eligibility/allocation distinctions.
+`uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
+— green.
 
 #### Acceptance
-Every confirmed-scope presentation surface reads the actual persisted
-recommendation/allocation state, verified at the component level, not
-only via helper-function tests. The action boundary gates on positive
-completed allocation specifically, confirmed by test for all five
-recommendation states (none, failed, pending, zero, positive) — a
-persisted result that is failed, insufficient, conflicting, allocation-
-pending, or zero-allocated is never labeled or rendered as an executable
-governed recommendation. `BetLegCard.tsx`'s `ModelSection` sub-heading is
-similarly eligibility-gated, not presence-gated. The retroactive backend
-correction makes `PortfolioAllocationReason.EXACT_DUPLICATE_FOUND`/
-`OPPOSING_POSITION_FOUND` live, reachable, tested outcomes. Manual-wager
-execution mode remains presentation-only in this unit, per the scope
-decision above; a follow-up unit is required to persist the follow-versus-
-override distinction if needed. The unit is implemented, its design and
-subsequent correction rounds verified against real tool execution, and
-closed.
+One shared public grader owns all market grading and rejects unsupported
+markets explicitly. A persisted, schema-versioned decision-quality
+evaluation resolves its target result from a genuinely, fully validated
+parent manifest (every child result validated, every parent identity
+field checked), not a caller-supplied or partially-checked string. The
+evaluator validates its own constructed artifact before returning it.
+Canonical decision-quality identity has exactly one owner, which every
+caller — the evaluator, the validator, and the test fixture — uses
+identically. A real, monkeypatched replay-disagreement seam is proven to
+flip the public evaluator's overall status to `INCONSISTENT`, honestly
+described as a seam test rather than an independently-valid second domain
+replay. Missing original allocation evidence does not lower an otherwise-
+consistent conclusion. The canonical case uses a real, internally valid
+game-spread candidate with a genuinely computed parent-manifest identity.
+Persistence failure paths (hard-link and temporary-write) are both
+covered. The unit is implemented, validated against real game-spread
+evidence, and closed with all focused and full quality gates passing.
