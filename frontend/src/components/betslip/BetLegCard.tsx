@@ -12,6 +12,15 @@ import {
 } from "../../utils/props";
 import { PendingChip } from "../field-status/PendingChip";
 import { TeamMark } from "../primitives/TeamMark";
+import {
+  formatAllocationReason,
+  formatSuggestedStake,
+  isRecommendationEligible,
+  recommendationPresentation,
+  recommendationToneColor,
+  assertNever,
+} from "../recommendations/recommendationPresentation";
+import type { RecommendationTone } from "../recommendations/recommendationPresentation";
 
 type OddsFormat =
   | "american"
@@ -82,11 +91,10 @@ export function BetLegCard({
 
       <WagerDescription leg={leg} />
 
-      <section
-        aria-label={`Persisted policy result for ${accessibleLegLabel}`}
-        style={{ marginBottom: 12, display: "grid", gap: 6 }}
-      >
-      </section>
+      <PersistedPolicyResultSection
+        leg={leg}
+        accessibleLegLabel={accessibleLegLabel}
+      />
 
       <PriceSection
         leg={leg}
@@ -267,6 +275,66 @@ function CardHeader({
   );
 }
 
+function PersistedPolicyResultSection({
+  leg,
+  accessibleLegLabel,
+}: {
+  leg: BetLeg;
+  accessibleLegLabel: string;
+}) {
+  const persisted = leg.persistedRecommendation;
+  const presentation = recommendationPresentation(persisted);
+  const suggestedStake = formatSuggestedStake(persisted);
+  const allocationReason = formatAllocationReason(persisted);
+
+  return (
+    <section
+      aria-label={`Persisted policy result for ${accessibleLegLabel}`}
+      style={{ marginBottom: 12, display: "grid", gap: 4 }}
+    >
+      <span
+        className="mono"
+        style={{ fontSize: 11, fontWeight: 600, color: recommendationToneColor(presentation.tone) }}
+      >
+        {presentation.label}
+      </span>
+      <span className="mono dim2" style={{ fontSize: 9.5 }}>
+        {presentation.description}
+      </span>
+      {suggestedStake && (
+        <span className="mono dim2" style={{ fontSize: 9.5 }}>
+          Governed suggested stake: {suggestedStake}
+        </span>
+      )}
+      {allocationReason && (
+        <span className="mono dim2" style={{ fontSize: 9.5 }}>
+          {allocationReason}
+        </span>
+      )}
+    </section>
+  );
+}
+
+// BetLegCard.tsx
+function toMetricTone(
+  tone: RecommendationTone,
+): "default" | "positive" | "warning" | "negative" {
+  switch (tone) {
+    case "positive":
+      return "positive";
+    case "warning":
+    case "unavailable":
+      return "warning";
+    case "negative":
+    case "conflicting":
+      return "negative";
+    case "candidate":
+      return "default";
+    default:
+      return assertNever(tone);
+  }
+}
+
 function WagerDescription({
   leg,
 }: {
@@ -404,15 +472,16 @@ function ModelSection({
   oddsFormat: OddsFormat;
   kellyMultiplier: number;
 }) {
-  const probability =
-    leg.edgeAnalytics
-      ?.referenceModelProbability ?? null;
+  const probability = leg.edgeAnalytics?.referenceModelProbability ?? null;
+
+  const persisted = leg.persistedRecommendation;
+  const governedPresentation = persisted == null ? null : recommendationPresentation(persisted);
+  const governedStake = formatSuggestedStake(persisted);
+  const allocationReason = formatAllocationReason(persisted);
 
   return (
     <section
-      aria-label={`Model analysis for ${legLabel(
-        leg,
-      )}`}
+      aria-label={`Model analysis for ${legLabel(leg)}`}
       className="betslip-card-grid"
       style={{
         marginBottom: 12,
@@ -423,108 +492,86 @@ function ModelSection({
     >
       <Metric
         label="Model probability"
-        value={
-          probability == null
-            ? null
-            : `${(
-                probability * 100
-              ).toFixed(1)}%`
-        }
+        value={probability == null ? null : `${(probability * 100).toFixed(1)}%`}
       />
 
       <Metric
         label="Edge strength"
-        value={
-          leg.edgeAnalytics
-            ?.referenceEdgeStrength ?? null
-        }
+        value={leg.edgeAnalytics?.referenceEdgeStrength ?? null}
         capitalize
       />
 
       <Metric
         label="Reference EV"
-        value={formatPercent(
-          leg.edgeAnalytics
-            ?.referenceExpectedValue ?? null,
-        )}
-        tone={evTone(
-          leg.edgeAnalytics
-            ?.referenceExpectedValue ?? null,
-        )}
+        value={formatPercent(leg.edgeAnalytics?.referenceExpectedValue ?? null)}
+        tone={evTone(leg.edgeAnalytics?.referenceExpectedValue ?? null)}
       />
 
       <Metric
         label="Current EV"
-        value={formatPercent(
-          analysis.current
-            ?.expectedValue ?? null,
-        )}
-        tone={evTone(
-          analysis.current
-            ?.expectedValue ?? null,
-        )}
+        value={formatPercent(analysis.current?.expectedValue ?? null)}
+        tone={evTone(analysis.current?.expectedValue ?? null)}
       />
 
       <Metric
         label="Full Kelly"
-        value={formatPercent(
-          analysis.current
-            ?.fullKellyFraction ??
-            null,
-        )}
+        value={formatPercent(analysis.current?.fullKellyFraction ?? null)}
       />
 
       <Metric
-        label={`${kellyMultiplier.toFixed(
-          2,
-        )}× suggested stake`}
-        value={formatMoney(
-          analysis.suggestedStake,
-        )}
+        label={`${kellyMultiplier.toFixed(2)}× suggested stake`}
+        value={formatMoney(analysis.suggestedStake)}
       />
 
       {leg.kind === "prop" && (
         <Metric
           label="Model projection"
-          value={
-            leg.predictedMean == null
-              ? null
-              : leg.predictedMean.toFixed(
-                  1,
-                )
-          }
+          value={leg.predictedMean == null ? null : leg.predictedMean.toFixed(1)}
         />
       )}
 
       <Metric
         label="Current implied"
-        value={formatPercent(
-          analysis.current
-            ?.impliedProbability ??
-            null,
-        )}
+        value={formatPercent(analysis.current?.impliedProbability ?? null)}
       />
 
-      {analysis.current &&
-        leg.draft.currentAmericanOdds !=
-          null && (
+      {analysis.current && leg.draft.currentAmericanOdds != null && (
+        <div className="mono dim2" style={{ gridColumn: "1 / -1", fontSize: 9 }}>
+          Current price {formatOdds(leg.draft.currentAmericanOdds, oddsFormat)} is used for
+          current EV, Kelly, payout, and profit.
+        </div>
+      )}
+
+      {governedPresentation && (
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: "1px solid var(--line-soft)",
+          }}
+        >
           <div
-            className="mono dim2"
-            style={{
-              gridColumn: "1 / -1",
-              fontSize: 9,
-            }}
+            className="upper dim2"
+            style={{ fontSize: 9, marginBottom: 6, letterSpacing: "0.06em" }}
           >
-            Current price{" "}
-            {formatOdds(
-              leg.draft
-                .currentAmericanOdds,
-              oddsFormat,
-            )}{" "}
-            is used for current EV,
-            Kelly, payout, and profit.
+            {isRecommendationEligible(persisted) ? "Governed Recommendation" : "Persisted Policy Result"}
           </div>
-        )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <Metric
+              label="Policy state"
+              value={governedPresentation.label}
+              tone={toMetricTone(governedPresentation.tone)}
+            />
+            <Metric label="Governed suggested stake" value={governedStake} />
+          </div>
+          {allocationReason && (
+            <div className="mono dim2" style={{ fontSize: 9, marginTop: 6 }}>
+              {allocationReason}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

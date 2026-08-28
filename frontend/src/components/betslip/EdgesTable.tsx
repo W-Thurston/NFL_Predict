@@ -12,6 +12,15 @@ import {
 } from "../../utils/sportsbookPreferences";
 import { buildGameBetLegId, createGameBetLeg } from "../../utils/betLegs";
 import { ErrorCard } from "../../components/error/ErrorCard";
+import {
+  formatAllocationReason,
+  formatSuggestedStake,
+  recommendationPresentation,
+  recommendationToneColor,
+} from "../recommendations/recommendationPresentation";
+import type { components } from "../../api/schema";
+
+type EdgeApiRow = components["schemas"]["EdgeRow"];
 
 export function EdgesTable({
   bankroll,
@@ -340,8 +349,7 @@ export function EdgesTable({
                       <EdgeStrengthPill strength={edge.edge_strength} />
                     </td>
                     <td style={{ padding: "10px 12px 10px 0" }}>
-                      <div style={{ display: "grid", gap: 5 }}>
-                      </div>
+                      <PolicyStateCell edge={edge} />
                     </td>
                     <td style={{ padding: "10px 0" }}>
                       <AddButton
@@ -411,6 +419,34 @@ function formatMarketContext(
 
 function formatAmericanOdds(odds: number): string {
   return odds > 0 ? `+${odds}` : `${odds}`;
+}
+
+function PolicyStateCell({ edge }: { edge: EdgeApiRow }) {
+  const persisted = edge.recommendation ?? null;
+  const presentation = recommendationPresentation(persisted);
+  const suggestedStake = formatSuggestedStake(persisted);
+  const allocationReason = formatAllocationReason(persisted);
+
+  return (
+    <div style={{ display: "grid", gap: 3 }}>
+      <span
+        className="mono"
+        style={{ fontSize: 10.5, color: recommendationToneColor(presentation.tone) }}
+      >
+        {presentation.label}
+      </span>
+      {suggestedStake && (
+        <span className="mono dim2" style={{ fontSize: 9.5 }}>
+          {suggestedStake}
+        </span>
+      )}
+      {allocationReason && (
+        <span className="mono dim2" style={{ fontSize: 9 }}>
+          {allocationReason}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function EdgeStrengthPill({ strength }: { strength: string }) {

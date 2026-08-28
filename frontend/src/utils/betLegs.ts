@@ -778,6 +778,7 @@ function parsePersistedRecommendation(
     !Array.isArray(value.failed_checks) ||
     !Array.isArray(value.unavailable_checks) ||
     !isRecord(value.sizing) ||
+    !isRecord(value.allocation) ||
     !isRecord(value.offer_provenance) ||
     !isRecord(value.forecast_provenance) ||
     !isRecord(value.policy_provenance)

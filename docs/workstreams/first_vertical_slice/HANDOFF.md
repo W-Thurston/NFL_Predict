@@ -5,7 +5,7 @@
 > evidence. Full evidence lives in FINDINGS.md; full program authority
 > lives in the root ROADMAP.md, VISION.md, and CONSTITUTION.md.
 
-### Status: BOUNDARY INSPECTION COMPLETE (Boundaries 1-5 closed). Ready for ROADMAP/PLAN construction. No implementation unit yet started.
+### Status: IMPLEMENTATION IN PROGRESS. Units 1-3 of 7 closed. Unit 4 (decision-quality evaluation) not yet started.
 
 ### The one thing a new thread must never lose: WHY this workstream exists
 
@@ -20,131 +20,134 @@ only).
 
 WS2 closed all seven planned units but carries two capabilities forward
 (D35: general validity/invalidation beyond one field; D36: forward-impact
-discoverability, no mechanism selected). WS3's own obligation 8 and its
-real vertical-slice pipeline were expected to supply the first genuine
-evidence needed to resolve them.
+discoverability, no mechanism selected). Boundary inspection (closed)
+found no new evidence for either. Obligation 8 (later observation can
+supersede/invalidate downstream artifacts) requires its own dedicated
+implementation unit (Unit 5) — it is not being carried forward
+indefinitely. D36 remains correctly deferred pending a concrete
+forward-impact consumer need, which has not appeared.
 
-**Full boundary inspection is now complete. This is resolved as far as
-inspection alone can resolve it, and no further:** no new concrete
-evidence for a general invalidation mechanism or a forward-impact need
-emerged during Boundaries 1-5. **Critically: this does NOT mean
-obligation 8 can simply remain "Partial" indefinitely.** Workstream 3's
-own exit criterion requires all ten obligations demonstrated end to end.
-A dedicated implementation unit (Unit — spread-slice supersession and
-invalidation proof, see below) is required to either close obligation 8
-with a bounded, evidence-driven second test case, or this workstream's
-exit criterion must be amended through an explicit program-level
-decision — not silently accepted as unmet. D36 remains a separate,
-correctly-deferred item (no concrete forward-impact consumer need has
-appeared anywhere).
+### Boundary inspection (closed; full detail in FINDINGS.md)
+
+All five boundaries closed. All ten obligations carry an explicit,
+source-confirmed disposition. Four obligations (6, 7, 8, 10) were
+confirmed to have a component genuinely missing, not merely
+under-evidenced — this became the implementation roadmap below.
+
+### Implementation units closed so far
+
+**Unit 1 — Reproducible decision-time bankroll evidence.** Added
+`betting/bankroll.py::bankroll_snapshot_as_of`, a cutoff-scoped,
+content-identified bankroll evidence derivation, wired into
+`cli/production_chain.py::evaluate_recommendations_cmd` (the sole
+production caller of `evaluate_recommendation_issuance`). Hardened
+`_write_txn_log` to atomic publication. Confirmed reproducible for a
+fixed ledger state; does not claim immutable historical reproduction
+independent of ledger concurrency-safety (deferred, no confirmed need).
+Two full review rounds; three real bugs caught only by test execution
+(wall-clock-dependent test timing, an invalid Settings test double, a
+test fixture with the wrong market string). Closed with all gates green.
+
+**Unit 2 — Separate recommendation eligibility from portfolio
+allocation.** The existing evaluator coupled eligibility to allocation
+amount (`eligible = (...) and sizing.actionable_stake is not None`),
+making "eligible recommendation, zero allocation" structurally
+unrepresentable. Added `PortfolioAllocationState`/`Reason`/`Result` as an
+independent axis; restructured `evaluate_recommendation_candidate` into
+explicit Stage 1 (recommendation eligibility, frozen once established)
+and Stage 2 (portfolio allocation) phases. Bumped
+`RECOMMENDED_BET_RESULT_SCHEMA_VERSION` 2→3 (clean-sheet replace, per
+established precedent). Two design options were considered and rejected
+before implementation (reusing `QUALIFIED_OPPORTUNITY` as the zero-proof;
+manufacturing zero via `minimum_actionable_stake=0`) — both would have
+preserved the coupling rather than fixing it. A full review round after
+initial implementation found and required four additional corrections
+(sizing.actionable_stake was silently overloaded to carry a zero-
+allocation amount; the evidence-gate conflated real policy rejections
+with genuine evidence gaps; validation checked amounts but not reasons/
+cross-consistency; the new axis was never projected through the API).
+Closed with all gates green, including a live-server discovery (stale
+schema-2 data correctly rejected by the strict decoder — resolved by
+regenerating, not migrating).
+
+**Unit 3 — Governed recommendation presentation and action separation.**
+Corrected `recommendationPresentation.ts` to consume `decision_state` and
+`allocation` alongside `result_state` (the function predated Unit 2's
+schema change and had a real, live correctness gap: `result_state`
+alone conflated genuine insufficient-evidence with an eligible
+recommendation whose allocation simply hadn't been evaluated, and
+conflated positive allocation with genuine zero allocation). Wired the
+correction through `GameDetail.tsx`, `EdgesTable.tsx`, and
+`BetLegCard.tsx`. The action boundary (add-to-slip label, `WhyLink`
+subject selection, `BetLegCard`'s sub-heading) is gated on **positive
+completed allocation specifically**, not on mere persisted-result
+presence — an earlier draft used presence alone and could have labeled a
+failed, zero-allocated, or allocation-pending result as an executable
+recommendation. A second review round, during verification, found and
+required this correction plus a **retroactive Unit 2 backend defect**:
+`evaluate_recommendation_candidate`'s evidence-gate had grouped real
+policy rejections (exact-duplicate, opposing-position) with genuine
+evidence gaps, making two `PortfolioAllocationReason` enum values
+unreachable dead code. Fixed as part of this unit, not deferred, since it
+was required to make the presented reasons truthful. **Scope decision:**
+manual-wager execution mode (follow vs. override) is presentation-only in
+this unit — a manually-staged leg retains `persistedRecommendation`
+identically to a governed-staged leg; no new field records which action
+label was used. Closed with all gates green, including 5 new
+component-level tests covering all five recommendation states.
 
 ### Governing decisions relevant to this workstream
 
 All of Workstream 1 and Workstream 2 (D27, D30-D37) remain in force.
-None were reopened during this inspection.
+None were reopened. No new numbered `DECISIONS.md` entry was required by
+Units 1-3 — each closed as a direct, evidence-driven correction of an
+already-locked contract, not a new architectural choice; if this changes
+in a future unit, record it there, not here.
 
-### Boundary inspection summary — all five boundaries closed (full detail in FINDINGS.md)
+### Process note (carried here per reviewer guidance, not duplicated in each unit's PLAN closure)
 
-**Boundary 1** named candidate owners for all ten obligations. **Boundary
-2** traced the complete production chain end-to-end, confirmed
-`market/recommendations.py` as the separate analytical-edge layer, and
-surfaced the bankroll-composition gap. **Boundary 3** confirmed the
-calibration/product-composition layers and the historical-backtest
-report chain, sharpened the bankroll finding, and left decision-quality
-evaluation open. **Boundary 4** confirmed decision-quality evaluation
-Absent (exhaustive search, not merely unfound), confirmed the raw
-prediction-generation layer, retired `prediction_availability.py`, and
-found `GameDetail.tsx`'s presentation gap. **Boundary 5** produced the
-full ten-obligation coverage table, recorded direct source evidence for
-`EdgesTable`/`BetLegCard`/`SlipPanel` (extending the presentation-gap
-finding — confirming the actual recording/confirmation step is sound,
-but every decision-support display before it is not), and corrected
-obligation 8's status from an unassigned carry-forward into a named,
-required implementation item.
+Prefer complete, self-contained replacement blocks over prose-described
+edits for any change spanning more than a few contiguous lines,
+especially for TSX/JSX. A described transform ("replace the return block
+with...") has twice produced unusable output in this workstream — once
+as a request for content that was never actually pasted into the visible
+response, once as a genuine unbalanced-brace syntax error from an
+ambiguous edit boundary. Paste-and-confirm the complete result; verify
+brace/paren balance against the full current file before running gates.
 
-### Final obligation status (all ten; full detail and evidence in FINDINGS.md Boundary 5)
+### Remaining implementation sequence (unchanged from original sequencing; Units 1-3 closed)
 
-| # | Obligation | Status |
-|---|---|---|
-| 1 | Mutable observation preserved without overwrite | Reuse (cutoff-visibility); persistence owned by WS1 |
-| 2 | Time-valid claim consumes exact source version | Reuse, full chain traced |
-| 3 | Honest uncertainty/limitation | Reuse |
-| 4 | Market price separate from prediction | Reuse |
-| 5 | Edge derived without automatically becoming recommendation | Reuse, architecturally enforced |
-| 6 | Recommendation policy can recommend or abstain | Reuse (domain, both branches); Blocked (production composition, positive branch — no bankroll); Adapt (every inspected presentation surface) |
-| 7 | Portfolio can allocate zero despite eligible recommendation | Blocked — no eligible recommendation has ever been produced to test against |
-| 8 | Later observation can supersede/invalidate downstream artifacts | Partial (WS2 D31, one field). **Requires a dedicated implementation unit — not a permanent carry-forward.** |
-| 9 | Original decision remains reproducible | Reuse, for the inspected candidate/policy/result/evaluation/historical-report artifacts |
-| 10 | Realized outcome vs. decision-quality evaluation remain separate | Reuse (realized-outcome/prediction-quality split); Absent (decision-quality half) — **requires a dedicated implementation unit.** |
-
-**Three obligations (6's production branch, 7, 8, 10) each have a
-confirmed-missing component requiring implementation work, not merely a
-documented finding** — corrected from the prior revision, which
-undercounted this by treating obligation 8 as already-resolved-enough
-to carry forward indefinitely.
-
-### Final Workstream 3 candidate implementation inventory
-
-The inspection identified **two primary vertical-slice gaps, two missing
-proof capabilities required by the exit criterion, and several bounded
-cleanup items** — not a fixed count of "eight," which does not survive
-correction and should not be treated as a durable fact.
-
-**Primary vertical-slice gaps (high priority):**
-1. Bankroll-composition gap — blocks obligation 6's positive branch and
-   obligation 7 entirely.
-2. Governed recommendation presentation across the composed decision
-   surface (`GameDetail.tsx`, `EdgesTable`, `BetLegCard`) — `SlipPanel`'s
-   final confirmation is sound and must be preserved unchanged.
-
-**Missing proof capabilities (required for the exit criterion):**
-3. Decision-quality evaluation for persisted recommendations.
-4. Spread-slice supersession and invalidation proof (closes obligation 8
-   or forces an explicit program-level exit-criterion decision).
-
-**Bounded cleanup items (low priority):**
-5. `cli/production_chain.py` hardcoded policy schema literal.
-6. `resolve_recommended_bet_recording_evidence` stale "Unit 24" docstring.
-7. `visibleRecommendedOffer.ts` naming/presentation risk.
-8. `recordWager.ts` local completeness-check (`result_id`).
-9. `prediction_availability.py` — Retire.
-10. `market/recommendations.py` file path/naming.
-
-### Recommended implementation sequence (dependency-ordered by proof, not file or urgency alone)
-
-1. Reproducible decision-time bankroll evidence (unlocks the positive
-   recommendation branch; nothing downstream can be tested without it).
-2. Eligible-recommendation and explained-zero portfolio proof (bankroll
-   alone doesn't prove obligation 7 — needs two real cases: positive
-   allocation and zero allocation with a machine-readable explanation).
-3. Governed recommendation presentation and action separation (needs
-   real recommended/abstained states from units 1-2 to display
-   correctly).
-4. Decision-quality evaluation contract and first spread evaluation.
-5. Spread-slice supersession and invalidation proof (tests D35 against a
-   second real case; do not build a forward-impact index unless this
-   unit reveals a concrete need — that would be the honest trigger for
-   revisiting D36).
-6. Scoped ownership and naming cleanup (items 5-10 above, folded in
-   wherever a unit naturally touches the file).
+4. Decision-quality evaluation contract and first spread evaluation —
+   **next.** Confirmed absent by boundary inspection (exhaustive search,
+   not merely unfound): no consumer anywhere evaluates a persisted
+   recommendation decision against its decision-time policy and evidence,
+   as distinct from prediction accuracy or realized wager outcome.
+5. Spread-slice supersession and invalidation proof — tests D35 against
+   a second real case; closes obligation 8 or forces an explicit
+   program-level exit-criterion decision. Do not build a forward-impact
+   index unless this unit reveals a concrete need.
+6. Scoped ownership and naming cleanup — the bounded low-priority items
+   named in FINDINGS.md Boundary 5 (schema-literal replacements, stale
+   docstrings, naming risks), folded in wherever a unit naturally touches
+   the file, plus the manual-wager execution-mode follow-up from Unit 3
+   if the program requires it recorded.
 7. End-to-end ten-obligation proof matrix using real, verified artifacts
-   — the unit that actually allows Workstream 3 to close honestly.
+   — the unit that allows Workstream 3 to close honestly against its
+   exit criterion.
 
-Units 3 and 4 may be swapped if implementation convenience favors it.
-Unit 1 must remain first.
+### Updated obligation status (deltas from boundary-inspection baseline; full table in FINDINGS.md)
 
-### Immediate action items
-
-1. Boundary inspection is complete. Do not re-open any boundary without
-   new evidence.
-2. Next: full Workstream 3 implementation ROADMAP.md reflecting the
-   seven-unit sequence above.
-3. Then: one active PLAN.md, scoped to Unit 1 only (reproducible
-   decision-time bankroll evidence). Its definition of done must not
-   claim obligation 7 is complete — only that bankroll evidence is
-   truthful/reproducible, the writer accepts it, both absent- and
-   supplied-bankroll paths are tested, the positive branch becomes
-   reachable, and existing abstention semantics remain intact.
+- **Obligation 6** (recommend or abstain): domain logic — Reuse
+  (unchanged). Production composition — **no longer Blocked**: Unit 1
+  unlocked the positive branch; Unit 2 made eligibility genuinely
+  independent of allocation outcome. Presentation — **no longer Adapt**:
+  Unit 3 corrected every confirmed-scope surface.
+- **Obligation 7** (portfolio can allocate zero despite eligible
+  recommendation): **no longer Blocked** — Unit 2 proved this directly
+  (a real eligible-recommendation-with-zero-allocation case, from genuine
+  capacity exhaustion, confirmed by test).
+- **Obligations 8, 10**: unchanged: Partial and Absent respectively,
+  pending Units 5 and 4.
 
 ### Reading order for a new thread (per AI_BOOTSTRAP.md)
 

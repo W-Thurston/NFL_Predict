@@ -35,6 +35,14 @@ import {
   createPropBetLeg,
   propSideFromLean,
 } from "../utils/betLegs";
+import {
+  formatAllocationReason,
+  formatSuggestedStake,
+  hasPositiveAllocation,
+  isRecommendationEligible,
+  recommendationPresentation,
+  recommendationToneColor,
+} from "../components/recommendations/recommendationPresentation";
 
 export function GameDetail() {
   const { route, navigate } = useNav();
@@ -629,7 +637,7 @@ function ModelLeanCallout({
     (leg) => leg.id === legId,
   );
 
-  const handleAddSlip = () => {
+    const handleAddSlip = () => {
     if (isPicked) {
       return;
     }
@@ -638,11 +646,27 @@ function ModelLeanCallout({
       createGameBetLeg({
         edge: topEdge,
         source: "game-detail-lean",
-        addedAt:
-          new Date().toISOString(),
+        addedAt: new Date().toISOString(),
       }),
     );
   };
+
+  const persisted = topEdge.recommendation ?? null;
+  const presentation = recommendationPresentation(persisted);
+  const suggestedStake = formatSuggestedStake(persisted);
+  const hasPersistedPolicyResult = persisted != null;
+  const eligible = isRecommendationEligible(persisted);
+  const positiveAllocation = hasPositiveAllocation(persisted);
+
+  const heading = eligible
+    ? "Governed Recommendation"
+    : hasPersistedPolicyResult
+      ? "Persisted Policy Result"
+      : "Top Analytical Edge";
+
+  const actionLabel = positiveAllocation
+    ? "Add recommendation to bet slip"
+    : "Add as manual wager";
 
   return (
     <div
@@ -657,23 +681,19 @@ function ModelLeanCallout({
     >
       <span
         className="upper dim"
-        style={{
-          fontSize: 9.5,
-          letterSpacing: "0.1em",
-          color: "var(--ink-4)",
-        }}
+        style={{ fontSize: 9.5, letterSpacing: "0.1em", color: "var(--ink-4)" }}
       >
-        Top Analytical Edge
+        {heading}
       </span>
       <span
-        style={{
-          fontSize: 18,
-          fontWeight: 600,
-          color: "var(--pos)",
-        }}
+        style={{ fontSize: 18, fontWeight: 600, color: recommendationToneColor(presentation.tone) }}
       >
         {topEdge.side}
       </span>
+      <div className="mono dim2" style={{ fontSize: 10.5 }}>
+        {presentation.label}
+        {suggestedStake ? ` · ${suggestedStake}` : ""}
+      </div>
       <div
         style={{
           display: "flex",
@@ -684,22 +704,28 @@ function ModelLeanCallout({
         }}
       >
         <span className="mono">
-          {topEdge.sportsbook
-            ? sportsbookDisplayName(topEdge.sportsbook)
-            : "Consensus"}
+          {topEdge.sportsbook ? sportsbookDisplayName(topEdge.sportsbook) : "Consensus"}
           {" · "}
-          {topEdge.american_odds > 0
-            ? `+${topEdge.american_odds}`
-            : topEdge.american_odds}
+          {topEdge.american_odds > 0 ? `+${topEdge.american_odds}` : topEdge.american_odds}
           {" · +"}
           {(topEdge.ev * 100).toFixed(1)}% EV
         </span>
         <WhyLink
           dot
           tone="pos"
-          subject={{ kind: "rec", gameId: topEdge.game_id }}
+          subject={
+            eligible && persisted != null
+              ? { kind: "recommendation", gameId: topEdge.game_id, resultId: persisted.result_id }
+              : { kind: "edge", gameId: topEdge.game_id }
+          }
         />
       </div>
+
+      {!positiveAllocation && hasPersistedPolicyResult && (
+        <div className="mono dim2" style={{ fontSize: 9, textAlign: "right" }}>
+          Staging this as a manual wager — it is not a portfolio-governed allocation.
+        </div>
+      )}
 
       <button
         onClick={handleAddSlip}
@@ -718,7 +744,7 @@ function ModelLeanCallout({
           marginTop: 4,
         }}
       >
-        {isPicked ? "✓ On slip" : "Add to bet slip"}
+        {isPicked ? "✓ On slip" : actionLabel}
       </button>
     </div>
   );
@@ -1016,33 +1042,42 @@ function RecCell({
     );
   }
 
+  const persisted = edge.recommendation ?? null;
+  const presentation = recommendationPresentation(persisted);
+  const suggestedStake = formatSuggestedStake(persisted);
+  const allocationReason = formatAllocationReason(persisted);
+
   return (
     <div style={{ display: "grid", gap: 5 }}>
       <div
         style={{
-          color: "var(--pos)",
+          color: recommendationToneColor(presentation.tone),
           fontWeight: 600,
           fontFamily: "var(--f-mono)",
         }}
       >
-        {edge.side}
+        {presentation.label}
       </div>
       <div
         className="mono"
-        style={{
-          fontSize: 10.5,
-          color: "var(--pos)",
-          marginTop: 2,
-        }}
+        style={{ fontSize: 10.5, color: "var(--ink-3)", marginTop: 2 }}
       >
-        {edge.sportsbook
-          ? sportsbookDisplayName(edge.sportsbook)
-          : "Consensus"}
+        {edge.side} · {edge.sportsbook ? sportsbookDisplayName(edge.sportsbook) : "Consensus"}
         {" · "}
         {edge.american_odds > 0 ? `+${edge.american_odds}` : edge.american_odds}
         {" · +"}
         {(edge.ev * 100).toFixed(1)}% EV
       </div>
+      {suggestedStake && (
+        <div className="mono dim2" style={{ fontSize: 10 }}>
+          Suggested stake: {suggestedStake}
+        </div>
+      )}
+      {allocationReason && (
+        <div className="mono dim2" style={{ fontSize: 9.5 }}>
+          {allocationReason}
+        </div>
+      )}
     </div>
   );
 }

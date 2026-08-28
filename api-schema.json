@@ -4215,6 +4215,8 @@
           "recommendation_ineligible",
           "allocation_evidence_unavailable",
           "allocated",
+          "exact_duplicate_found",
+          "opposing_position_found",
           "candidate_capacity_exhausted",
           "game_capacity_exhausted",
           "portfolio_capacity_exhausted",

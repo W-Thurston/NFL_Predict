@@ -240,9 +240,11 @@ def test_missing_mandatory_correlation_evidence_prevents_allocation() -> None:
     assert result.allocation.allocated_stake is None
 
 
-def test_exact_duplicate_prevents_allocation_not_eligibility() -> None:
-    """An exact duplicate is a Stage 2 (allocation) gap -- it must not
-    retroactively erase an already-established recommendation eligibility."""
+def test_exact_duplicate_is_zero_allocation_not_eligibility_loss() -> None:
+    """An exact duplicate is a real Stage 2 policy rejection from valid
+    evidence -- a completed ZERO_ALLOCATION with a specific reason, not
+    missing allocation evidence, and it must not retroactively erase an
+    already-established recommendation eligibility."""
     issued = _issuance()
     reference = candidate_issuance_row_id(issued.issuance_id, issued.rows[0])
     duplicate = PortfolioExposureRow(
@@ -253,17 +255,27 @@ def test_exact_duplicate_prevents_allocation_not_eligibility() -> None:
     assert check.status is PolicyCheckStatus.FAILED
     assert result.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
     assert result.recommendation_eligible
-    assert result.allocation.state is PortfolioAllocationState.NOT_EVALUATED
-    assert result.allocation.reason is PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE
+    assert result.allocation.state is PortfolioAllocationState.ZERO_ALLOCATION
+    assert result.allocation.reason is PortfolioAllocationReason.EXACT_DUPLICATE_FOUND
+    assert result.allocation.allocated_stake == pytest.approx(0.0)
 
 
-def test_opposing_position_fails() -> None:
+def test_opposing_position_is_zero_allocation_not_eligibility_loss() -> None:
+    """An opposing position is a real Stage 2 policy rejection from valid
+    evidence -- a completed ZERO_ALLOCATION, not missing evidence, and it
+    must not retroactively erase established recommendation eligibility."""
     opposing = PortfolioExposureRow(
         "bet-1", "2026_01_KC_LAC", EVALUATED, "moneyline", "away", 10.0, "open", None
     )
     result = _evaluate(portfolio=_portfolio(opposing))
     check = next(item for item in result.checks if item.check_id == "opposing_position")
     assert check.status is PolicyCheckStatus.FAILED
+    assert result.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
+    assert result.recommendation_eligible
+    assert result.allocation.state is PortfolioAllocationState.ZERO_ALLOCATION
+    assert result.allocation.reason is PortfolioAllocationReason.OPPOSING_POSITION_FOUND
+    assert result.allocation.allocated_stake == pytest.approx(0.0)
+    assert result.sizing.actionable_stake is None
 
 
 def test_game_capacity_constrains_stake() -> None:
@@ -333,3 +345,15 @@ def test_qualified_opportunity_requires_all_qualification_checks() -> None:
     stale = _evaluate(decision_at=datetime(2026, 9, 1, 12, 20, tzinfo=UTC))
     assert stale.state is RecommendationDecisionState.UNQUALIFIED
     assert not stale.recommendation_eligible
+
+
+def test_opposing_position_is_zero_allocation_not_missing_evidence() -> None:
+    opposing = PortfolioExposureRow(
+        "bet-1", "2026_01_KC_LAC", EVALUATED, "moneyline", "away", 10.0, "open", None
+    )
+    result = _evaluate(portfolio=_portfolio(opposing))
+    assert result.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
+    assert result.recommendation_eligible
+    assert result.allocation.state is PortfolioAllocationState.ZERO_ALLOCATION
+    assert result.allocation.reason is PortfolioAllocationReason.OPPOSING_POSITION_FOUND
+    assert result.allocation.allocated_stake == pytest.approx(0.0)

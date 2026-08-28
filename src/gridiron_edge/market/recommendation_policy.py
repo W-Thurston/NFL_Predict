@@ -471,6 +471,8 @@ class PortfolioAllocationReason(StrEnum):
     RECOMMENDATION_INELIGIBLE = "recommendation_ineligible"
     ALLOCATION_EVIDENCE_UNAVAILABLE = "allocation_evidence_unavailable"
     ALLOCATED = "allocated"
+    EXACT_DUPLICATE_FOUND = "exact_duplicate_found"
+    OPPOSING_POSITION_FOUND = "opposing_position_found"
     CANDIDATE_CAPACITY_EXHAUSTED = "candidate_capacity_exhausted"
     GAME_CAPACITY_EXHAUSTED = "game_capacity_exhausted"
     PORTFOLIO_CAPACITY_EXHAUSTED = "portfolio_capacity_exhausted"
@@ -609,30 +611,69 @@ def evaluate_recommendation_candidate(
     # or `recommendation_eligible` away from True.
 
     # --- Stage 2: portfolio evidence and allocation ---
-    checks.append(_portfolio_check(portfolio, decision))
-    checks.append(_duplicate_check(candidate_reference_id, portfolio))
-    checks.append(_opposing_check(row, portfolio, policy.governance))
-    checks.append(_bankroll_check(bankroll, decision))
-    checks.append(_correlation_check(correlation, policy.governance))
+    portfolio_check = _portfolio_check(portfolio, decision)
+    duplicate_check = _duplicate_check(candidate_reference_id, portfolio)
+    opposing_check = _opposing_check(row, portfolio, policy.governance)
+    bankroll_check = _bankroll_check(bankroll, decision)
+    correlation_check = _correlation_check(correlation, policy.governance)
+    checks.extend(
+        [portfolio_check, duplicate_check, opposing_check, bankroll_check, correlation_check]
+    )
 
+    # Missing or conflicting evidence prevents any allocation conclusion
+    # from being reached at all -- distinct from a FAILED check below,
+    # which is a real, completed policy conclusion, not missing evidence.
+    evidence_gap_checks = (portfolio_check, bankroll_check, correlation_check)
     allocation_evidence_ready = all(
-        check.status is PolicyCheckStatus.PASSED
-        for check in checks
-        if check.mandatory
-        and check.check_id
-        in {
-            "portfolio_snapshot",
-            "exact_duplicate",
-            "opposing_position",
-            "bankroll_basis",
-            "correlation_evidence",
-        }
+        check.status is PolicyCheckStatus.PASSED for check in evidence_gap_checks if check.mandatory
     )
     if not allocation_evidence_ready:
         allocation = PortfolioAllocationResult(
             PortfolioAllocationState.NOT_EVALUATED,
             PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE,
             None,
+        )
+        return RecommendationPolicyDecision(
+            policy.policy_id,
+            candidate_reference_id,
+            row.market,
+            decision,
+            issuance_age,
+            decision_age,
+            RecommendationDecisionState.RECOMMENDATION_ELIGIBLE,
+            True,
+            tuple(checks),
+            empty_sizing,
+            allocation,
+        )
+
+    # Valid, available evidence, but the portfolio policy actively rejects
+    # this candidate -- a completed zero allocation with a specific,
+    # real reason, not a missing decision.
+    if duplicate_check.status is PolicyCheckStatus.FAILED:
+        allocation = PortfolioAllocationResult(
+            PortfolioAllocationState.ZERO_ALLOCATION,
+            PortfolioAllocationReason.EXACT_DUPLICATE_FOUND,
+            0.0,
+        )
+        return RecommendationPolicyDecision(
+            policy.policy_id,
+            candidate_reference_id,
+            row.market,
+            decision,
+            issuance_age,
+            decision_age,
+            RecommendationDecisionState.RECOMMENDATION_ELIGIBLE,
+            True,
+            tuple(checks),
+            empty_sizing,
+            allocation,
+        )
+    if opposing_check.status is PolicyCheckStatus.FAILED:
+        allocation = PortfolioAllocationResult(
+            PortfolioAllocationState.ZERO_ALLOCATION,
+            PortfolioAllocationReason.OPPOSING_POSITION_FOUND,
+            0.0,
         )
         return RecommendationPolicyDecision(
             policy.policy_id,
