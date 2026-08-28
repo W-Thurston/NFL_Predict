@@ -1,11 +1,11 @@
-# HANDOFF.md — Workstream 3 (First Complete Vertical Decision Slice)
+## HANDOFF.md — Workstream 3 (First Complete Vertical Decision Slice)
 
 > Compressed rehydration only. This file restates the program-level goal
 > and the current honest state against it — it does not re-derive
 > evidence. Full evidence lives in FINDINGS.md; full program authority
 > lives in the root ROADMAP.md, VISION.md, and CONSTITUTION.md.
 
-### Status: IMPLEMENTATION IN PROGRESS. Units 1-3 of 7 closed. Unit 4 (decision-quality evaluation) not yet started.
+### Status: IMPLEMENTATION IN PROGRESS. Units 1-4 of 7 closed. Unit 5 (spread-slice supersession and invalidation proof) active.
 
 ### The one thing a new thread must never lose: WHY this workstream exists
 
@@ -23,8 +23,8 @@ WS2 closed all seven planned units but carries two capabilities forward
 discoverability, no mechanism selected). Boundary inspection (closed)
 found no new evidence for either. Obligation 8 (later observation can
 supersede/invalidate downstream artifacts) requires its own dedicated
-implementation unit (Unit 5) — it is not being carried forward
-indefinitely. D36 remains correctly deferred pending a concrete
+implementation unit (Unit 5, now active) — it is not being carried
+forward indefinitely. D36 remains correctly deferred pending a concrete
 forward-impact consumer need, which has not appeared.
 
 ### Boundary inspection (closed; full detail in FINDINGS.md)
@@ -96,11 +96,63 @@ identically to a governed-staged leg; no new field records which action
 label was used. Closed with all gates green, including 5 new
 component-level tests covering all five recommendation states.
 
+**Unit 4 — Decision-quality evaluation contract and first spread
+evaluation.** Extracted one shared realized-outcome grader
+(`market/candidate_outcome.py::grade_candidate_outcome`) and migrated
+every consumer, including one discovered only by a pre-edit repository
+search (`evaluation/historical_backtest.py`) — confirming the value of
+searching before moving ownership rather than editing blind. Added a
+new, independently persisted, schema-versioned `DecisionQualityEvaluation`
+(`market/decision_quality.py`, `market/decision_quality_store.py`)
+assessing one recommendation decision's cross-artifact consistency,
+separate from prediction accuracy and realized outcome, with realized
+outcome recorded as an identity-bearing but decision-status-independent
+field.
+
+Four full review rounds preceded a working, closed implementation — each
+found real architectural or correctness gaps, not stylistic preferences.
+Round one corrected an initial overclaim that a persisted result alone
+could independently verify referenced-artifact content (it can only
+prove recorded internal consistency, not that a referenced policy or
+issuance genuinely still exists and matches). Round two corrected a
+fabricated `recommendation_evaluation_id` (was `candidate_reference_id`,
+a different identity entirely), an internally invalid three-family policy
+test fixture, optional-check aggregation that silently ignored a
+completed contradictory replay, an ungrounded outcome literal in the
+separation test, and duplicated identity/validation logic. Round three
+found the evaluator never validated the artifact it constructed before
+returning it, that a "trusted parent evaluation" was accepted on a
+two-line check while the test fixture used a fabricated parent ID, and
+that replay-disagreement was tested only through the private aggregator,
+never an actual disagreeing replay through the public evaluator — all
+three corrected, including adding a new public
+`validate_recommended_bet_evaluation` (validating every child result and
+every parent identity field) shared by both `recommended_bet_result_store.py`
+and `decision_quality.py`, removing the store's former private duplicate
+entirely. Round four found `decision_quality_evaluation_id` was described
+as a canonical identity owner but only hashed whatever payload a caller
+independently constructed in three separate places — corrected so the
+function accepts the evaluation object directly and is the only real
+owner — plus a market/side validation-ordering bug in the now-public
+grader (an unsupported market was only rejected when scores happened to
+be supplied, not unconditionally).
+
+A real, repeating pattern across this unit, worth naming directly: each
+time a validation rule was correctly tightened (digest format, composite
+identity format, exact check order), an existing test fixture using the
+older, looser placeholder value broke — three consecutive times, each
+traced to real pytest output and corrected in the fixture, not the
+validator. This confirms the validators were doing real, load-bearing
+work throughout, not decorative checks that happened to pass. Closed with
+all gates green, including a canonical game-spread proof case (real
+computed parent-manifest identity, not a placeholder) and both
+persistence failure paths (hard-link and temporary-write) covered.
+
 ### Governing decisions relevant to this workstream
 
 All of Workstream 1 and Workstream 2 (D27, D30-D37) remain in force.
 None were reopened. No new numbered `DECISIONS.md` entry was required by
-Units 1-3 — each closed as a direct, evidence-driven correction of an
+Units 1-4 — each closed as a direct, evidence-driven correction of an
 already-locked contract, not a new architectural choice; if this changes
 in a future unit, record it there, not here.
 
@@ -114,18 +166,21 @@ as a request for content that was never actually pasted into the visible
 response, once as a genuine unbalanced-brace syntax error from an
 ambiguous edit boundary. Paste-and-confirm the complete result; verify
 brace/paren balance against the full current file before running gates.
+Unit 4 surfaced a related pattern worth naming alongside it: after
+correctly tightening a validation rule, re-check every existing fixture
+that exercises the validated path, not only the ones the current change
+directly touches — three consecutive fixture breaks in one unit came from
+skipping this step.
 
-### Remaining implementation sequence (unchanged from original sequencing; Units 1-3 closed)
+### Remaining implementation sequence (unchanged from original sequencing; Units 1-4 closed)
 
-4. Decision-quality evaluation contract and first spread evaluation —
-   **next.** Confirmed absent by boundary inspection (exhaustive search,
-   not merely unfound): no consumer anywhere evaluates a persisted
-   recommendation decision against its decision-time policy and evidence,
-   as distinct from prediction accuracy or realized wager outcome.
-5. Spread-slice supersession and invalidation proof — tests D35 against
-   a second real case; closes obligation 8 or forces an explicit
-   program-level exit-criterion decision. Do not build a forward-impact
-   index unless this unit reveals a concrete need.
+5. Spread-slice supersession and invalidation proof — **active.** Tests
+   D35 against a second real case; closes obligation 8 or forces an
+   explicit program-level exit-criterion decision. Do not build a
+   forward-impact index or generalized invalidation mechanism
+   speculatively — if this unit reveals a genuine need to query all
+   downstream dependents, that becomes the evidence required to revisit
+   D36, not an assumption made ahead of it.
 6. Scoped ownership and naming cleanup — the bounded low-priority items
    named in FINDINGS.md Boundary 5 (schema-literal replacements, stale
    docstrings, naming risks), folded in wherever a unit naturally touches
@@ -138,16 +193,23 @@ brace/paren balance against the full current file before running gates.
 ### Updated obligation status (deltas from boundary-inspection baseline; full table in FINDINGS.md)
 
 - **Obligation 6** (recommend or abstain): domain logic — Reuse
-  (unchanged). Production composition — **no longer Blocked**: Unit 1
-  unlocked the positive branch; Unit 2 made eligibility genuinely
-  independent of allocation outcome. Presentation — **no longer Adapt**:
-  Unit 3 corrected every confirmed-scope surface.
+  (unchanged). Production composition — no longer Blocked (Units 1-2).
+  Presentation — no longer Adapt (Unit 3).
 - **Obligation 7** (portfolio can allocate zero despite eligible
-  recommendation): **no longer Blocked** — Unit 2 proved this directly
-  (a real eligible-recommendation-with-zero-allocation case, from genuine
+  recommendation): no longer Blocked — Unit 2 proved this directly (a
+  real eligible-recommendation-with-zero-allocation case, from genuine
   capacity exhaustion, confirmed by test).
-- **Obligations 8, 10**: unchanged: Partial and Absent respectively,
-  pending Units 5 and 4.
+- **Obligation 8** (later observation can supersede/invalidate
+  downstream artifacts): unchanged, Partial (WS2 D31, one field, one
+  artifact) — **Unit 5, now active, is the dedicated unit to test this
+  against a second real case.**
+- **Obligation 10** (realized outcome and decision-quality evaluation
+  remain separate): **no longer Absent for its decision-quality half** —
+  Unit 4 added `DecisionQualityEvaluation`, a persisted, schema-versioned
+  cross-artifact consistency assessment proven separate from realized
+  outcome via a real pre/post-outcome test. The prediction-quality/
+  realized-outcome/evidence-availability separation (the other confirmed
+  Reuse half of this obligation) was already established pre-Workstream-3.
 
 ### Reading order for a new thread (per AI_BOOTSTRAP.md)
 

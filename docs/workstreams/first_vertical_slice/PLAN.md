@@ -1,86 +1,117 @@
-# PLAN.md — Active implementation unit (Workstream 3)
+## PLAN.md — Active implementation unit (Workstream 3)
 
 Exactly ONE active unit. Future units live in ROADMAP.md, not here.
 
-### Unit — Decision-quality evaluation contract and first spread evaluation
+### Unit — Spread-slice later-evidence reproducibility and recomputation proof
 
 #### Completed
-- Extracted one shared realized-outcome grader
-  (`market/candidate_outcome.py`) and migrated all consumers, including
-  one discovered only by a pre-edit repository search
-  (`evaluation/historical_backtest.py`). The grader now explicitly
-  rejects an unsupported market rather than silently defaulting to total
-  grading.
-- Added immutable decision-quality evaluation and persistence contracts
-  (`market/decision_quality.py`, `market/decision_quality_store.py`).
-- Added canonical parent-manifest validation
-  (`validate_recommended_bet_evaluation`) shared by both
-  `recommended_bet_result_store.py` and `decision_quality.py` — the
-  store's prior private duplicate is removed; both the write and read
-  paths now call the single public owner, which itself validates every
-  child result and all parent identity-bearing fields.
-- Added policy, candidate, and optional allocation-replay consistency
-  checks, each resolving and validating its referenced artifact directly
-  rather than trusting a claimed identifier.
-- Preserved realized outcome as an identity-bearing but
-  decision-status-independent field; a locked design choice
-  (`evaluated_at` is included in decision-quality identity, since each
-  evaluation call is a distinct event) is stated explicitly rather than
-  left implicit.
-- Added a canonical game-spread proof (real computed parent-manifest
-  identity, not a placeholder) and strict store tests, including
-  temporary-write and hard-link failure paths.
-- Corrected `grade_candidate_outcome` to validate the market/side
-  contract before inspecting scores, so an invalid row is rejected
-  regardless of whether outcome evidence happens to be available yet.
-  `historical_backtest.py`'s incidental lint-driven simplifications
-  (redundant cast/wrapper removal) were retained alongside its import
-  update, without behavioral change.
 
-#### Goal
-Define the minimum persisted evaluation needed to assess one
-recommendation decision separately from model correctness and realized
-wager outcome, for one canonical game-spread case.
+Proved, using only existing code (zero new domain logic, zero new
+persisted artifact types), all four clauses of the Goal against a real,
+controlled two-quote scenario: T1 (home spread -1.0 at -110, a confirmed
+real positive-EV candidate) and T2 (same comparison scope, later, home
+spread -9.5 at -110, a confirmed real negative-EV non-candidate). The
+controlled lines were selected from the evaluator's actual
+spread-probability and expected-value behavior and placed comfortably on
+opposite sides of the zero-EV boundary. The tests verify the resulting
+signs and domain states through the real evaluator rather than
+duplicating its calculation.
+
+Implemented as `tests/integration/market/test_spread_later_evidence_reproducibility.py`,
+eight tests, all passing:
+1. `as_known_at(T1)` excludes the T2 quote.
+2. `as_known_at(T2)` includes both quotes.
+3. Repeating the T1 evaluation chain against identical inputs reproduces
+   an object-equal `CandidateIssuance`; also confirms T1 is a genuine,
+   real positive-EV candidate.
+4. The T2 evaluation produces a distinct `issuance_id`; because
+   `CandidateIssuance` evaluates every supplied visible row (confirmed
+   exhaustive, not selective, from source), the T2 issuance contains
+   both the original and the later row, each with its own distinct
+   `candidate_issuance_row_id`.
+5. Running the T2 evaluation does not mutate the T1 in-memory artifact.
+6. **The Goal's "affected downstream artifact receives an explicit,
+   artifact-owned status or recomputation outcome" clause**, satisfied
+   by the existing, already-owned `CandidateIssuanceRow.state`/`.reason`/
+   `.expected_value` contract: T1 evaluates independently to
+   `CANDIDATE`/`POSITIVE_EXPECTED_VALUE`; among rows sharing T1's exact
+   business comparison scope, the maximum-`fetched_at` (latest visible)
+   row at T2 independently evaluates to `NOT_CANDIDATE`/
+   `EXPECTED_VALUE_NOT_POSITIVE`. No new artifact was required.
+7. The T1-vs-T2 difference is attributable to exact, named fields (line,
+   fetch time, sportsbook-update time) via business comparison-scope
+   matching, not tuple position.
+8. The real persisted-bytes proof, using the actual
+   `candidate_issuance_store.py` API (`write_candidate_issuance`,
+   `read_candidate_issuance`): T1's persisted bytes are confirmed
+   unchanged after the T2 issuance is separately written and persisted
+   under its own distinct path.
+
+**Design corrections made before implementation, preserved as real
+findings, not smoothed over:** an initial hypothesis that distinct
+artifact identity alone would satisfy "artifact-owned status" was
+rejected — identity is a property, not a claim about relative standing,
+and D35 explicitly distinguishes decision-outcome enums from artifact-
+validity lifecycle semantics. A second hypothesis, that
+`CandidateIssuance` behaves as a "current quote selector," was also
+rejected from source: it is confirmed exhaustive over every supplied
+visible row. A repository-wide search
+(`rg "superseded|invalidat|supersede|is_current|lifecycle_status"`)
+confirmed zero existing lifecycle mechanisms anywhere in the codebase.
+`market_closeout.py` was considered as the artifact-owned recomputation
+owner and correctly ruled out on closer inspection — its real,
+already-owned recomputation outcome (`CandidateIssuanceRow.state`/
+`.reason`) was the correct, simpler answer, requiring no closeout
+machinery at all.
+
+**A real bug caught only by the first actual test run, not by any
+review round:** the initial T1 fixture (home -3.5 at -110) was, in fact,
+already negative EV against the shared `model_spread=-3.0` fixture — an
+inherited-fixture assumption that was never actually validated against
+this specific market scenario. The real assertion failure was the only
+thing that caught this; five prior tests passed coincidentally because
+none of them asserted the candidate state directly. The corrected T1/T2
+values were verified through the real evaluator, not re-guessed.
+
+#### Goal (verbatim from ROADMAP.md)
+
+Using one real or controlled later quote, demonstrate: the original
+as-known decision remains reproducible; the later quote changes the
+latest-current interpretation; affected downstream artifacts receive an
+explicit, artifact-owned status or recomputation outcome; the difference
+can be explained without rewriting the original.
 
 #### Files Changed
-- `src/gridiron_edge/market/candidate_outcome.py` — new.
-- `src/gridiron_edge/market/market_family_evaluation.py`,
-  `src/gridiron_edge/evaluation/historical_backtest.py` — consume the
-  shared grader.
-- `src/gridiron_edge/market/recommended_bet_result.py` — new
-  `validate_recommended_bet_evaluation`, new `_require_digest`.
-- `src/gridiron_edge/market/recommended_bet_result_store.py` — write and
-  read paths migrated to the public parent-evaluation validator; private
-  duplicate removed.
-- `src/gridiron_edge/market/decision_quality.py` — new; canonical
-  identity ownership consolidated into `decision_quality_evaluation_id`,
-  which accepts the evaluation object directly (no caller independently
-  constructs the identity payload).
-- `src/gridiron_edge/market/decision_quality_store.py` — new.
-- `tests/unit/market/test_candidate_outcome.py`,
-  `tests/unit/market/test_decision_quality.py`,
-  `tests/unit/market/test_decision_quality_store.py` — new.
-- `tests/unit/market/test_market_family_evaluation.py` — import updated.
+- `tests/integration/market/test_spread_later_evidence_reproducibility.py` —
+  new.
 
 #### Tests
+Focused integration proof:
+`uv run pytest tests/integration/market/test_spread_later_evidence_reproducibility.py -v`
+— 8 passed.
+
+Full backend quality gates:
 `uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
 — green.
 
 #### Acceptance
-One shared public grader owns all market grading and rejects unsupported
-markets explicitly. A persisted, schema-versioned decision-quality
-evaluation resolves its target result from a genuinely, fully validated
-parent manifest (every child result validated, every parent identity
-field checked), not a caller-supplied or partially-checked string. The
-evaluator validates its own constructed artifact before returning it.
-Canonical decision-quality identity has exactly one owner, which every
-caller — the evaluator, the validator, and the test fixture — uses
-identically. A real, monkeypatched replay-disagreement seam is proven to
-flip the public evaluator's overall status to `INCONSISTENT`, honestly
-described as a seam test rather than an independently-valid second domain
-replay. Missing original allocation evidence does not lower an otherwise-
-consistent conclusion. The canonical case uses a real, internally valid
-game-spread candidate with a genuinely computed parent-manifest identity.
-Persistence failure paths (hard-link and temporary-write) are both
-covered. The unit is implemented, validated against real game-spread
-evidence, and closed with all focused and full quality gates passing.
+All four Goal clauses are proven using exclusively existing, already-
+shipped code — `as_known_at`, `issue_pregame_candidates`,
+`candidate_issuance_row_id`, `CandidateIssuanceRow.state`/`.reason`/
+`.expected_value`, and `candidate_issuance_store.py`. No lifecycle field,
+validity enum, or comparison artifact was added to any existing
+immutable artifact. The T1 decision remains historically valid for its
+own cutoff and is never marked invalid — at the later cutoff, the latest
+newly visible observation within the same declared comparison scope
+receives a different persisted evaluation outcome; this is a separate,
+independently-evaluated, real, changed downstream outcome, not a
+mutation or invalidation of the original. D35 remains correctly open:
+this scenario never required distinguishing "superseded" from
+"corrupt," since the T1 artifact was never unsupported or corrupt — it
+was, and remains, correct for its own cutoff. D36 remains correctly
+deferred: this proof compares two explicitly supplied artifacts; it
+creates no requirement for arbitrary forward discovery of downstream
+consumers. The unit is implemented, its design corrected across one
+review round before implementation and one real defect corrected after
+the first test run, verified against real, passing focused and full
+quality-gate execution, and closed.
