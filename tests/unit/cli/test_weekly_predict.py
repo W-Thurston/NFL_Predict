@@ -254,7 +254,7 @@ class TestGenerateEdgesStage:
     ) -> None:
         from gridiron_edge.cli.weekly_predict import _stage_generate_edges
         from gridiron_edge.market.edge_diagnostics import EdgeResultState
-        from gridiron_edge.market.recommendations import EdgeResult
+        from gridiron_edge.market.edge_report import EdgeResult
 
         rows = pd.DataFrame(
             {
@@ -318,7 +318,7 @@ class TestGenerateEdgesStage:
             EdgeDiagnosticBlocker,
             EdgeResultState,
         )
-        from gridiron_edge.market.recommendations import EdgeResult
+        from gridiron_edge.market.edge_report import EdgeResult
 
         edge_result = EdgeResult(
             rows=pd.DataFrame(),
@@ -379,7 +379,7 @@ class TestGenerateEdgesStage:
     ) -> None:
         from gridiron_edge.cli.weekly_predict import _stage_generate_edges
         from gridiron_edge.market.edge_diagnostics import EdgeResultState
-        from gridiron_edge.market.recommendations import EdgeResult
+        from gridiron_edge.market.edge_report import EdgeResult
 
         edge_result = EdgeResult(
             rows=pd.DataFrame(),

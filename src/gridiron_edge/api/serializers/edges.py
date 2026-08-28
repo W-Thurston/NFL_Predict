@@ -21,7 +21,7 @@ from gridiron_edge.api.serializers.recommendations import (
     serialize_recommendation_result,
 )
 from gridiron_edge.market.edge import EdgeStrength
-from gridiron_edge.market.recommendations import EdgeResult
+from gridiron_edge.market.edge_report import EdgeResult
 
 
 def _none_if_nan(v: Any) -> Any:  # noqa: ANN401

@@ -14,7 +14,7 @@ from pandas import DataFrame
 from gridiron_edge.core.settings import get_settings
 from gridiron_edge.datasets.loaders import load_current_weekly_product
 from gridiron_edge.ingest.odds.store import load_current_odds
-from gridiron_edge.market.recommendations import EdgeResult, build_edge_result
+from gridiron_edge.market.edge_report import EdgeResult, build_edge_result
 from gridiron_edge.models.game_prediction.weekly_spread_product import (
     WeeklySpreadStatus,
 )

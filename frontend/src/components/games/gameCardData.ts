@@ -1,5 +1,5 @@
 import type { components } from "../../api/schema";
-import { selectVisibleRecommendedOffer } from "../recommendations/visibleRecommendedOffer";
+import { selectVisibleModelSelectedOffer } from "../recommendations/visibleModelSelectedOffer";
 
 type GameSummary = components["schemas"]["GameSummary"];
 type LineOffer = components["schemas"]["LineOffer"];
@@ -55,7 +55,7 @@ export function buildGamesCardData({
         offer.market === market &&
         visibleSportsbooks.includes(offer.sportsbook),
     );
-    const recommendedOffer = selectVisibleRecommendedOffer(
+    const modelSelectedOffer = selectVisibleModelSelectedOffer(
       visibleOffers,
       visibleSportsbooks,
     );
@@ -67,15 +67,15 @@ export function buildGamesCardData({
         const sideOffers = visibleOffers.filter(
           (offer) => offer.side === side,
         );
-        const recommendedForSide =
-          recommendedOffer?.side === side ? recommendedOffer : null;
+        const modelSelectedForSide =
+          modelSelectedOffer?.side === side ? modelSelectedOffer : null;
         const offer =
-          recommendedForSide ?? selectBestVisibleOffer(sideOffers);
+          modelSelectedForSide ?? selectBestVisibleOffer(sideOffers);
 
         return {
           side,
           offer,
-          recommended: offer != null && offer === recommendedOffer,
+          recommended: offer != null && offer === modelSelectedOffer,
         };
       }),
     };

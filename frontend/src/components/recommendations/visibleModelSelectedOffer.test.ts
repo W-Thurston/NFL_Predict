@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { LineOffer } from "./visibleRecommendedOffer";
-import { selectVisibleRecommendedOffer } from "./visibleRecommendedOffer";
+import type { LineOffer } from "./visibleModelSelectedOffer";
+import { selectVisibleModelSelectedOffer } from "./visibleModelSelectedOffer";
 
 function offer(overrides: Partial<LineOffer> = {}): LineOffer {
   return {
@@ -24,9 +24,9 @@ function offer(overrides: Partial<LineOffer> = {}): LineOffer {
   };
 }
 
-describe("selectVisibleRecommendedOffer", () => {
-  it("returns null without a model-recommended side", () => {
-    expect(selectVisibleRecommendedOffer([offer()], ["draftkings"])).toBeNull();
+describe("selectVisibleModelSelectedOffer", () => {
+  it("returns null without a model-selected side", () => {
+    expect(selectVisibleModelSelectedOffer([offer()], ["draftkings"])).toBeNull();
   });
 
   it("returns the exact best eligible visible offer without mutating input", () => {
@@ -36,7 +36,7 @@ describe("selectVisibleRecommendedOffer", () => {
     const offers = [hidden, worse, expected];
     const original = [...offers];
 
-    const selected = selectVisibleRecommendedOffer(offers, ["draftkings"]);
+    const selected = selectVisibleModelSelectedOffer(offers, ["draftkings"]);
 
     expect(selected).toBe(expected);
     expect(offers).toEqual(original);
@@ -51,16 +51,16 @@ describe("selectVisibleRecommendedOffer", () => {
       is_best_price: true,
       is_best_model_approved_offer: true,
     });
-    expect(selectVisibleRecommendedOffer([hidden], ["draftkings"])).toBeNull();
+    expect(selectVisibleModelSelectedOffer([hidden], ["draftkings"])).toBeNull();
   });
 
   it("prefers lower totals for Over and higher totals for Under", () => {
     const overHigh = offer({ market: "total", side: "over", line: 46.5, is_model_recommended_side: true });
     const overLow = offer({ market: "total", side: "over", line: 45.5, is_model_recommended_side: true });
-    expect(selectVisibleRecommendedOffer([overHigh, overLow], ["draftkings"])).toBe(overLow);
+    expect(selectVisibleModelSelectedOffer([overHigh, overLow], ["draftkings"])).toBe(overLow);
 
     const underLow = offer({ market: "total", side: "under", line: 45.5, is_model_recommended_side: true });
     const underHigh = offer({ market: "total", side: "under", line: 46.5, is_model_recommended_side: true });
-    expect(selectVisibleRecommendedOffer([underLow, underHigh], ["draftkings"])).toBe(underHigh);
+    expect(selectVisibleModelSelectedOffer([underLow, underHigh], ["draftkings"])).toBe(underHigh);
   });
 });

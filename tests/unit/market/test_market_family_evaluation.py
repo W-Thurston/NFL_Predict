@@ -380,7 +380,7 @@ def test_contracts_are_frozen_and_source_has_no_policy_dependencies() -> None:
         "gridiron_edge.betting.bankroll",
         "gridiron_edge.market.kelly",
         "gridiron_edge.market.qualification",
-        "gridiron_edge.market.recommendations",
+        "gridiron_edge.market.edge_report",
     )
     assert not any(
         module == prefix or module.startswith(f"{prefix}.")

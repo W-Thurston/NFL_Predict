@@ -42,7 +42,7 @@ from gridiron_edge.evaluation.forecast_store import write_forecast_events
 from gridiron_edge.models.game_prediction.prediction_policy import PredictionPolicy
 
 if TYPE_CHECKING:
-    from gridiron_edge.market.recommendations import EdgeResult
+    from gridiron_edge.market.edge_report import EdgeResult
 
 # ---------------------------------------------------------------------------
 # Stage functions

@@ -347,7 +347,7 @@ class TestLoadEdgesForWeek:
             EdgeDiagnostics,
             EdgeResultState,
         )
-        from gridiron_edge.market.recommendations import EdgeResult
+        from gridiron_edge.market.edge_report import EdgeResult
 
         diagnostics = EdgeDiagnostics(
             season="2026-2027",
@@ -409,7 +409,7 @@ class TestLoadEdgesForWeek:
             EdgeDiagnostics,
             EdgeResultState,
         )
-        from gridiron_edge.market.recommendations import EdgeResult
+        from gridiron_edge.market.edge_report import EdgeResult
 
         rows = pd.DataFrame(
             [

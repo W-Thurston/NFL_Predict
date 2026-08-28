@@ -75,7 +75,7 @@ class EdgeRow(BaseModel):
     One row per provider-event-sportsbook-game-market-side offer.
     Moneyline rows have ``point_edge`` and ``cover_prob`` as null;
     spread/total rows populate them. Fields mirror ``_REPORT_COLUMNS`` in
-    ``market.recommendations`` and preserve exact quote provenance.
+    ``market.edge_report`` and preserve exact quote provenance.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

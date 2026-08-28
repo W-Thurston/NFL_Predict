@@ -84,7 +84,7 @@ _REPORT_COLUMNS: list[str] = [
 
 @dataclass(frozen=True, slots=True)
 class EdgeResult:
-    """Filtered recommendation rows with diagnostics for the same scope."""
+    """Filtered edge rows with diagnostics for the same scope."""
 
     rows: DataFrame
     diagnostics: EdgeDiagnostics
@@ -95,7 +95,7 @@ class EdgeResult:
             raise ValueError("rows must contain diagnostics.filtered_edge_count rows.")
 
 
-def _scope_recommendation_input(
+def _scope_edge_input(
     frame: DataFrame,
     *,
     season: str,
@@ -107,9 +107,7 @@ def _scope_recommendation_input(
     required = {"season", "week"}
     missing = sorted(required - set(frame.columns))
     if missing:
-        raise ValueError(
-            "Recommendation input is missing required scope columns: " + ", ".join(missing)
-        )
+        raise ValueError("Edge input is missing required scope columns: " + ", ".join(missing))
     return frame.loc[
         (frame["season"].astype(str) == season) & (frame["week"] == week),
         :,
@@ -709,12 +707,12 @@ def build_edge_result(
     if min_ev < 0.0:
         raise ValueError("min_ev must be greater than or equal to 0.")
 
-    scoped_predictions = _scope_recommendation_input(
+    scoped_predictions = _scope_edge_input(
         predictions_df,
         season=season,
         week=week,
     )
-    scoped_markets = _scope_recommendation_input(
+    scoped_markets = _scope_edge_input(
         odds_df,
         season=season,
         week=week,

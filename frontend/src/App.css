@@ -315,7 +315,7 @@
 .line-shopping-offer-values { display: flex; justify-content: center; gap: 8px; }
 .line-shopping-offer--positive-ev { background: color-mix(in oklab, var(--line-shopping-value) 13%, transparent); }
 .line-shopping-offer--best-line { border-color: color-mix(in oklab, var(--ink-2) 40%, transparent); }
-.line-shopping-offer--recommended { background: color-mix(in oklab, var(--pos) 24%, transparent); border-color: var(--pos); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--pos) 65%, transparent); }
+.line-shopping-offer--model-selected { background: color-mix(in oklab, var(--pos) 24%, transparent); border-color: var(--pos); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--pos) 65%, transparent); }
 .line-shopping-best-price { color: var(--warn); font-weight: 800; }
 @media (max-width: 640px) {
   .line-shopping-header { align-items: flex-start; flex-direction: column; }

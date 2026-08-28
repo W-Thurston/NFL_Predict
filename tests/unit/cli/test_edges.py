@@ -22,7 +22,7 @@ class TestWeeklyReport:
             EdgeDiagnostics,
             EdgeResultState,
         )
-        from gridiron_edge.market.recommendations import EdgeResult
+        from gridiron_edge.market.edge_report import EdgeResult
 
         calculated = 1 if state == EdgeResultState.NO_POSITIVE_EDGES.value else rows
         positive = rows

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from gridiron_edge.evaluation.historical_backtest_report_loader import (
         CurrentHistoricalBacktestReport,
     )
-    from gridiron_edge.market.recommendations import EdgeResult
+    from gridiron_edge.market.edge_report import EdgeResult
     from gridiron_edge.market.recommended_bet_result import RecommendedBetResult
 
 
@@ -987,7 +987,7 @@ def load_edges_for_week(
     min_ev: float = 0.0,
 ) -> EdgeResult:
     """Load the unified persisted weekly edge result for one scope."""
-    from gridiron_edge.market.recommendations import EdgeResult
+    from gridiron_edge.market.edge_report import EdgeResult
     from gridiron_edge.market.weekly_edge_service import (
         build_weekly_edge_result,
     )
@@ -1462,7 +1462,7 @@ def resolve_recommended_bet_recording_evidence(
     candidate_reference_id: str,
     policy_id: str,
 ) -> RecommendationRecordingEvidence:
-    """Resolve one complete Unit 24 identity chain into trusted evidence."""
+    """Resolve one complete recommendation identity chain into trusted evidence."""
     from gridiron_edge.betting.recording import RecommendationRecordingEvidence
     from gridiron_edge.market.recommended_bet_result_store import (
         read_recommended_bet_evaluation,

@@ -1316,7 +1316,7 @@
       },
       "EdgeRow": {
         "additionalProperties": false,
-        "description": "A single edge in the ranked edge report.\n\nOne row per provider-event-sportsbook-game-market-side offer.\nMoneyline rows have ``point_edge`` and ``cover_prob`` as null;\nspread/total rows populate them. Fields mirror ``_REPORT_COLUMNS`` in\n``market.recommendations`` and preserve exact quote provenance.",
+        "description": "A single edge in the ranked edge report.\n\nOne row per provider-event-sportsbook-game-market-side offer.\nMoneyline rows have ``point_edge`` and ``cover_prob`` as null;\nspread/total rows populate them. Fields mirror ``_REPORT_COLUMNS`` in\n``market.edge_report`` and preserve exact quote provenance.",
         "properties": {
           "american_odds": {
             "description": "American price used to calculate EV and Kelly for this edge.",

@@ -40,7 +40,7 @@ KICKOFF = datetime(2026, 9, 1, 20, tzinfo=UTC)
 
 
 def governance() -> RecommendationPolicyGovernance:
-    """Return deterministic governed inputs for Unit 24 tests."""
+    """Return deterministic governed recommendation inputs for tests."""
     return RecommendationPolicyGovernance(
         0.25,
         5.0,

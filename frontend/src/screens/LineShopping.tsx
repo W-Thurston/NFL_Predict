@@ -12,7 +12,7 @@ import {
   normalizeSportsbookKey,
   sportsbookDisplayName,
 } from "../utils/sportsbookPreferences";
-import { selectVisibleRecommendedOffer } from "../components/recommendations/visibleRecommendedOffer";
+import { selectVisibleModelSelectedOffer } from "../components/recommendations/visibleModelSelectedOffer";
 
 type Market = "spread" | "total" | "moneyline";
 type LineOffer = components["schemas"]["LineOffer"];
@@ -139,7 +139,7 @@ export function LineShopping() {
           </>
         )}
         <span className="line-shopping-value-caveat">
-          +EV identifies estimated price value. The green offer is the model's recommended exact wager.
+          +EV identifies estimated price value. The green offer is the model-selected exact offer.
         </span>
         </div>
         <span className="line-shopping-snapshot">
@@ -238,7 +238,7 @@ function GameRows({
   sportsbooks: string[];
   display: LineShoppingDisplay;
 }) {
-  const recommendedOffer = selectVisibleRecommendedOffer(
+  const modelSelectedOffer = selectVisibleModelSelectedOffer(
     game.offers ?? [],
     sportsbooks,
   );
@@ -276,7 +276,7 @@ function GameRows({
                 offer={offer}
                 display={display}
                 isRecommended={
-                  recommendedOffer === offer
+                  modelSelectedOffer === offer
                 }
               />
             ) : (
@@ -386,7 +386,7 @@ function OfferCell({
     && isRecommended
   ) {
     classNames.push(
-      "line-shopping-offer--recommended",
+      "line-shopping-offer--model-selected",
     );
   }
   const title = offerTitle(game, offer);
@@ -453,7 +453,7 @@ function offerExplanationSections(
   const marketFacts = [
     offer.is_best_line ? "This is the best available line." : null,
     offer.is_best_price ? "This is the best price available at this exact line." : null,
-    offer.is_best_model_approved_offer ? "This is the model's recommended exact wager for this market." : null,
+    offer.is_best_model_approved_offer ? "This is the model-selected exact offer for this market." : null,
   ].filter((value): value is string => value !== null);
   if (marketFacts.length > 0) {
     sections.push({ label: "Market", text: marketFacts.join(" ") });
@@ -519,7 +519,7 @@ function offerModelExplanation(
   const ev = offer.expected_value == null
     ? ""
     : ` Expected value: ${formatPercent(offer.expected_value)}.`;
-  return `${candidate}${likelihood}${ev} +EV describes estimated price value. A green offer is the model's suggested bet.`;
+  return `${candidate}${likelihood}${ev} +EV describes estimated price value. A green offer is the model-selected exact offer.`;
 }
 
 function offerTitle(game: LineShoppingGame, offer: LineOffer): string {
@@ -544,8 +544,8 @@ function DisplayPanel({
   }> = [
     {
       key: "recommendedBet",
-      label: "Recommended bet",
-      group: "Recommendation",
+      label: "Model-selected offer",
+      group: "Model selection",
     },
     { key: "positiveEv", label: "+EV candidates", group: "Offer value" },
     { key: "bestLine", label: "Best available line", group: "Market comparison" },
@@ -554,7 +554,7 @@ function DisplayPanel({
   ];
   return (
     <div className="line-shopping-display-panel" role="dialog" aria-label="Line Shopping display settings">
-      {["Recommendation", "Offer value", "Market comparison", "Outcome context"].map((group) => (
+      {["Model selection", "Offer value", "Market comparison", "Outcome context"].map((group) => (
         <fieldset key={group}>
           <legend>{group}</legend>
           {options.filter((option) => option.group === group).map((option) => (

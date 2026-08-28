@@ -30,6 +30,7 @@ from gridiron_edge.market.candidate_issuance import (
 )
 from gridiron_edge.market.candidate_outcome import CandidateOutcome
 from gridiron_edge.market.recommendation_policy import (
+    RECOMMENDATION_POLICY_SCHEMA_VERSION,
     CorrelationExposureEvidence,
     PortfolioExposureSnapshot,
     RecommendationPolicy,
@@ -251,8 +252,8 @@ def validate_decision_quality_evaluation(evaluation: DecisionQualityEvaluation) 
     check_ids = [c.check_id for c in evaluation.checks]
     if len(set(check_ids)) != len(check_ids):
         raise ValueError("Decision-quality evaluation contains duplicate check IDs.")
-    if evaluation.policy_schema_version < 1:
-        raise ValueError("policy_schema_version must be a positive integer.")
+    if evaluation.policy_schema_version != RECOMMENDATION_POLICY_SCHEMA_VERSION:
+        raise ValueError("Unsupported recommendation-policy schema version.")
     actual_check_ids = tuple(check.check_id for check in evaluation.checks)
     if actual_check_ids != DECISION_QUALITY_CHECK_IDS:
         raise ValueError(

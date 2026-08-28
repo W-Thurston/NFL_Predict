@@ -31,7 +31,7 @@ from gridiron_edge.market.edge_diagnostics import (
     EdgeDiagnostics,
     EdgeResultState,
 )
-from gridiron_edge.market.recommendations import EdgeResult
+from gridiron_edge.market.edge_report import EdgeResult
 
 runner = CliRunner()
 

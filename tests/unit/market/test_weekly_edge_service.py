@@ -17,7 +17,7 @@ from gridiron_edge.market.edge_diagnostics import (
     EdgeDiagnostics,
     EdgeResultState,
 )
-from gridiron_edge.market.recommendations import EdgeResult
+from gridiron_edge.market.edge_report import EdgeResult
 from gridiron_edge.market.weekly_edge_service import build_weekly_edge_result
 
 SEASON = "2026-2027"

@@ -11,7 +11,7 @@ from pandas import DataFrame, Series, Timestamp
 import pytest
 
 from gridiron_edge.market.edge import MoneylineEdge, SpreadEdge, TotalEdge
-from gridiron_edge.market.recommendations import (
+from gridiron_edge.market.edge_report import (
     _REPORT_COLUMNS,
     build_edge_report,
     compute_game_edges,

@@ -16,7 +16,7 @@ from gridiron_edge.market.edge_diagnostics import (
     EdgeDiagnostics,
     EdgeResultState,
 )
-from gridiron_edge.market.recommendations import EdgeResult
+from gridiron_edge.market.edge_report import EdgeResult
 
 runner = CliRunner()
 _SERVICE = "gridiron_edge.market.weekly_edge_service.build_weekly_edge_result"

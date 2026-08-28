@@ -29,7 +29,7 @@ from gridiron_edge.evaluation.weekly_readiness import (
 from gridiron_edge.ingest.odds.store import load_current_odds
 
 if TYPE_CHECKING:
-    from gridiron_edge.market.recommendations import EdgeResult
+    from gridiron_edge.market.edge_report import EdgeResult
 
 _SEASON_PATTERN: Final[re.Pattern[str]] = re.compile(r"^(?P<start>\d{4})-(?P<end>\d{4})$")
 

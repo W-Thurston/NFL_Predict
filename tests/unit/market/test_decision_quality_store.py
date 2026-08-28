@@ -23,6 +23,9 @@ from gridiron_edge.market.decision_quality_store import (
     read_decision_quality_evaluation,
     write_decision_quality_evaluation,
 )
+from gridiron_edge.market.recommendation_policy import (
+    RECOMMENDATION_POLICY_SCHEMA_VERSION,
+)
 
 _EVALUATED_AT = datetime(2026, 9, 1, 12, 10, tzinfo=UTC)
 
@@ -50,7 +53,7 @@ def _evaluation(**overrides: object) -> DecisionQualityEvaluation:
         "recommendation_evaluation_id": "b" * 64,
         "candidate_reference_id": "2" * 64 + ":" + "3" * 64,
         "policy_id": "c" * 64,
-        "policy_schema_version": 1,
+        "policy_schema_version": RECOMMENDATION_POLICY_SCHEMA_VERSION,
         "issuance_id": "d" * 64,
         "portfolio_snapshot_id": None,
         "correlation_evidence_fingerprint": None,
@@ -200,6 +203,17 @@ class TestSemanticValidation:
         tampered = replace(base_evaluation, decision_status=DecisionQualityStatus.CONSISTENT)
         with pytest.raises(ValueError, match="decision_status does not agree"):
             validate_decision_quality_evaluation(tampered)
+
+    def test_unsupported_policy_schema_version_is_rejected(self) -> None:
+        evaluation = _evaluation(
+            policy_schema_version=(RECOMMENDATION_POLICY_SCHEMA_VERSION + 1),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Unsupported recommendation-policy schema version",
+        ):
+            validate_decision_quality_evaluation(evaluation)
 
 
 class TestWriteAtomicity:

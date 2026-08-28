@@ -16,7 +16,7 @@ from gridiron_edge.market.edge_diagnostics import (
     EdgeDiagnostics,
     EdgeResultState,
 )
-from gridiron_edge.market.recommendations import (
+from gridiron_edge.market.edge_report import (
     EdgeResult,
     build_edge_result,
 )

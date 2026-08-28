@@ -125,7 +125,7 @@ describe("LineShopping", () => {
       screen.getByRole("button", {
         name: /explain New England Patriots \+4\.5 at -120/i,
       }),
-    ).toHaveClass("line-shopping-offer--recommended");
+    ).toHaveClass("line-shopping-offer--model-selected");
     expect(
       screen.getByRole("button", { name: /^highlights/i }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -154,7 +154,7 @@ describe("LineShopping", () => {
     expect(screen.getByText("Week 1 · 1 available sportsbooks")).toBeInTheDocument();
   });
 
-  it("moves the recommendation to the best remaining selected sportsbook", () => {
+  it("moves the model-selected offer to the best remaining sportsbook", () => {
     localStorage.setItem(
       "hm-app",
       JSON.stringify({
@@ -179,7 +179,7 @@ describe("LineShopping", () => {
     ).not.toBeInTheDocument();
 
     const recommended = container.querySelector(
-      ".line-shopping-offer--recommended",
+      ".line-shopping-offer--model-selected",
     );
 
     expect(recommended).toHaveAccessibleName(
@@ -187,7 +187,7 @@ describe("LineShopping", () => {
     );
     expect(
       container.querySelectorAll(
-        ".line-shopping-offer--recommended",
+        ".line-shopping-offer--model-selected",
       ),
     ).toHaveLength(1);
   });
@@ -247,7 +247,7 @@ describe("LineShopping", () => {
       container.querySelector(".line-shopping-offer--positive-ev"),
     ).not.toBeNull();
     expect(
-      container.querySelector(".line-shopping-offer--recommended"),
+      container.querySelector(".line-shopping-offer--model-selected"),
     ).not.toBeNull();
     expect(
       container.querySelector(".line-shopping-offer--best-line"),
@@ -272,7 +272,7 @@ describe("LineShopping", () => {
     const { container } = render(<TestWrapper><LineShopping /></TestWrapper>);
 
     expect(container.querySelector(".line-shopping-offer--positive-ev")).toBeNull();
-    expect(container.querySelector(".line-shopping-offer--recommended")).not.toBeNull();
+    expect(container.querySelector(".line-shopping-offer--model-selected")).not.toBeNull();
     expect(container.querySelector(".line-shopping-offer--best-line")).toBeNull();
     expect(container.querySelector(".line-shopping-best-price")).toBeNull();
     expect(screen.getByText("Playable New England Patriots +2.3 or more at -110")).toBeInTheDocument();
@@ -295,7 +295,7 @@ describe("LineShopping", () => {
       within(tooltip).getByText(/This is the best price available at this exact line\./),
     ).toBeInTheDocument();
     expect(
-      within(tooltip).getByText(/This is the model's recommended exact wager for this market\./),
+      within(tooltip).getByText(/This is the model-selected exact offer for this market\./),
     ).toBeInTheDocument();
   });
 
@@ -402,27 +402,27 @@ it("separates Moneyline likelihood from +EV candidate value", async () => {
     container.querySelectorAll(".line-shopping-offer--positive-ev"),
   ).toHaveLength(1);
   expect(
-    container.querySelectorAll(".line-shopping-offer--recommended"),
+    container.querySelectorAll(".line-shopping-offer--model-selected"),
   ).toHaveLength(1);
 
   const positiveEvOffer = container.querySelector(
     ".line-shopping-offer--positive-ev",
   );
-  const recommendedOffer = container.querySelector(
-    ".line-shopping-offer--recommended",
+  const modelSelectedOffer = container.querySelector(
+    ".line-shopping-offer--model-selected",
   );
 
   expect(positiveEvOffer).toHaveAccessibleName(
     /New England Patriots moneyline at \+120/i,
   );
-  expect(recommendedOffer).toHaveAccessibleName(
+  expect(modelSelectedOffer).toHaveAccessibleName(
     /Seattle Seahawks moneyline at -130/i,
   );
-  expect(positiveEvOffer).not.toBe(recommendedOffer);
+  expect(positiveEvOffer).not.toBe(modelSelectedOffer);
 
   expect(
     screen.getByText(
-      /The green offer is the model's recommended exact wager\./i,
+      /The green offer is the model-selected exact offer\./i,
     ),
   ).toBeInTheDocument();
 });
