@@ -257,29 +257,29 @@ def test_pre_publication_failure_leaves_no_destination_or_temporary_file(
     assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
 
 
-def test_schema_2_result_round_trip_preserves_derivation_version(tmp_path: Path) -> None:
+def test_schema_3_result_round_trip_preserves_derivation_version(tmp_path: Path) -> None:
     result = evaluation().results[0]
-    assert result.schema_version == 2
+    assert result.schema_version == 3
     path = write_recommended_bet_result(result, repo=tmp_path)
-    assert path.parent.parent.name == "schema=2"
+    assert path.parent.parent.name == "schema=3"
     assert path.parent.name == "results"
     loaded = read_recommended_bet_result(path)
     assert loaded.candidate_reference_derivation_version == 1
     assert loaded == result
 
 
-def test_schema_2_evaluation_manifest_uses_schema_2_namespace(tmp_path: Path) -> None:
+def test_schema_3_evaluation_manifest_uses_schema_3_namespace(tmp_path: Path) -> None:
     value = evaluation()
-    assert value.schema_version == 2
+    assert value.schema_version == 3
     path = write_recommended_bet_evaluation(value, repo=tmp_path)
-    assert path.parent.parent.name == "schema=2"
+    assert path.parent.parent.name == "schema=3"
     assert path.parent.name == "evaluations"
     loaded = read_recommended_bet_evaluation(path)
     for result in loaded.results:
         result_path = recommended_bet_result_path(
             result.schema_version, result.result_id, repo=tmp_path
         )
-        assert result_path.parent.parent.name == "schema=2"
+        assert result_path.parent.parent.name == "schema=3"
 
 
 def test_result_missing_derivation_version_field_is_rejected(tmp_path: Path) -> None:

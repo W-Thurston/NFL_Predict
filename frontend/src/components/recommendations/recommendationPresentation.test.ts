@@ -11,6 +11,10 @@ function recommendation(
   resultState: Recommendation["result_state"],
 ): Recommendation {
   return {
+    allocation:
+      resultState === "recommended"
+        ? { state: "allocated", reason: "allocated", allocated_stake: 12.5 }
+        : { state: "not_evaluated", reason: "recommendation_ineligible", allocated_stake: null },
     bankroll_basis: null,
     checks: [],
     decision_quote_age_seconds: 10,

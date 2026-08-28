@@ -1,3 +1,4 @@
+# tests/unit/market/test_recommendation_policy_evaluation.py
 """Focused tests for pure recommendation-policy evaluation mechanics."""
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from gridiron_edge.market.recommendation_policy import (
     PolicyDerivationReason,
     PolicyDerivationStatus,
     PolicyValueSource,
+    PortfolioAllocationReason,
+    PortfolioAllocationState,
     PortfolioExposureRow,
     RecommendationDecisionState,
     RecommendationPolicy,
@@ -214,7 +217,9 @@ def test_decision_time_controls_freshness() -> None:
     assert result.state is RecommendationDecisionState.UNQUALIFIED
 
 
-def test_missing_mandatory_correlation_evidence_prevents_eligibility() -> None:
+def test_missing_mandatory_correlation_evidence_prevents_allocation() -> None:
+    """Missing correlation evidence is a Stage 2 (allocation) gap. It must
+    not affect Stage 1 recommendation eligibility, which is independent."""
     issued = _issuance()
     reference = candidate_issuance_row_id(issued.issuance_id, issued.rows[0])
     result = evaluate_recommendation_candidate(
@@ -228,10 +233,16 @@ def test_missing_mandatory_correlation_evidence_prevents_eligibility() -> None:
     )
     check = next(item for item in result.checks if item.check_id == "correlation_evidence")
     assert check.status is PolicyCheckStatus.UNAVAILABLE
-    assert result.state is RecommendationDecisionState.INSUFFICIENT_EVIDENCE
+    assert result.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
+    assert result.recommendation_eligible
+    assert result.allocation.state is PortfolioAllocationState.NOT_EVALUATED
+    assert result.allocation.reason is PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE
+    assert result.allocation.allocated_stake is None
 
 
-def test_exact_duplicate_fails() -> None:
+def test_exact_duplicate_prevents_allocation_not_eligibility() -> None:
+    """An exact duplicate is a Stage 2 (allocation) gap -- it must not
+    retroactively erase an already-established recommendation eligibility."""
     issued = _issuance()
     reference = candidate_issuance_row_id(issued.issuance_id, issued.rows[0])
     duplicate = PortfolioExposureRow(
@@ -240,7 +251,10 @@ def test_exact_duplicate_fails() -> None:
     result = _evaluate(issuance=issued, portfolio=_portfolio(duplicate))
     check = next(item for item in result.checks if item.check_id == "exact_duplicate")
     assert check.status is PolicyCheckStatus.FAILED
-    assert not result.recommendation_eligible
+    assert result.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
+    assert result.recommendation_eligible
+    assert result.allocation.state is PortfolioAllocationState.NOT_EVALUATED
+    assert result.allocation.reason is PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE
 
 
 def test_opposing_position_fails() -> None:
@@ -262,12 +276,18 @@ def test_game_capacity_constrains_stake() -> None:
     assert result.sizing.actionable_stake == pytest.approx(5.0)
 
 
-def test_below_minimum_constrained_stake_is_not_actionable() -> None:
+def test_below_minimum_constrained_stake_is_zero_allocation_not_ineligibility() -> None:
+    """Real portfolio/correlation capacity exhaustion produces an
+    independently eligible recommendation with an explained zero
+    allocation -- not a demoted recommendation state. This is the seed
+    proof for Unit 2's core obligation."""
     result = _evaluate(correlation=_correlation(existing_stake=49.0))
+    assert result.recommendation_eligible
+    assert result.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
     assert result.sizing.constrained_stake == pytest.approx(1.0)
-    assert result.sizing.actionable_stake is None
-    assert result.state is RecommendationDecisionState.QUALIFIED_OPPORTUNITY
-    assert not result.recommendation_eligible
+    assert result.allocation.state is PortfolioAllocationState.ZERO_ALLOCATION
+    assert result.allocation.reason is PortfolioAllocationReason.CORRELATION_CAPACITY_EXHAUSTED
+    assert result.allocation.allocated_stake == pytest.approx(0.0)
 
 
 def test_repeated_evaluation_is_deterministic_and_inputs_are_unchanged() -> None:

@@ -1,3 +1,4 @@
+# src/gridiron_edge/market/recommended_bet_result.py
 """Immutable recommended-bet results and deterministic issuance evaluation."""
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from gridiron_edge.market.recommendation_policy import (
     CorrelationExposureEvidence,
     PolicyCheckResult,
     PolicyCheckStatus,
+    PortfolioAllocationResult,
+    PortfolioAllocationState,
     PortfolioExposureSnapshot,
     RecommendationDecisionState,
     RecommendationPolicy,
@@ -31,7 +34,7 @@ from gridiron_edge.market.recommendation_policy import (
     validate_recommendation_policy,
 )
 
-RECOMMENDED_BET_RESULT_SCHEMA_VERSION: Final[int] = 2
+RECOMMENDED_BET_RESULT_SCHEMA_VERSION: Final[int] = 3
 
 
 class RecommendedBetResultState(StrEnum):
@@ -92,6 +95,7 @@ class RecommendedBetResult:
     recommendation_eligible: bool
     checks: tuple[PolicyCheckResult, ...]
     sizing: RecommendationSizingResult
+    allocation: PortfolioAllocationResult
     bankroll_basis: BankrollBasis | None
     portfolio_snapshot_id: str | None
     portfolio_observed_at: datetime | None
@@ -177,6 +181,7 @@ def build_recommended_bet_result(
         decision.recommendation_eligible,
         decision.checks,
         decision.sizing,
+        decision.allocation,
         bankroll,
         None if portfolio is None else portfolio.snapshot_id,
         None if portfolio is None else portfolio.observed_at,
@@ -256,6 +261,43 @@ def recommended_bet_result_id(result: RecommendedBetResult) -> str:
     return _digest(payload)
 
 
+def _validate_allocation_consistency(result: RecommendedBetResult) -> None:
+    """Require allocation state, reason, and amount to mutually agree.
+
+    Also requires allocation state to agree with recommendation
+    eligibility. Extracted from validate_recommended_bet_result to keep
+    that function's branch count under this project's complexity gate.
+    """
+    if result.result_state is RecommendedBetResultState.RECOMMENDED and (
+        not result.recommendation_eligible
+        or result.allocation.state is PortfolioAllocationState.NOT_EVALUATED
+    ):
+        raise ValueError(
+            "Recommended result requires eligibility and a completed allocation decision."
+        )
+    if result.allocation.state is PortfolioAllocationState.ALLOCATED and (
+        result.allocation.allocated_stake is None or result.allocation.allocated_stake <= 0
+    ):
+        raise ValueError("Allocated state requires a positive allocated stake.")
+    if (
+        result.allocation.state is PortfolioAllocationState.ZERO_ALLOCATION
+        and result.allocation.allocated_stake != 0.0
+    ):
+        raise ValueError("Zero-allocation state requires an allocated stake of exactly zero.")
+    if (
+        result.allocation.state is PortfolioAllocationState.NOT_EVALUATED
+        and result.allocation.allocated_stake is not None
+    ):
+        raise ValueError("Not-evaluated allocation state must not carry an allocated stake.")
+    if (
+        not result.recommendation_eligible
+        and result.allocation.state is not PortfolioAllocationState.NOT_EVALUATED
+    ):
+        raise ValueError(
+            "An ineligible recommendation must not carry a completed allocation decision."
+        )
+
+
 def validate_recommended_bet_result(result: RecommendedBetResult) -> None:
     """Validate identity, provenance, lifecycle, timestamps, and check ordering."""
     if result.schema_version != RECOMMENDED_BET_RESULT_SCHEMA_VERSION:
@@ -290,16 +332,15 @@ def validate_recommended_bet_result(result: RecommendedBetResult) -> None:
         result.decision_state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
     ):
         raise ValueError("Recommendation eligibility disagrees with decision state.")
-    if result.result_state is RecommendedBetResultState.RECOMMENDED and (
-        result.sizing.actionable_stake is None or not result.recommendation_eligible
-    ):
-        raise ValueError("Recommended result requires actionable stake and eligibility.")
+    _validate_allocation_consistency(result)
     if result.portfolio_snapshot_id is None and result.portfolio_observed_at is not None:
         raise ValueError("Portfolio observation requires a snapshot identity.")
 
 
 def _result_state(decision: RecommendationPolicyDecision) -> RecommendedBetResultState:
     if decision.state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE:
+        if decision.allocation.state is PortfolioAllocationState.NOT_EVALUATED:
+            return RecommendedBetResultState.UNAVAILABLE
         return RecommendedBetResultState.RECOMMENDED
     if decision.state is RecommendationDecisionState.QUALIFIED_OPPORTUNITY:
         return RecommendedBetResultState.QUALIFIED

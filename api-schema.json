@@ -4209,6 +4209,31 @@
         "title": "PolicyCheckStatus",
         "type": "string"
       },
+      "PortfolioAllocationReason": {
+        "description": "Stable, machine-readable cause for the allocation state.",
+        "enum": [
+          "recommendation_ineligible",
+          "allocation_evidence_unavailable",
+          "allocated",
+          "candidate_capacity_exhausted",
+          "game_capacity_exhausted",
+          "portfolio_capacity_exhausted",
+          "correlation_capacity_exhausted",
+          "below_minimum_actionable_stake"
+        ],
+        "title": "PortfolioAllocationReason",
+        "type": "string"
+      },
+      "PortfolioAllocationState": {
+        "description": "Whether portfolio allocation was evaluated, and if so, its outcome.",
+        "enum": [
+          "not_evaluated",
+          "allocated",
+          "zero_allocation"
+        ],
+        "title": "PortfolioAllocationState",
+        "type": "string"
+      },
       "PortfolioSplits": {
         "additionalProperties": false,
         "description": "ROI/record splits by a chosen dimension.",
@@ -5568,6 +5593,35 @@
         "title": "RecentResult",
         "type": "object"
       },
+      "RecommendationAllocationResponse": {
+        "additionalProperties": false,
+        "description": "Mechanical projection of one persisted portfolio-allocation outcome.",
+        "properties": {
+          "allocated_stake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Stake"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PortfolioAllocationReason"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PortfolioAllocationState"
+          }
+        },
+        "required": [
+          "state",
+          "reason"
+        ],
+        "title": "RecommendationAllocationResponse",
+        "type": "object"
+      },
       "RecommendationBankrollBasisResponse": {
         "additionalProperties": false,
         "description": "Persisted bankroll basis used by the original policy evaluation.",
@@ -5945,6 +5999,9 @@
         "additionalProperties": false,
         "description": "Mechanical read-only presentation of one persisted recommendation result.",
         "properties": {
+          "allocation": {
+            "$ref": "#/components/schemas/RecommendationAllocationResponse"
+          },
           "bankroll_basis": {
             "anyOf": [
               {
@@ -6081,6 +6138,7 @@
           "failed_checks",
           "unavailable_checks",
           "sizing",
+          "allocation",
           "offer_provenance",
           "forecast_provenance",
           "policy_provenance"

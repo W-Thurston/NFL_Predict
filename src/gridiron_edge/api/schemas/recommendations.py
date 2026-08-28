@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict
 
 from gridiron_edge.market.recommendation_policy import (
     PolicyCheckStatus,
+    PortfolioAllocationReason,
+    PortfolioAllocationState,
     RecommendationDecisionState,
 )
 from gridiron_edge.market.recommended_bet_result import RecommendedBetResultState
@@ -37,6 +39,16 @@ class RecommendationSizingResponse(BaseModel):
     constrained_stake: float | None = None
     rounded_stake: float | None = None
     actionable_stake: float | None = None
+
+
+class RecommendationAllocationResponse(BaseModel):
+    """Mechanical projection of one persisted portfolio-allocation outcome."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    state: PortfolioAllocationState
+    reason: PortfolioAllocationReason
+    allocated_stake: float | None = None
 
 
 class RecommendationBankrollBasisResponse(BaseModel):
@@ -120,6 +132,7 @@ class RecommendationPresentation(BaseModel):
     failed_checks: tuple[RecommendationCheckResponse, ...]
     unavailable_checks: tuple[RecommendationCheckResponse, ...]
     sizing: RecommendationSizingResponse
+    allocation: RecommendationAllocationResponse
     suggested_stake: float | None = None
     bankroll_basis: RecommendationBankrollBasisResponse | None = None
     portfolio_snapshot_id: str | None = None

@@ -29,6 +29,8 @@ from gridiron_edge.market.recommendation_policy import (
     PolicyDerivationReason,
     PolicyDerivationStatus,
     PolicyValueSource,
+    PortfolioAllocationReason,
+    PortfolioAllocationState,
     RecommendationDecisionState,
     RecommendationPolicy,
     RecommendationPolicyGovernance,
@@ -200,12 +202,16 @@ class TestEvaluateRecommendationsBankrollWiring:
     outcomes. Where practical, these assert on the actual persisted
     RecommendedBetEvaluation/Result objects, not stdout text."""
 
-    def test_empty_bankroll_history_preserves_insufficient_evidence(
+    def test_empty_bankroll_history_yields_eligible_recommendation_with_unevaluated_allocation(
         self, monkeypatch, tmp_path: Path
     ) -> None:
-        """No bankroll transactions at all -> bankroll_snapshot_as_of
-        (run for real, against an empty tmp_path ledger) returns None ->
-        bankroll=None -> existing missing-bankroll behavior is preserved."""
+        """No bankroll transactions at all -> bankroll_snapshot_as_of returns
+        None -> bankroll=None. Under the corrected Stage 1/Stage 2 model, this
+        candidate is still a genuinely eligible recommendation (bankroll is a
+        Stage 2 / allocation-evidence concern, not a Stage 1 / recommendation-
+        eligibility concern) -- but allocation itself could not be evaluated,
+        so the persisted result_state is UNAVAILABLE, not RECOMMENDED, and the
+        allocation axis explicitly records why."""
         monkeypatch.setattr(
             "gridiron_edge.core.settings.get_settings",
             lambda: _bankroll_wiring_settings(tmp_path),
@@ -219,8 +225,14 @@ class TestEvaluateRecommendationsBankrollWiring:
         evaluation: RecommendedBetEvaluation = written["evaluation"]
         assert len(evaluation.results) == 1
         wager_result = evaluation.results[0]
-        assert wager_result.decision_state is RecommendationDecisionState.INSUFFICIENT_EVIDENCE
+        assert wager_result.decision_state is RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
+        assert wager_result.recommendation_eligible
         assert wager_result.result_state is RecommendedBetResultState.UNAVAILABLE
+        assert wager_result.allocation.state is PortfolioAllocationState.NOT_EVALUATED
+        assert (
+            wager_result.allocation.reason
+            is PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE
+        )
         assert wager_result.bankroll_basis is None
 
     def test_pre_decision_deposit_supplies_exact_bankroll_basis(

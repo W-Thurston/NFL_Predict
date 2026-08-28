@@ -457,6 +457,36 @@ class RecommendationSizingResult:
     actionable_stake: float | None
 
 
+class PortfolioAllocationState(StrEnum):
+    """Whether portfolio allocation was evaluated, and if so, its outcome."""
+
+    NOT_EVALUATED = "not_evaluated"
+    ALLOCATED = "allocated"
+    ZERO_ALLOCATION = "zero_allocation"
+
+
+class PortfolioAllocationReason(StrEnum):
+    """Stable, machine-readable cause for the allocation state."""
+
+    RECOMMENDATION_INELIGIBLE = "recommendation_ineligible"
+    ALLOCATION_EVIDENCE_UNAVAILABLE = "allocation_evidence_unavailable"
+    ALLOCATED = "allocated"
+    CANDIDATE_CAPACITY_EXHAUSTED = "candidate_capacity_exhausted"
+    GAME_CAPACITY_EXHAUSTED = "game_capacity_exhausted"
+    PORTFOLIO_CAPACITY_EXHAUSTED = "portfolio_capacity_exhausted"
+    CORRELATION_CAPACITY_EXHAUSTED = "correlation_capacity_exhausted"
+    BELOW_MINIMUM_ACTIONABLE_STAKE = "below_minimum_actionable_stake"
+
+
+@dataclass(frozen=True, slots=True)
+class PortfolioAllocationResult:
+    """Final portfolio-allocation outcome, independent of recommendation eligibility."""
+
+    state: PortfolioAllocationState
+    reason: PortfolioAllocationReason
+    allocated_stake: float | None
+
+
 @dataclass(frozen=True, slots=True)
 class RecommendationPolicyDecision:
     """Deterministic immutable policy evaluation result."""
@@ -471,6 +501,7 @@ class RecommendationPolicyDecision:
     recommendation_eligible: bool
     checks: tuple[PolicyCheckResult, ...]
     sizing: RecommendationSizingResult
+    allocation: PortfolioAllocationResult
 
 
 def portfolio_exposure_snapshot(
@@ -497,18 +528,28 @@ def evaluate_recommendation_candidate(
     portfolio: PortfolioExposureSnapshot | None = None,
     correlation: CorrelationExposureEvidence | None = None,
 ) -> RecommendationPolicyDecision:
-    """Evaluate one exact immutable candidate without loading or mutating state."""
+    """Evaluate one exact immutable candidate without loading or mutating state.
+
+    Recommendation eligibility (Stage 1) is determined independently of
+    portfolio allocation (Stage 2). A zero allocation never demotes or
+    erases an established recommendation eligibility.
+    """
     validate_recommendation_policy(policy)
     decision = _require_utc(decision_at, label="decision_at")
     row = _resolve_candidate(issuance, candidate_reference_id)
     issuance_age = (issuance.evaluated_at - row.fetched_at).total_seconds()
     decision_age = (decision - row.fetched_at).total_seconds()
     family = _family_policy(policy, row.market)
-    checks: list[PolicyCheckResult] = []
-    checks.append(_issuance_check(row))
-    checks.append(_family_check(family))
 
     empty_sizing = RecommendationSizingResult(None, None, None, None, None, None)
+    not_evaluated = PortfolioAllocationResult(
+        PortfolioAllocationState.NOT_EVALUATED,
+        PortfolioAllocationReason.RECOMMENDATION_INELIGIBLE,
+        None,
+    )
+
+    # --- Stage 1: qualification and recommendation eligibility ---
+    checks: list[PolicyCheckResult] = [_issuance_check(row), _family_check(family)]
     if any(check.status is not PolicyCheckStatus.PASSED for check in checks):
         return RecommendationPolicyDecision(
             policy.policy_id,
@@ -521,20 +562,32 @@ def evaluate_recommendation_candidate(
             False,
             tuple(checks),
             empty_sizing,
+            not_evaluated,
         )
 
     thresholds = cast(EmpiricalQualificationThresholds, family.thresholds)
     checks.extend(_candidate_evidence_checks(row, issuance, decision, thresholds))
-    checks.append(_portfolio_check(portfolio, decision))
-    checks.append(_duplicate_check(candidate_reference_id, portfolio))
-    checks.append(_opposing_check(row, portfolio, policy.governance))
-    checks.append(_bankroll_check(bankroll, decision))
-    checks.append(_correlation_check(correlation, policy.governance))
 
-    if any(check.mandatory and check.status is not PolicyCheckStatus.PASSED for check in checks):
+    recommendation_check_ids = {
+        "candidate_issuance",
+        "market_family_policy",
+        "quote_freshness",
+        "expected_value_threshold",
+    }
+    recommendation_eligible = all(
+        check.status is PolicyCheckStatus.PASSED
+        for check in checks
+        if check.check_id in recommendation_check_ids
+    )
+    if not recommendation_eligible:
+        has_failure = any(
+            check.status is PolicyCheckStatus.FAILED
+            for check in checks
+            if check.check_id in recommendation_check_ids
+        )
         state = (
             RecommendationDecisionState.UNQUALIFIED
-            if any(check.status is PolicyCheckStatus.FAILED for check in checks)
+            if has_failure
             else RecommendationDecisionState.INSUFFICIENT_EVIDENCE
         )
         return RecommendationPolicyDecision(
@@ -548,9 +601,54 @@ def evaluate_recommendation_candidate(
             False,
             tuple(checks),
             empty_sizing,
+            not_evaluated,
         )
 
-    sizing, sizing_checks = _size_candidate(
+    # Recommendation eligibility is now established and FROZEN. Nothing
+    # below this point may change `state` away from RECOMMENDATION_ELIGIBLE
+    # or `recommendation_eligible` away from True.
+
+    # --- Stage 2: portfolio evidence and allocation ---
+    checks.append(_portfolio_check(portfolio, decision))
+    checks.append(_duplicate_check(candidate_reference_id, portfolio))
+    checks.append(_opposing_check(row, portfolio, policy.governance))
+    checks.append(_bankroll_check(bankroll, decision))
+    checks.append(_correlation_check(correlation, policy.governance))
+
+    allocation_evidence_ready = all(
+        check.status is PolicyCheckStatus.PASSED
+        for check in checks
+        if check.mandatory
+        and check.check_id
+        in {
+            "portfolio_snapshot",
+            "exact_duplicate",
+            "opposing_position",
+            "bankroll_basis",
+            "correlation_evidence",
+        }
+    )
+    if not allocation_evidence_ready:
+        allocation = PortfolioAllocationResult(
+            PortfolioAllocationState.NOT_EVALUATED,
+            PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE,
+            None,
+        )
+        return RecommendationPolicyDecision(
+            policy.policy_id,
+            candidate_reference_id,
+            row.market,
+            decision,
+            issuance_age,
+            decision_age,
+            RecommendationDecisionState.RECOMMENDATION_ELIGIBLE,
+            True,
+            tuple(checks),
+            empty_sizing,
+            allocation,
+        )
+
+    sizing, allocation, sizing_checks = _size_candidate(
         row=row,
         governance=policy.governance,
         bankroll=cast(BankrollBasis, bankroll),
@@ -558,27 +656,7 @@ def evaluate_recommendation_candidate(
         correlation=correlation,
     )
     checks.extend(sizing_checks)
-    eligible = (
-        all(not check.mandatory or check.status is PolicyCheckStatus.PASSED for check in checks)
-        and sizing.actionable_stake is not None
-    )
-    qualification_check_ids = {
-        "candidate_issuance",
-        "market_family_policy",
-        "quote_freshness",
-        "expected_value_threshold",
-    }
-    qualification_passed = all(
-        check.status is PolicyCheckStatus.PASSED
-        for check in checks
-        if check.check_id in qualification_check_ids
-    )
-    if eligible:
-        state = RecommendationDecisionState.RECOMMENDATION_ELIGIBLE
-    elif qualification_passed:
-        state = RecommendationDecisionState.QUALIFIED_OPPORTUNITY
-    else:
-        state = RecommendationDecisionState.UNQUALIFIED
+
     return RecommendationPolicyDecision(
         policy.policy_id,
         candidate_reference_id,
@@ -586,10 +664,11 @@ def evaluate_recommendation_candidate(
         decision,
         issuance_age,
         decision_age,
-        state,
-        eligible,
+        RecommendationDecisionState.RECOMMENDATION_ELIGIBLE,
+        True,
         tuple(checks),
         sizing,
+        allocation,
     )
 
 
@@ -802,12 +881,19 @@ def _size_candidate(
     bankroll: BankrollBasis,
     portfolio: PortfolioExposureSnapshot,
     correlation: CorrelationExposureEvidence | None,
-) -> tuple[RecommendationSizingResult, tuple[PolicyCheckResult, ...]]:
+) -> tuple[RecommendationSizingResult, PortfolioAllocationResult, tuple[PolicyCheckResult, ...]]:
     if row.model_probability is None or row.american_price is None:
         unavailable = PolicyCheckResult(
             "kelly_sizing", True, PolicyCheckStatus.UNAVAILABLE, "kelly_inputs_missing"
         )
-        return RecommendationSizingResult(None, None, None, None, None, None), (unavailable,)
+        empty_sizing = RecommendationSizingResult(None, None, None, None, None, None)
+        allocation = PortfolioAllocationResult(
+            PortfolioAllocationState.NOT_EVALUATED,
+            PortfolioAllocationReason.ALLOCATION_EVIDENCE_UNAVAILABLE,
+            None,
+        )
+        return empty_sizing, allocation, (unavailable,)
+
     full = kelly_fraction(row.model_probability, row.american_price)
     fractional = full * governance.fractional_kelly_multiplier
     raw = bankroll.amount * fractional
@@ -817,28 +903,66 @@ def _size_candidate(
     game_stake = sum(row_.stake for row_ in active if row_.game_id == row.game_id)
     portfolio_stake = sum(row_.stake for row_ in active)
     correlation_stake = 0.0 if correlation is None else correlation.existing_stake
-    capacities = (
-        bankroll.amount * governance.maximum_candidate_bankroll_fraction,
-        max(bankroll.amount * governance.maximum_game_bankroll_fraction - game_stake, 0.0),
-        max(
-            bankroll.amount * governance.maximum_portfolio_bankroll_fraction - portfolio_stake, 0.0
-        ),
-        max(bankroll.amount * governance.maximum_game_bankroll_fraction - correlation_stake, 0.0),
+
+    candidate_capacity = bankroll.amount * governance.maximum_candidate_bankroll_fraction
+    game_capacity = max(
+        bankroll.amount * governance.maximum_game_bankroll_fraction - game_stake, 0.0
     )
+    portfolio_capacity = max(
+        bankroll.amount * governance.maximum_portfolio_bankroll_fraction - portfolio_stake, 0.0
+    )
+    correlation_capacity = max(
+        bankroll.amount * governance.maximum_game_bankroll_fraction - correlation_stake, 0.0
+    )
+    capacities = (candidate_capacity, game_capacity, portfolio_capacity, correlation_capacity)
+
     constrained = min(raw, *capacities)
     increment = governance.stake_increment
     if governance.stake_rounding is StakeRoundingMode.DOWN:
         rounded = math.floor(constrained / increment) * increment
     else:
         rounded = math.floor(constrained / increment + 0.5) * increment
-    actionable = rounded if rounded >= governance.minimum_actionable_stake else None
-    status = PolicyCheckStatus.PASSED if actionable is not None else PolicyCheckStatus.FAILED
+
+    if rounded >= governance.minimum_actionable_stake and rounded > 0:
+        allocation_reason = PortfolioAllocationReason.ALLOCATED
+        allocation_state = PortfolioAllocationState.ALLOCATED
+        allocated_stake = rounded
+    else:
+        allocation_state = PortfolioAllocationState.ZERO_ALLOCATION
+        allocated_stake = 0.0
+        # Identify the specific binding cause, in the same precedence
+        # order the capacities were computed above -- the first exhausted
+        # capacity that actually constrained `raw` below the minimum.
+        if candidate_capacity < governance.minimum_actionable_stake and candidate_capacity == min(
+            capacities
+        ):
+            allocation_reason = PortfolioAllocationReason.CANDIDATE_CAPACITY_EXHAUSTED
+        elif (
+            game_capacity == min(capacities) and game_capacity < governance.minimum_actionable_stake
+        ):
+            allocation_reason = PortfolioAllocationReason.GAME_CAPACITY_EXHAUSTED
+        elif (
+            portfolio_capacity == min(capacities)
+            and portfolio_capacity < governance.minimum_actionable_stake
+        ):
+            allocation_reason = PortfolioAllocationReason.PORTFOLIO_CAPACITY_EXHAUSTED
+        elif (
+            correlation_capacity == min(capacities)
+            and correlation_capacity < governance.minimum_actionable_stake
+        ):
+            allocation_reason = PortfolioAllocationReason.CORRELATION_CAPACITY_EXHAUSTED
+        else:
+            allocation_reason = PortfolioAllocationReason.BELOW_MINIMUM_ACTIONABLE_STAKE
+
+    # kelly_sizing now reports whether allocation completed at all (not
+    # whether it was positive) -- a real zero is a completed decision,
+    # not a failed check.
     checks = (
         PolicyCheckResult(
             "kelly_sizing",
             True,
-            status,
-            "stake_actionable" if actionable is not None else "stake_not_actionable",
+            PolicyCheckStatus.PASSED,
+            "allocation_evaluated",
             raw,
             governance.minimum_actionable_stake,
         ),
@@ -848,7 +972,7 @@ def _size_candidate(
             PolicyCheckStatus.PASSED,
             "candidate_capacity_applied",
             constrained,
-            capacities[0],
+            candidate_capacity,
         ),
         PolicyCheckResult(
             "game_exposure",
@@ -875,9 +999,11 @@ def _size_candidate(
             bankroll.amount * governance.maximum_game_bankroll_fraction,
         ),
     )
-    return RecommendationSizingResult(
-        full, fractional, raw, constrained, rounded, actionable
-    ), checks
+    sizing = RecommendationSizingResult(
+        full, fractional, raw, constrained, rounded, allocated_stake
+    )
+    allocation = PortfolioAllocationResult(allocation_state, allocation_reason, allocated_stake)
+    return sizing, allocation, checks
 
 
 def _validate_exposure_row(row: PortfolioExposureRow, *, observed_at: datetime) -> None:

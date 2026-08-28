@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from gridiron_edge.api.schemas.recommendations import (
+    RecommendationAllocationResponse,
     RecommendationBankrollBasisResponse,
     RecommendationCheckResponse,
     RecommendationForecastProvenanceResponse,
@@ -61,6 +62,11 @@ def serialize_recommendation_result(
             constrained_stake=result.sizing.constrained_stake,
             rounded_stake=result.sizing.rounded_stake,
             actionable_stake=result.sizing.actionable_stake,
+        ),
+        allocation=RecommendationAllocationResponse(
+            state=result.allocation.state,
+            reason=result.allocation.reason,
+            allocated_stake=result.allocation.allocated_stake,
         ),
         suggested_stake=result.sizing.actionable_stake,
         bankroll_basis=(
