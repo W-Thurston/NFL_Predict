@@ -1,217 +1,203 @@
-## HANDOFF.md — Workstream 3 (First Complete Vertical Decision Slice)
+### HANDOFF.md — Workstream 3 (First Complete Vertical Decision Slice)
 
-> Compressed rehydration only. This file restates the program-level goal
-> and the current honest state against it — it does not re-derive
-> evidence. Full evidence lives in FINDINGS.md; full program authority
-> lives in the root ROADMAP.md, VISION.md, and CONSTITUTION.md.
+Compressed rehydration only. This file restates the program-level goal
+and the current honest state against it. Full boundary evidence lives in
+FINDINGS.md. The durable exit proof lives in
+TEN_OBLIGATION_PROOF_MATRIX.md. Program authority remains in the root
+ROADMAP.md, VISION.md, CONSTITUTION.md, and DECISIONS.md.
 
-### Status: IMPLEMENTATION IN PROGRESS. Units 1-4 of 7 closed. Unit 5 (spread-slice supersession and invalidation proof) active.
+#### Status: COMPLETE. All seven implementation units are closed. All ten first-slice obligations are proven end to end for one controlled game-spread subject.
 
-### The one thing a new thread must never lose: WHY this workstream exists
+#### The one thing a new thread must never lose: why this workstream exists
 
 **Goal:** exercise all ten of VISION.md's first-slice proof obligations
 for one market.
 
 **Exit criterion:** every one of the ten obligations is demonstrated end
-to end for the chosen market (game spread, locked; moneyline fallback
-only).
+to end for the chosen market.
 
-### Why this workstream opened before Workstream 2 fully closed
+The chosen market remained game spread. The durable proof uses one
+controlled `2026_01_KC_LAC` home-spread subject and production writers,
+readers, validators, identity owners, cutoff semantics, recommendation
+evaluation, portfolio allocation, and decision-quality evaluation.
 
-WS2 closed all seven planned units but carries two capabilities forward
-(D35: general validity/invalidation beyond one field; D36: forward-impact
-discoverability, no mechanism selected). Boundary inspection (closed)
-found no new evidence for either. Obligation 8 (later observation can
-supersede/invalidate downstream artifacts) requires its own dedicated
-implementation unit (Unit 5, now active) — it is not being carried
-forward indefinitely. D36 remains correctly deferred pending a concrete
-forward-impact consumer need, which has not appeared.
+#### Exit determination
 
-### Boundary inspection (closed; full detail in FINDINGS.md)
+**Workstream 3 is complete.**
 
-All five boundaries closed. All ten obligations carry an explicit,
-source-confirmed disposition. Four obligations (6, 7, 8, 10) were
-confirmed to have a component genuinely missing, not merely
-under-evidenced — this became the implementation roadmap below.
+`TEN_OBLIGATION_PROOF_MATRIX.md` records the exact artifact or response,
+canonical identity or path, evidence cutoff, method or policy identity,
+expected and observed state, temporal meaning, and verification test for
+each obligation.
 
-### Implementation units closed so far
+The integration proof is owned by:
 
-**Unit 1 — Reproducible decision-time bankroll evidence.** Added
-`betting/bankroll.py::bankroll_snapshot_as_of`, a cutoff-scoped,
-content-identified bankroll evidence derivation, wired into
-`cli/production_chain.py::evaluate_recommendations_cmd` (the sole
-production caller of `evaluate_recommendation_issuance`). Hardened
-`_write_txn_log` to atomic publication. Confirmed reproducible for a
-fixed ledger state; does not claim immutable historical reproduction
-independent of ledger concurrency-safety (deferred, no confirmed need).
-Two full review rounds; three real bugs caught only by test execution
-(wall-clock-dependent test timing, an invalid Settings test double, a
-test fixture with the wrong market string). Closed with all gates green.
+```text
+tests/integration/market/test_spread_vertical_slice_proof.py
+```
 
-**Unit 2 — Separate recommendation eligibility from portfolio
-allocation.** The existing evaluator coupled eligibility to allocation
-amount (`eligible = (...) and sizing.actionable_stake is not None`),
-making "eligible recommendation, zero allocation" structurally
-unrepresentable. Added `PortfolioAllocationState`/`Reason`/`Result` as an
-independent axis; restructured `evaluate_recommendation_candidate` into
-explicit Stage 1 (recommendation eligibility, frozen once established)
-and Stage 2 (portfolio allocation) phases. Bumped
-`RECOMMENDED_BET_RESULT_SCHEMA_VERSION` 2→3 (clean-sheet replace, per
-established precedent). Two design options were considered and rejected
-before implementation (reusing `QUALIFIED_OPPORTUNITY` as the zero-proof;
-manufacturing zero via `minimum_actionable_stake=0`) — both would have
-preserved the coupling rather than fixing it. A full review round after
-initial implementation found and required four additional corrections
-(sizing.actionable_stake was silently overloaded to carry a zero-
-allocation amount; the evidence-gate conflated real policy rejections
-with genuine evidence gaps; validation checked amounts but not reasons/
-cross-consistency; the new axis was never projected through the API).
-Closed with all gates green, including a live-server discovery (stale
-schema-2 data correctly rejected by the strict decoder — resolved by
-regenerating, not migrating).
+Its deterministic evidence builders are owned by:
+
+```text
+tests/fixtures/spread_vertical_slice.py
+```
+
+The proof contains ten obligation tests plus one cross-cutting canonical
+path and embedded-identity test. Focused execution completed with all 11
+tests passing. The established Python quality gates also passed and all
+tests are green.
+
+#### Why the proof is controlled and real-store-backed
+
+A local runtime inspection found a strict-reader-valid current-product
+spread lineage and a genuine policy abstention. The proposed product,
+forecast, issuance, policy, recommendation-evaluation, result, and
+current-selection artifacts were not Git-tracked. They were therefore
+rejected as durable proof dependencies.
+
+The final proof constructs a deterministic temporary repository from
+checked-in fixtures. Source values are controlled, while every durable
+artifact is written and read through its production persistence owner.
+All domain states and identities are produced by production evaluators
+and identity functions. The proof therefore reproduces in CI and a clean
+checkout without depending on a developer's local `data/output` tree.
+
+#### Boundary inspection
+
+All five boundaries closed before implementation began. Every one of the
+ten obligations received a source-confirmed disposition. Four
+obligations had a genuinely missing component rather than merely missing
+test evidence:
+
+- Obligation 6 lacked complete production recommendation composition and
+  truthful presentation across the governed action boundary.
+- Obligation 7 could not represent an independently eligible
+  recommendation with a completed zero allocation.
+- Obligation 8 had only one narrow validity case and needed a second
+  concrete supersession or recomputation proof.
+- Obligation 10 lacked a persisted decision-quality evaluation separate
+  from realized outcome.
+
+The seven implementation units closed those gaps without introducing a
+general downstream impact index.
+
+#### Completed implementation sequence
+
+**Unit 1 — Reproducible decision-time bankroll evidence.** Added a
+cutoff-scoped, content-identified bankroll evidence derivation and wired
+it into the governed recommendation writer. Hardened transaction-log
+publication with atomic replacement. Preserved the bounded limitation
+that this does not claim immutable historical reproduction independent
+of ledger concurrency safety.
+
+**Unit 2 — Eligible recommendation and explained-zero portfolio proof.**
+Separated recommendation eligibility from portfolio allocation. Added
+stable allocation state, reason, and amount evidence. Made positive
+allocation, completed zero allocation, and genuinely unavailable
+allocation evidence distinct. Bumped the recommended-bet result schema
+to 3 under the project's clean-sheet replacement policy.
 
 **Unit 3 — Governed recommendation presentation and action separation.**
-Corrected `recommendationPresentation.ts` to consume `decision_state` and
-`allocation` alongside `result_state` (the function predated Unit 2's
-schema change and had a real, live correctness gap: `result_state`
-alone conflated genuine insufficient-evidence with an eligible
-recommendation whose allocation simply hadn't been evaluated, and
-conflated positive allocation with genuine zero allocation). Wired the
-correction through `GameDetail.tsx`, `EdgesTable.tsx`, and
-`BetLegCard.tsx`. The action boundary (add-to-slip label, `WhyLink`
-subject selection, `BetLegCard`'s sub-heading) is gated on **positive
-completed allocation specifically**, not on mere persisted-result
-presence — an earlier draft used presence alone and could have labeled a
-failed, zero-allocated, or allocation-pending result as an executable
-recommendation. A second review round, during verification, found and
-required this correction plus a **retroactive Unit 2 backend defect**:
-`evaluate_recommendation_candidate`'s evidence-gate had grouped real
-policy rejections (exact-duplicate, opposing-position) with genuine
-evidence gaps, making two `PortfolioAllocationReason` enum values
-unreachable dead code. Fixed as part of this unit, not deferred, since it
-was required to make the presented reasons truthful. **Scope decision:**
-manual-wager execution mode (follow vs. override) is presentation-only in
-this unit — a manually-staged leg retains `persistedRecommendation`
-identically to a governed-staged leg; no new field records which action
-label was used. Closed with all gates green, including 5 new
-component-level tests covering all five recommendation states.
+Updated recommendation presentation to consume decision state and
+allocation alongside result state. Gated governed action language on a
+positive completed allocation rather than persisted-result presence.
+Corrected the backend evidence gate so exact-duplicate and opposing-
+position outcomes remain completed zero-allocation conclusions rather
+than being misclassified as missing evidence.
 
 **Unit 4 — Decision-quality evaluation contract and first spread
-evaluation.** Extracted one shared realized-outcome grader
-(`market/candidate_outcome.py::grade_candidate_outcome`) and migrated
-every consumer, including one discovered only by a pre-edit repository
-search (`evaluation/historical_backtest.py`) — confirming the value of
-searching before moving ownership rather than editing blind. Added a
-new, independently persisted, schema-versioned `DecisionQualityEvaluation`
-(`market/decision_quality.py`, `market/decision_quality_store.py`)
-assessing one recommendation decision's cross-artifact consistency,
-separate from prediction accuracy and realized outcome, with realized
-outcome recorded as an identity-bearing but decision-status-independent
-field.
+evaluation.** Added one shared candidate outcome grader and a persisted,
+schema-versioned decision-quality evaluation. The evaluator verifies
+result integrity, parent recommendation relationship, policy reference,
+candidate reference, and optional allocation replay. Realized outcome is
+identity-bearing but does not determine decision status.
 
-Four full review rounds preceded a working, closed implementation — each
-found real architectural or correctness gaps, not stylistic preferences.
-Round one corrected an initial overclaim that a persisted result alone
-could independently verify referenced-artifact content (it can only
-prove recorded internal consistency, not that a referenced policy or
-issuance genuinely still exists and matches). Round two corrected a
-fabricated `recommendation_evaluation_id` (was `candidate_reference_id`,
-a different identity entirely), an internally invalid three-family policy
-test fixture, optional-check aggregation that silently ignored a
-completed contradictory replay, an ungrounded outcome literal in the
-separation test, and duplicated identity/validation logic. Round three
-found the evaluator never validated the artifact it constructed before
-returning it, that a "trusted parent evaluation" was accepted on a
-two-line check while the test fixture used a fabricated parent ID, and
-that replay-disagreement was tested only through the private aggregator,
-never an actual disagreeing replay through the public evaluator — all
-three corrected, including adding a new public
-`validate_recommended_bet_evaluation` (validating every child result and
-every parent identity field) shared by both `recommended_bet_result_store.py`
-and `decision_quality.py`, removing the store's former private duplicate
-entirely. Round four found `decision_quality_evaluation_id` was described
-as a canonical identity owner but only hashed whatever payload a caller
-independently constructed in three separate places — corrected so the
-function accepts the evaluation object directly and is the only real
-owner — plus a market/side validation-ordering bug in the now-public
-grader (an unsupported market was only rejected when scores happened to
-be supplied, not unconditionally).
+**Unit 5 — Spread-slice supersession and invalidation proof.** Added a
+second concrete validity case for game spread. A T1 quote produces a
+positive-EV candidate. A later T2 quote in the same declared comparison
+scope produces an explicit negative-EV non-candidate. Both source
+observations and both issuance artifacts remain preserved, and the T1
+decision remains reproducible after T2 exists. This satisfies obligation
+8 without a speculative general forward-impact index.
 
-A real, repeating pattern across this unit, worth naming directly: each
-time a validation rule was correctly tightened (digest format, composite
-identity format, exact check order), an existing test fixture using the
-older, looser placeholder value broke — three consecutive times, each
-traced to real pytest output and corrected in the fixture, not the
-validator. This confirms the validators were doing real, load-bearing
-work throughout, not decorative checks that happened to pass. Closed with
-all gates green, including a canonical game-spread proof case (real
-computed parent-manifest identity, not a placeholder) and both
-persistence failure paths (hard-link and temporary-write) covered.
+**Unit 6 — Scoped ownership and naming cleanup.** Completed the bounded
+ownership and lasting-language cleanup required before the final proof.
+Temporary implementation-sequence naming was not allowed to become a
+lasting production or test contract. Optional broad renaming and the
+remaining out-of-scope `field-status` cleanup were not made prerequisites
+for closure.
 
-### Governing decisions relevant to this workstream
+**Unit 7 — End-to-end ten-obligation proof matrix.** Added one controlled,
+real-store-backed vertical-slice integration proof and the durable
+matrix. The proof persists two candidate issuances, two recommendation
+policies, three recommendation evaluations and results, and two
+pre/post-outcome decision-quality evaluations. Canonical paths and
+embedded identities are verified through public owners.
 
-All of Workstream 1 and Workstream 2 (D27, D30-D37) remain in force.
-None were reopened. No new numbered `DECISIONS.md` entry was required by
-Units 1-4 — each closed as a direct, evidence-driven correction of an
-already-locked contract, not a new architectural choice; if this changes
-in a future unit, record it there, not here.
+#### Final obligation status
 
-### Process note (carried here per reviewer guidance, not duplicated in each unit's PLAN closure)
+1. Mutable source observation preserved without overwrite — **Proven**.
+2. Time-valid analytical claim consumes an exact source version —
+   **Proven**.
+3. Estimated output includes uncertainty or limitation — **Proven**.
+4. Market price remains separate from prediction — **Proven**.
+5. Analytical edge does not automatically become a recommendation —
+   **Proven**.
+6. Recommendation policy can recommend or abstain — **Proven**.
+7. Portfolio policy can allocate zero despite eligibility — **Proven**.
+8. Later observation can supersede or invalidate downstream artifacts —
+   **Proven** through an explicit row-owned recomputation outcome.
+9. Original decision remains reproducible — **Proven**.
+10. Realized outcome and decision-quality evaluation remain separate —
+    **Proven**.
 
-Prefer complete, self-contained replacement blocks over prose-described
-edits for any change spanning more than a few contiguous lines,
-especially for TSX/JSX. A described transform ("replace the return block
-with...") has twice produced unusable output in this workstream — once
-as a request for content that was never actually pasted into the visible
-response, once as a genuine unbalanced-brace syntax error from an
-ambiguous edit boundary. Paste-and-confirm the complete result; verify
-brace/paren balance against the full current file before running gates.
-Unit 4 surfaced a related pattern worth naming alongside it: after
-correctly tightening a validation rule, re-check every existing fixture
-that exercises the validated path, not only the ones the current change
-directly touches — three consecutive fixture breaks in one unit came from
-skipping this step.
+#### Governing decisions and carried-forward scope
 
-### Remaining implementation sequence (unchanged from original sequencing; Units 1-4 closed)
+All Workstream 1 and Workstream 2 decisions D27 and D30-D37 remain in
+force. Workstream 3 did not reopen them.
 
-5. Spread-slice supersession and invalidation proof — **active.** Tests
-   D35 against a second real case; closes obligation 8 or forces an
-   explicit program-level exit-criterion decision. Do not build a
-   forward-impact index or generalized invalidation mechanism
-   speculatively — if this unit reveals a genuine need to query all
-   downstream dependents, that becomes the evidence required to revisit
-   D36, not an assumption made ahead of it.
-6. Scoped ownership and naming cleanup — the bounded low-priority items
-   named in FINDINGS.md Boundary 5 (schema-literal replacements, stale
-   docstrings, naming risks), folded in wherever a unit naturally touches
-   the file, plus the manual-wager execution-mode follow-up from Unit 3
-   if the program requires it recorded.
-7. End-to-end ten-obligation proof matrix using real, verified artifacts
-   — the unit that allows Workstream 3 to close honestly against its
-   exit criterion.
+D36, general forward-impact discoverability, remains deferred. Unit 5
+and Unit 7 prove the exact bounded chain they construct, but they do not
+implement discovery of every arbitrary downstream dependent. No
+concrete consumer requirement emerged that justified a general impact
+index.
 
-### Updated obligation status (deltas from boundary-inspection baseline; full table in FINDINGS.md)
+The following also remain outside Workstream 3's closure claim:
 
-- **Obligation 6** (recommend or abstain): domain logic — Reuse
-  (unchanged). Production composition — no longer Blocked (Units 1-2).
-  Presentation — no longer Adapt (Unit 3).
-- **Obligation 7** (portfolio can allocate zero despite eligible
-  recommendation): no longer Blocked — Unit 2 proved this directly (a
-  real eligible-recommendation-with-zero-allocation case, from genuine
-  capacity exhaustion, confirmed by test).
-- **Obligation 8** (later observation can supersede/invalidate
-  downstream artifacts): unchanged, Partial (WS2 D31, one field, one
-  artifact) — **Unit 5, now active, is the dedicated unit to test this
-  against a second real case.**
-- **Obligation 10** (realized outcome and decision-quality evaluation
-  remain separate): **no longer Absent for its decision-quality half** —
-  Unit 4 added `DecisionQualityEvaluation`, a persisted, schema-versioned
-  cross-artifact consistency assessment proven separate from realized
-  outcome via a real pre/post-outcome test. The prediction-quality/
-  realized-outcome/evidence-availability separation (the other confirmed
-  Reuse half of this obligation) was already established pre-Workstream-3.
+- complete five-level transparency across the full composed application;
+- the remaining out-of-scope `field-status` files;
+- an advanced portfolio correlation model;
+- generalized validity lifecycle machinery across all artifact families;
+- proof for moneyline, total, props, or other market families.
 
-### Reading order for a new thread (per AI_BOOTSTRAP.md)
+#### Durable evidence and reproduction
 
-Root `HANDOFF.md` → this file → root `PLAN.md` → root `DECISIONS.md` →
-(only if evidence-level detail is needed) `FINDINGS.md`.
+Read in this order when evidence-level detail is needed:
+
+```text
+docs/workstreams/first_vertical_slice/TEN_OBLIGATION_PROOF_MATRIX.md
+tests/integration/market/test_spread_vertical_slice_proof.py
+tests/fixtures/spread_vertical_slice.py
+```
+
+Focused proof:
+
+```bash
+uv run pytest \
+  tests/integration/market/test_spread_vertical_slice_proof.py \
+  -v
+```
+
+Established Python quality gates:
+
+```bash
+uv run ruff check . --fix \
+&& uvx pyrefly check \
+&& uv run pytest -m "unit and not slow"
+```
+
+#### Reading order for a new thread
+
+Root HANDOFF.md → this file → root PLAN.md → root DECISIONS.md →
+TEN_OBLIGATION_PROOF_MATRIX.md → FINDINGS.md only if boundary-level
+evidence is needed.

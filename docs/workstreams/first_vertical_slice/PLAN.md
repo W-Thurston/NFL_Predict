@@ -2,87 +2,92 @@
 
 Exactly ONE active unit. Future units live in ROADMAP.md, not here.
 
-### Unit — Scoped ownership and naming cleanup
-
-#### Completed
-
-Removed the empty, unreferenced
-`models/game_prediction/prediction_availability.py`; retained the actual
-owners in `prediction_policy.py` and `availability.py`.
-
-Renamed the analytical edge-report module from
-`market/recommendations.py` to `market/edge_report.py` and migrated all
-checked-in imports, exports, tests, and schema documentation. Renamed the
-Line Shopping visible-offer helper and local presentation vocabulary
-from governed-recommendation language to model-selected terminology
-while preserving generated backend wire-field names.
-
-Tightened `recordWager.ts` so recommendation provenance is emitted only
-when result, evaluation, candidate-reference, and policy identities are
-all nonempty; incomplete provenance emits all four identities as null.
-
-Removed the two remaining live "Unit 24" docstrings while retaining
-historical planning and decision references. Replaced decision-quality's
-generic positive policy-schema check with exact
-`RECOMMENDATION_POLICY_SCHEMA_VERSION` compatibility.
+### Unit — End-to-end ten-obligation proof matrix
 
 #### Goal
 
-Fold in wherever not already naturally resolved by Units 1-5: remove
-`prediction_availability.py` after import-safety verification; correct
-model-side recommendation vocabulary; tighten wager-recording
-completeness; remove remaining live "Unit 24" wording; replace the policy
-schema literal; and decide the optional analytical module rename from
-current evidence.
+Verify one real game-spread case against all ten obligations, not merely
+trust accumulated unit tests. Produce a durable proof matrix: for each
+obligation, the artifact or response proving it, its exact ID or path,
+evidence cutoff, relevant method or policy identity, verification
+command or test, expected state, and whether the proof is historical or
+latest-current.
 
-#### Files Added/Removed/Changed
+This unit allows Workstream 3 to close only if every obligation is
+demonstrated end to end for the same exact spread slice. Existing tests,
+documents, and artifacts may provide evidence, but no obligation is
+accepted solely because an earlier unit claimed it was complete.
 
-- Removed
-  `src/gridiron_edge/models/game_prediction/prediction_availability.py`.
-- Renamed `src/gridiron_edge/market/recommendations.py` to
-  `src/gridiron_edge/market/edge_report.py` and renamed its owning test.
-- Renamed `visibleRecommendedOffer.ts` and its test to
-  `visibleModelSelectedOffer.ts`; updated Line Shopping, game-card, CSS,
-  and test consumers.
-- Changed `frontend/src/components/betslip/recordWager.ts` and its tests.
-- Changed `src/gridiron_edge/market/decision_quality.py` and its store
-  tests.
-- Changed live loader/fixture docstrings and migrated edge-report imports,
-  exports, and generated schema references.
+#### Locked proof discipline
 
-#### Tests
+- Use one exact game-spread slice throughout the matrix. Record the
+  season, week, game ID, provider, provider event ID, sportsbook, market,
+  side, line, American price, quote observation time, evidence cutoff,
+  product ID/run ID, issuance ID, candidate-reference ID, policy ID,
+  recommendation-evaluation ID, result ID, and decision-quality
+  evaluation ID wherever those values exist.
+- Distinguish exact artifact identity from descriptive scope. A season,
+  week, game, market, or sportsbook is not a substitute for a persisted
+  content identity.
+- Distinguish historical proof from latest-current proof explicitly.
+  Never reconstruct a historical claim from newer repository state.
+- Record the command that verifies every matrix row and the expected
+  machine-readable result. A prose statement without a repeatable
+  verification path is insufficient.
+- Open and validate every referenced persisted artifact. File existence,
+  directory presence, newest modification time, and copied identifiers
+  are insufficient.
+- Follow relationships through their owning public validators and
+  resolvers. Do not duplicate identity payloads or perform string-only
+  relationship checks in the proof.
+- Use existing production owners wherever they satisfy an obligation.
+  Add no new domain machinery merely to make the matrix visually
+  complete.
+- If an obligation cannot be proven, mark it OPEN with the exact missing
+  artifact, status, relationship, or command. Do not reinterpret the
+  obligation downward.
+- D35 and D36 remain governed by their accepted decisions. This unit may
+  surface a concrete revisit trigger, but must not declare either
+  capability solved without an implemented and verified mechanism.
+- Do not use unit-numbered production names, fixture names, IDs, or test
+  names.
 
-Focused backend tests:
+#### Required durable deliverables
 
-`uv run pytest ...`
+1. A checked-in proof matrix under
+   `docs/workstreams/first_vertical_slice/`.
+2. One executable integration or end-to-end proof that validates the
+   matrix's load-bearing relationships against real persisted artifacts
+   or a controlled repository containing artifacts written through the
+   real stores.
+3. Exact commands for reproducing every proof row.
+4. Updated `HANDOFF.md`, `ROADMAP.md`, and any conformance or obligation
+   registry whose status changes.
+5. A final explicit Workstream 3 exit determination:
+   - CLOSED: all ten obligations proven for the exact slice; or
+   - OPEN: named obligations remain unproven, with their exact missing
+     evidence and next owner.
 
-201 passed.
+#### Status
 
-Focused frontend tests:
+**Canonical architecture locked: controlled real-store-backed spread
+proof; implementation in progress.**
 
-`npm --prefix frontend test -- --run ...`
+Local runtime inspection found a strict-reader-valid current-product
+spread lineage and a genuine policy abstention, but none of the proposed
+product, forecast, issuance, policy, recommendation-evaluation, or result
+artifacts are tracked by Git. They therefore cannot be durable proof
+dependencies in CI or a clean checkout.
 
-33 passed.
+The proof will construct one deterministic `2026_01_KC_LAC` home-spread
+lineage in a temporary repository through production writers, readers,
+validators, evaluators, identity owners, and cutoff semantics. The same
+subject will be evaluated in explicitly named contexts for active-policy
+recommendation, unavailable-policy abstention, eligible zero allocation,
+later-observation recomputation, historical replay, and pre/post-outcome
+decision quality.
 
-Full backend quality gates:
+Planned durable outputs:
 
-`uv run ruff check . --fix && uvx pyrefly check && uv run pytest -m "unit and not slow"`
-
-[record actual result]
-
-Full frontend quality gates:
-
-`npm --prefix frontend test -- --run && npm --prefix frontend run build`
-
-[record actual result]
-
-#### Acceptance
-
-The dead prediction-availability module is removed with zero consumers
-remaining. Analytical edge-report and Line Shopping ownership use
-lasting terminology distinct from governed recommendations. Wager
-recording cannot emit a partial recommendation identity chain. Live
-development-era "Unit 24" wording is absent from source and tests.
-Decision-quality accepts only the recommendation-policy schema it
-actually understands. Generated contracts and all checked-in consumers
-use the renamed owners. Focused and full backend/frontend gates pass.
+- `tests/integration/market/test_spread_vertical_slice_proof.py`
+- `docs/workstreams/first_vertical_slice/TEN
